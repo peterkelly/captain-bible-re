@@ -103,6 +103,20 @@ inside the Microsoft C low-level I/O routines. The trace supports the names
 `libc_lowio_open` (`0xDB1C`), `libc_lowio_read` (`0xDCC0`), and
 `libc_lowio_write` (`0xDD9E`).
 
+### Live decoded effect capture
+
+For an independent codec check, launched QEMU with the same visible Cocoa
+display and silent audio devices, plus its GDB remote stub. A breakpoint at
+physical `0xA499` stopped Captain Bible at `0627:4229`, after `D003.ABT` had
+been decoded and immediately before its state was submitted to interrupt
+`66h`.
+
+The state at `DS:A0DE` pointed to `5A45:0000` and declared 9,064 samples at
+9,000 Hz. The 9,064-byte physical-memory dump from `0x5A450` exactly matches
+the independently implemented ABT decoder. Both have SHA-256
+`ca97ad22acf3cc39d078b619168fa026deb1606082999bfb8b9a1aac4957422b`.
+The dedicated audio-format chapter records the codec and conversion tool.
+
 ## Main container correlation
 
 Startup first opens and closes `DD1.DAT` through normal stream setup, then

@@ -204,6 +204,25 @@ variables, and implement absolute jumps, calls, and returns. The dedicated
 scene-bytecode chapter documents the complete structural schema, startup
 sequence, mixed code/data regions, inspection tool, and QEMU memory check.
 
+## Digital effects and XMIDI music
+
+Opcode `0x57` passes an effect number and rate to `0x417F`. That routine
+formats `D###.ABT`, loads it from the archive, allocates the decoded sample
+count from the first word, calls the built-in decoder at `0x92E0`, and submits
+the resulting PCM state to the DIGPAK interface on interrupt `66h`.
+
+The decoder implements absolute samples, run-length commands, and packed
+one-, two-, or four-bit adaptive delta blocks. Its helpers at `0x93BE`,
+`0x94CB`, and `0x956E` add signed table deltas to the preceding sample and
+clamp to unsigned eight-bit PCM. All 41 resources decode exactly to 412,282
+samples at 9,000 Hz. A QEMU breakpoint immediately before playback captured
+`D003.ABT`'s live 9,064-byte buffer; it is byte-identical to the host decoder.
+
+Music function `0x4091` chooses `MUS###.XMI` or `IBM###.XMI`. All 32 resources
+are IFF/XMIDI files with `FORM XDIR`, one `INFO` sequence count, `CAT XMID`,
+and one `FORM XMID` containing `TIMB` and `EVNT`. The audio-format chapter
+documents both formats and their reproducible tools.
+
 ## High-confidence function map
 
 | Load offset | Name |
@@ -213,6 +232,9 @@ sequence, mixed code/data regions, inspection tool, and QEMU memory check.
 | `0x3A64` | `bin_read_cstring_offset` |
 | `0x4001` | `load_palette_resource` |
 | `0x4091` | `play_music_resource` |
+| `0x4155` | `release_sound_effect_buffer` |
+| `0x417F` | `play_sound_effect_resource` |
+| `0x4235` | `stop_sound_effect` |
 | `0x451B` | `execute_bin_commands` |
 | `0x5F92` | `export_game_text` |
 | `0x6631` | `initialize_scene` |
@@ -229,6 +251,9 @@ sequence, mixed code/data regions, inspection tool, and QEMU memory check.
 | `0x8D79` | `update_mouse_state` |
 | `0x8E0A` | `detect_mouse` |
 | `0x90D4` | `detect_video_adapter` |
+| `0x92D0` | `abt_get_sample_rate` |
+| `0x92E0` | `decode_abt` |
+| `0x93BE` / `0x94CB` / `0x956E` | Decode packed ABT delta blocks |
 | `0x97D0` | `archive_load_member` |
 | `0x99AB` | `archive_lookup_member` |
 | `0x9BEF` | `archive_read_raw_member` |

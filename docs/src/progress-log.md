@@ -1832,3 +1832,258 @@ decoder, Rizin, mdBook, generated-page, and whitespace checks. All 34 tests
 passed in 1.267 seconds. The direct probe decoded `01 FF 34 12` as a
 `load_art` operand of kind `string_offset`, value `0x1234`, and displayed it as
 `@0x1234`. Confirmed both new command-line tools retain executable file modes.
+
+## 2026-07-15: Audio resource formats
+
+### Remaining-format inventory
+
+After the user asked work to continue, reported that the next pass would
+classify the unresolved audio and text-bearing resources, correlate sound
+loads with the executable, and turn stable findings into tools, tests, and
+book documentation.
+
+Confirmed the working tree was clean after commit `b6c50df`, reread
+`PLAN.md`, the file inventory, the `DD1.DAT` chapter, and the archive listing.
+Used `DD1Archive` to group every expanded member by extension and print the
+names, sizes, and first 24 bytes of the unclassified groups.
+
+Results:
+
+- The 33 extensionless members are translation-specific Bible text. Names
+  begin with `T`, `R`, `N`, or `K`, and their payloads visibly start with
+  verse references followed by `|`-delimited prose.
+- All 21 `MAP` members are 768 bytes.
+- The 32 `XMI` members start with `FORM`, `XDIR`, and `INFO` IFF identifiers.
+  There are 16 `MUS###` and 16 `IBM###` resources.
+- The 41 `ABT` members share a compact binary header and contain 205,513
+  expanded bytes.
+
+Ran `file` and `ffprobe` on representative `MUS001.XMI` and `D003.ABT` files.
+`file` recognized XMI only as generic IFF and misidentified ABT as GeoSwath
+RDF. `ffprobe` rejected both. These host heuristics were recorded but not used
+as format evidence.
+
+Searched existing documentation and executable strings for `ABT`, `XMI`,
+`MUS`, `IBM`, DIGPAK, and MIDPAK references. The executable templates are
+`MUS000.XMI` at load offset `0xF1DA` and `D000.ABT` at `0xF1E6`.
+An initial Rizin command used `/ ABT`, which is not valid in the installed
+Rizin version and printed search-command help. Switched to data-offset and
+function inspection rather than treating that failed search as a result.
+
+### Digital-effect loader and decoder
+
+Saved focused disassembly in ignored files:
+
+```text
+build/analysis/audio-xrefs.txt
+build/analysis/audio-functions.txt
+build/analysis/digital-audio-loader.txt
+build/analysis/abt-decoder.txt
+build/analysis/audio-opcode-handlers.txt
+```
+
+The critical path is:
+
+- Scene opcode `0x57` reads a byte and word and calls `0x417F`.
+- `0x417F` writes the effect number into `D000.ABT`, stops and releases the
+  previous effect, loads the archive member, reads its first word as the
+  decoded allocation size, calls far routine `0x92E0`, constructs the DIGPAK
+  playback state, and submits it through the interrupt `66h` wrapper at
+  `0x8F2E`.
+- `0x4235` stops active digital playback and releases its allocation.
+- `0x92D0` returns the word at resource offset 2.
+- `0x92E0` is the complete ABT decoder, with packed-delta helpers at
+  `0x93BE`, `0x94CB`, and `0x956E`.
+
+Translated the decoder into a temporary Python probe. The nine-byte header is
+decoded sample count, sample rate, delta-block output count, codec byte,
+auxiliary word, and initial sample. The main stream has absolute-sample,
+run-length, and adaptive packed-delta commands. The three helpers expand one-,
+two-, and four-bit codes most-significant bits first, add signed table values,
+and clamp each new sample to 0 through 255.
+
+Ran the probe against every ABT member. All 41 files decode to their declared
+length and consume their compressed bytes exactly. Header values are 9,000 Hz,
+32 samples per delta block, and codec identifier 2 in every member. The
+decoder ignores the auxiliary word; its population is 128 in 35 files, 32 in
+four, 64 in one, and 320 in one.
+
+The complete output is 412,282 unsigned eight-bit samples, approximately
+45.809 seconds. The stream uses 71,094 absolute commands, 1,699 runs, 2,125
+one-bit blocks, 1,185 two-bit blocks, and 6,533 four-bit blocks.
+
+Enumerated all scene opcode `0x57` operands with `inspect_bin`. Nonzero
+effects range from 1 through 41, and every nonzero invocation supplies rate
+9,000. Several scenes use operands `0, 0` to stop playback. This connects the
+script schema directly to `D001.ABT` through `D041.ABT`.
+
+### XMI container and event structure
+
+Inspected `MUS001.XMI` with `xxd` and a temporary recursive IFF walker. Its
+complete structure is:
+
+```text
+FORM XDIR
+  INFO
+CAT  XMID
+  FORM XMID
+    TIMB
+    EVNT
+```
+
+Repeated the walker across all 32 files. IFF lengths are big endian, `INFO`
+contains little-endian sequence count 1, every catalog contains exactly one
+`FORM XMID`, and each form contains `TIMB` followed by `EVNT`. `TIMB` is an
+even-length series of patch/bank byte pairs.
+
+Implemented a temporary XMIDI event parser. It sums sub-`0x80` delay bytes,
+handles fixed-size channel events, reads the duration after each note-on,
+handles variable-length system-exclusive and meta payloads, and stops on
+`FF 2F 00`. Eleven EVNT chunks retain one zero byte after end-of-track.
+Across the archive, the streams contain 7,087 events, including 6,608 notes,
+and the TIMB chunks contain 173 pairs.
+
+### QEMU decoded-PCM capture
+
+Reported that QEMU would be used for an independent runtime codec check with
+its visible Cocoa display and silent audio backend. Launched a snapshot-backed
+copy of the persistent disk with the debugger paused:
+
+```sh
+qemu-system-i386 \
+  -name 'Captain Bible ABT capture' \
+  -machine pc -accel tcg -cpu pentium -m 16 -boot c \
+  -drive file=build/captain-bible/captain-bible.img,format=raw,\
+if=ide,index=0,media=disk,snapshot=on \
+  -vga std \
+  -audiodev none,id=audio0 \
+  -device sb16,audiodev=audio0 \
+  -device adlib,audiodev=audio0 \
+  -display cocoa,zoom-to-fit=on \
+  -monitor unix:build/qemu-trace/audio-monitor.sock,server=on,wait=off \
+  -gdb tcp:127.0.0.1:1234 -S
+```
+
+The first LLDB batch attempt set a breakpoint at physical `0xA499` and hit
+`0627:4229`, but the batch client disconnected after `continue` and allowed
+the guest to resume before the buffer could be dumped. Stopped that QEMU
+instance, relaunched it, and kept LLDB connected interactively.
+
+At the same breakpoint, immediately before the interrupt `66h` playback call,
+the registers included `CS=0627`, `EIP=4229`, `DS=14E1`, and `EAX=A0DE`.
+Reading physical `0x1EEEE`, which corresponds to `DS:A0DE`, returned:
+
+```text
+0000 5A45 2368 79EC 14E1 2328 FFFF 0000
+```
+
+This state contains decoded buffer `5A45:0000`, sample count `0x2368` (9,064),
+callback `14E1:79EC`, and rate `0x2328` (9,000). Used LLDB to write 9,064 bytes
+from physical `0x5A450` to ignored file
+`build/qemu-trace/d003-live.pcm`, then detached and terminated QEMU cleanly.
+
+Compared the live bytes with the temporary host decoder. Both are 9,064 bytes,
+are byte-for-byte equal, and have SHA-256:
+
+```text
+ca97ad22acf3cc39d078b619168fa026deb1606082999bfb8b9a1aac4957422b
+```
+
+Reported this result to the user. It independently validates every ABT command
+family used by `D003.ABT`, including packed bit order, signed delta tables,
+clamping, and output length.
+
+### Reproducible audio tools
+
+Added executable `tools/convert_abt.py`. It translates the executable's codec,
+checks all bounds and exact input consumption, prints header and command
+statistics, and optionally writes standard unsigned eight-bit mono WAV.
+
+Added executable `tools/inspect_xmi.py`. It recursively validates IFF sizes,
+padding, XDIR counts, XMID form and chunk order, TIMB pairs, event boundaries,
+durations, variable-length quantities, end-of-track, and zero padding.
+
+Added `tests/test_audio_formats.py`, backed directly by `CB/DD1.DAT`. Tests
+cover all 41 ABT resources, the QEMU-validated D003 PCM hash, WAV properties,
+ABT truncation and trailing data, all 32 XMI resources, MUS001 event counts,
+and damaged XMI structures.
+
+The first focused test run had six passes and one error. The whole-XMI test
+rejected a high-bit channel parameter in `MUS016.XMI`. Inspection found the
+deliberate event sequence `B1 00 FF`, alongside similar controller setup for
+other channels. The temporary parser had already accepted it because fixed
+event sizes make the boundary unambiguous. Removed the generic MIDI seven-bit
+parameter restriction from the repository validator, preserving the supplied
+XMIDI bytes, and repeated the run. All seven audio tests passed.
+
+Exercised both command-line paths:
+
+```sh
+tools/convert_abt.py \
+  build/dd1/all/306_D003.ABT --output build/audio/d003.wav
+tools/inspect_xmi.py build/dd1/all/267_MUS001.XMI
+file build/audio/d003.wav
+ffprobe -v error \
+  -show_entries stream=codec_name,sample_rate,channels,duration \
+  -of default=noprint_wrappers=1 build/audio/d003.wav
+```
+
+The ABT tool reports 9,064 samples, rate 9,000, duration 1.007 seconds, and all
+five command families. `file` and `ffprobe` independently recognize the output
+as mono unsigned eight-bit PCM at 9,000 Hz. The XMI tool reports one sequence,
+12 timbres, 446 events, 432 notes, eight meta events, and additive delay 3,016
+for `MUS001.XMI`.
+
+### Audio documentation and symbols
+
+Added `docs/src/audio-formats.md` and linked it from `SUMMARY.md`. Updated the
+README with ABT-to-WAV and XMI inspection examples, the static chapter with
+the loader and decoder path, the dynamic chapter with the live QEMU buffer,
+and the scene-bytecode chapter with opcodes `0x57` and `0x58`.
+
+Named the effect loader, stop/release paths, ABT header helper, main decoder,
+and three packed-delta helpers in `analysis/cb.rz`. Added corresponding names
+for opcodes `0x57` and `0x58` in `tools/inspect_bin.py`. Marked ABT/XMI format
+recovery and reproducible audio tooling complete in `PLAN.md`; the broader
+format task remains open because text and map families still need dedicated
+passes.
+
+The first full verification run passed all source and documentation checks but
+Rizin reported `Failed to run script 'analysis/cb.rz'`. The initial `aaa` pass
+did not define every ABT helper as a function, so `afn` could not rename one of
+the new offsets. Added explicit `af` commands for `0x4155`, `0x417F`, `0x4235`,
+`0x92D0`, `0x92E0`, `0x93BE`, `0x94CB`, and `0x956E` before assigning names.
+
+### Audio-pass verification
+
+Repeated the complete verification after the symbol-script correction:
+
+```sh
+python3 -m unittest discover -s tests -v
+python3 -m py_compile tools/*.py tests/*.py
+bash -n run.sh tools/build_qemu_dos_trace.sh
+tools/convert_abt.py \
+  build/dd1/all/306_D003.ABT \
+  --output build/audio/final-d003.wav \
+  > build/audio/d003-summary.txt
+tools/inspect_xmi.py build/dd1/all/267_MUS001.XMI \
+  > build/audio/mus001-summary.txt
+rizin -q -b 16 -a x86 -e scr.color=false \
+  -i analysis/cb.rz \
+  -c 'afl~sound_effect; afl~abt_; afl~decode_abt; q' \
+  build/analysis/CB_UNPACKED.EXE \
+  > build/audio/audio-symbols.txt
+mdbook build docs
+test -f build/docs-book/audio-formats.html
+git diff --check
+rg -n '[[:blank:]]+$' \
+  docs/src/audio-formats.md tests/test_audio_formats.py \
+  tools/convert_abt.py tools/inspect_xmi.py
+git status --short
+```
+
+All 41 tests passed in 1.298 seconds. Every Python source compiled, both shell
+scripts parsed, both audio CLIs completed, and Rizin listed all eight new
+effect/ABT symbols at their intended offsets. mdBook generated the audio
+chapter. Tracked and new files have no whitespace errors. The audio-pass
+changes remain uncommitted pending a requested checkpoint.

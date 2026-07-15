@@ -175,6 +175,30 @@ blocks, so those regions require explicit `--start` and `--limit` values. The
 mdBook scene-bytecode chapter describes the interpreter, command schema,
 startup sequence, QEMU memory correlation, and currently identified opcodes.
 
+## Inspecting audio resources
+
+The 41 `ABT` members are compressed 9,000 Hz unsigned eight-bit mono sound
+effects. Inspect one or convert it to a standard WAV file with:
+
+```sh
+tools/convert_abt.py build/dd1/all/306_D003.ABT
+tools/convert_abt.py \
+  build/dd1/all/306_D003.ABT \
+  --output build/audio/d003.wav
+```
+
+The 32 `XMI` members are one-sequence IFF/XMIDI music resources. Validate and
+summarize their containers, timbres, and event streams with:
+
+```sh
+tools/inspect_xmi.py build/dd1/all/267_MUS001.XMI
+```
+
+Both tools reject structural inconsistencies and consume their inputs exactly.
+The mdBook audio chapter documents the formats, executable decoder, and a
+byte-for-byte comparison between host-decoded `D003.ABT` and its live QEMU
+PCM buffer.
+
 ## QEMU DOS-call tracing
 
 Run the game with the QEMU TCG tracer and monitor socket enabled:

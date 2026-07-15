@@ -86,6 +86,8 @@ OPCODE_NAMES = {
     0x4D: "load_palette",
     0x52: "play_music",
     0x55: "snapshot_state",
+    0x57: "play_sound_effect",
+    0x58: "stop_sound_effect",
     0x6D: "load_palette",
     0x70: "unload_last_art",
 }

@@ -88,6 +88,8 @@ control-flow behavior:
 | `0x4D` | `z` | `load_palette` | Calls `load_palette_resource`, which appends `.PAL`. |
 | `0x52` | `B` | `play_music` | Builds `MUS###` or `IBM###` and loads an XMI member. |
 | `0x55` | none | `snapshot_state` | Copies the live state into a retained buffer. |
+| `0x57` | `BH` | `play_sound_effect` | Builds `D###.ABT`, decodes it, and starts playback at the supplied rate. |
+| `0x58` | none | `stop_sound_effect` | Stops active digital playback and releases its PCM buffer. |
 | `0x6D` | `z` | `load_palette` | Uses the same palette-loading path as `0x4D`. |
 | `0x70` | none | `unload_last_art` | Releases the most recently loaded art slot. |
 

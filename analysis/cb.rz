@@ -12,6 +12,12 @@ afn bin_read_u16 @ 0x3a30
 afn bin_read_cstring_offset @ 0x3a64
 afn load_palette_resource @ 0x4001
 afn play_music_resource @ 0x4091
+af @ 0x4155
+afn release_sound_effect_buffer @ 0x4155
+af @ 0x417f
+afn play_sound_effect_resource @ 0x417f
+af @ 0x4235
+afn stop_sound_effect @ 0x4235
 afn execute_bin_commands @ 0x451b
 afn initialize_scene @ 0x6631
 afn update_scene_threads @ 0x7997
@@ -35,6 +41,16 @@ afn hide_mouse_cursor @ 0x8d5d
 afn update_mouse_state @ 0x8d79
 afn detect_mouse @ 0x8e0a
 afn detect_video_adapter @ 0x90d4
+af @ 0x92d0
+afn abt_get_sample_rate @ 0x92d0
+af @ 0x92e0
+afn decode_abt @ 0x92e0
+af @ 0x93be
+afn abt_decode_1bit_delta_block @ 0x93be
+af @ 0x94cb
+afn abt_decode_2bit_delta_block @ 0x94cb
+af @ 0x956e
+afn abt_decode_4bit_delta_block @ 0x956e
 
 afn archive_load_member @ 0x97d0
 afn archive_lookup_member @ 0x99ab
