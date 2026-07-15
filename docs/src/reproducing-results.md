@@ -144,14 +144,16 @@ tools/convert_abt.py \
   build/dd1/all/306_D003.ABT \
   --output build/audio/d003.wav
 tools/inspect_xmi.py build/dd1/all/267_MUS001.XMI
+tools/inspect_midpak_ad.py CB/SOUND.4
 tools/inspect_text_resources.py \
   CB/DD1.DAT --data-dir CB \
   --translation N --bank A --record 0
 ```
 
 The audio decoder covers all 41 ABT members; the XMI parser covers all 32 music
-members. The text inspector covers every translation and bank pairing. Their
-chapters record the live PCM and QEMU-export comparisons.
+members; and the timbre inspector validates all 181 installed OPL patches. The
+text inspector covers every translation and bank pairing. Their chapters
+record the live PCM and QEMU-export comparisons.
 
 ## 8. Inspect saves and mutable state
 
@@ -176,9 +178,10 @@ Launch the visible QEMU session with the game-filtered DOS-call plugin:
 ./run.sh --trace-dos
 ```
 
-The dynamic-analysis chapter documents generated paths, deterministic segment
-assumptions, the preserved startup hashes, and known QEMU register-access
-limitations. This is an interactive capture, not part of the fast test suite.
+The dynamic-analysis and sound-driver chapters document generated paths,
+deterministic segment assumptions, preserved startup hashes, live AX capture,
+and the `int 21h`/`int 66h` record formats. This is an interactive capture, not
+part of the fast test suite.
 
 ## 10. Run the complete noninteractive verification
 

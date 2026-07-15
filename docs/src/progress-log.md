@@ -4978,3 +4978,242 @@ new chapters, checker, and checker tests. Added this success record to the same
 checkpoint. The first post-commit message audit found body line 12 was 73
 characters, one over the repository limit. Rewrapped that sentence, amended
 again, and then verified every message line and the clean worktree.
+
+## 2026-07-15: DIGPAK/MIDPAK ABI and timbre library
+
+### Static interrupt inventory
+
+Continued with the last concrete static-analysis gap: the bundled third-party
+sound layer. Began from clean commit `26a7275` and inspected PLAN, README, the
+audio/dynamic chapters, `run.sh`, `tools/qemu_dos_trace.c`, the current symbol
+map, and the installed sound files. Reported to the user that this slice would
+map every game-side `int 66h`, inspect `SOUND.1` through `SOUND.4`, extend the
+QEMU tracer without enabling host audio, and reconcile static and live calls.
+
+The principal read-only commands included:
+
+```sh
+git status --short
+git log -5 --oneline
+file CB/SOUND.{1,2,3,4}
+stat -f '%z %N' CB/SOUND.{1,2,3,4,5}
+shasum -a 256 CB/SOUND.{1,2,3,4,5}
+strings -a CB/SOUND.1
+strings -a CB/SOUND.3
+sed -n '1,120p' CB/SETSOUND.BAT
+rizin -q -b 16 -e scr.color=false \
+  -c 'aaa' -c '/x cd66' build/analysis/CB_UNPACKED.EXE
+```
+
+Rizin found exactly 34 literal `CD 66` sites. Precise `pD` views and raw `xxd`
+checks mapped 31 small wrappers, a driver-detection routine, and the DIGPAK and
+MIDPAK bootstrap calls. The API families are `AX=0688h..0697h` and
+`AX=0701h..0710h`. The game-owned high-level calls now have an exact chain:
+ABT decode, DIGPAK `068A` preformat, DIGPAK `068B` playback; and XMI load,
+MIDPAK `0704` registration, MIDPAK `0702` sequence playback.
+
+The installer batch independently maps `soundrv.com`, `midpak.adv`,
+`tmidpak.com`, and `midpak.ad` to `SOUND.1` through `SOUND.4`. File strings
+identify DIGPAK Sound Blaster 16 version 3.40 and the MIDPAK/Miles components.
+The five sound-file SHA-256 values remain those in the inventory; the first
+four sizes are 4,824, 16,263, 13,312, and 3,622 bytes.
+
+Consulted the Ralf Brown Interrupt List pages for INT 66 and each service used
+by the game. These supply the contemporary service names, input registers,
+return values, capability bits, and the 12-byte SNDSTRUC definition. Reported
+the interim result to the user: the 34 sites split cleanly between the two
+published service families. This external lookup corrected provisional names
+such as “play decoded PCM” to the API's exact preformat/play pair.
+
+### Tracer extension and visible captures
+
+The existing plugin recognized only `CD 21`, inferred only AH, and did not log
+result registers. A first large `apply_patch` attempt failed atomically because
+its expected context included a duplicate function-09 branch that was not
+actually present. Re-read the complete source and applied the change in small
+hunks. The plugin now recognizes interrupt 21h and 66h, distinguishes the
+vector in each record, retains complete inferred AX as a fallback, counts DOS
+and driver calls separately, and pairs each call with its vector.
+
+Built and syntax-checked it with:
+
+```sh
+tools/build_qemu_dos_trace.sh build/qemu-trace/qemu_dos_trace.so
+bash -n run.sh tools/build_qemu_dos_trace.sh
+git diff --check
+```
+
+Started `./run.sh --trace-dos` in a PTY. The requested Cocoa window was visible
+with `zoom-to-fit=on`; `-audiodev none` kept host audio silent. After eight
+seconds, the first trace had 27,027 calls, including 26,832 driver calls. The
+large count was mostly the game's status loops running under deliberately slow
+one-instruction translation blocks. Sent `quit` through
+`build/qemu-trace/monitor.sock` with `nc -U` and confirmed QEMU exited zero.
+
+That run revealed an implementation detail rather than a game error. The
+register list included EAX, but the plugin still printed its fallback header.
+QEMU uses opaque handle value zero for the first x86 register; the plugin's
+ordinary null-handle guard therefore mistook valid EAX for absence. Entry AX
+was still correct via inference, but return AX was unavailable. Added an
+explicit `have_eax` flag and an unchecked accessor for the known-present EAX
+descriptor.
+
+Rebuilt and started a second visible, silent capture. The header then stated
+that AX was live, DOS version entry showed `AX=3017`, and driver returns became
+meaningful. The bounded run recorded MIDPAK registration/play/status and both
+DIGPAK idle and playing states. It contained 20,609 calls: 180 DOS and 20,429
+driver. Its temporary trace hash was
+`cd4412e02b5100684c196c1f773ef10368c73d39cbcbade11d26fb56da428cba`.
+The next run intentionally replaced this ignored artifact.
+
+Extended return records with BX, CX, DX, SI, DI, DS, and ES. Stored input AX in
+the pending call and, for service `068C`, read the returned `BX:CX` ID string.
+The third visible capture directly produced:
+
+```text
+CALL ... pc=0627:ABED int=66 AX=068C ...
+RET  ... from=0627:ABED int=66 AX=0FC1 BX=2E88 CX=010C ...
+         result="Sound Blaster 16"
+```
+
+Stopped it through the monitor after two seconds. QEMU again exited zero. The
+current ignored trace has SHA-256
+`ae9d9b5952171f35d9dff8a75548e399a15fb01ee27d4058b2800891766404a6`
+and 8,003 calls: 159 DOS and 7,844 driver. It captured two identical capability
+queries, successful `0710` driver load, ABT preformat/play, stop calls, and
+both DIGPAK status results. Every captured driver return had carry clear.
+
+### `SOUND.4` format recovery
+
+Used a short read-only Python `struct` probe to interpret the start of
+`SOUND.4` as repeated `<BBI` records. It found 181 entries, `FF FF` at
+`0x43E`, and first data at `0x440`. IDs are bank-zero patches 0 through 127,
+then bank-`0x7F` percussion patches 35 through 87. Every absolute offset is 14
+bytes after the previous one, and the final record ends at the exact 3,622-byte
+file boundary.
+
+Web search located OPL3BankEditor's AIL global-timbre-library support. Cloned
+the repository read-only to `/tmp/opl3bankeditor` and inspected pinned commit
+`992008e2edbaabcd8809df6be6bc91925597f1a9`:
+
+```sh
+git clone --depth 1 \
+  https://github.com/Wohlstand/OPL3BankEditor.git \
+  /tmp/opl3bankeditor
+sed -n '1,430p' \
+  /tmp/opl3bankeditor/src/FileFormats/format_ail2_gtl.cpp
+```
+
+Its structure recovered from Miles AIL source explains every byte: six-byte
+patch/bank/offset directory entries, a two-byte record length, signed
+transpose or percussion note, five modulator OPL registers, feedback/
+connection, and five carrier registers. All Captain Bible records are the
+14-byte two-operator form.
+
+Added executable `tools/inspect_midpak_ad.py` with strict directory, identity,
+offset, length, and whole-file validation. Added three focused tests covering
+the exact 128/53 population, first and last boundaries, OPL field regression,
+missing terminator, and bad length. The first test run failed because the test
+expectation accidentally included the transpose byte in the five-byte
+modulator tuple. The parser output was correct; fixed the expected bytes and
+all three tests passed.
+
+### Symbols and documentation
+
+Added 31 API wrapper names and `detect_digpak_driver` to `analysis/cb.rz` and
+`analysis/symbol-map.tsv`. The first Rizin invocation used a single semicolon-
+separated `-c` string that this Rizin version rejected. A later script load
+also failed because newly named offsets had not all been explicitly declared
+as functions. Added `af` declarations, reran the normal `-i analysis/cb.rz`
+workflow, and resolved all 32 new functions with no stderr. The catalog now
+contains 175 symbols: 140 functions, 26 handlers, and 9 data; 82 are Verified
+and 93 High. Audio is now the largest subsystem with 41 named entries.
+
+Added `sound-drivers.md` with installed-file identities, both ABI tables,
+SNDSTRUC, bootstrap and playback sequences, live trace evidence, and the exact
+AIL timbre layout. Linked it from SUMMARY, the audio chapter, README, and the
+reproduction guide. Updated Dynamic Analysis for live AX and both traced
+vectors, removed the resolved sound gap, corrected all current symbol counts,
+and marked the PLAN sound-driver task complete.
+
+One claim-audit `rg` command included Markdown backticks inside a double-quoted
+shell string; Bash attempted to execute `21h` and printed
+`/bin/bash: 21h: command not found`. The read-only search still completed, but
+repeated the search safely and recorded the quoting failure here. A combined
+documentation patch also failed atomically because its Dynamic Analysis
+context did not match exact line wrapping. Applied the updates in smaller
+verified patches.
+
+Focused verification passed:
+
+```sh
+python3 -m unittest \
+  tests.test_midpak_ad tests.test_inspect_symbol_map -v
+tools/inspect_symbol_map.py
+rizin -q -b 16 -e scr.color=false -i analysis/cb.rz \
+  -c fl build/analysis/CB_UNPACKED.EXE \
+  > build/analysis/cb-flags.txt
+tools/inspect_symbol_map.py \
+  --rizin-flags build/analysis/cb-flags.txt
+tools/check_documentation.py
+mdbook build docs
+test -f build/docs-book/index.html
+git diff --check
+```
+
+All seven focused tests passed, Rizin emitted no errors, catalog/script/flag
+coverage matched, documentation integrity passed, mdBook built the new
+chapter, and Git found no whitespace errors.
+
+### Full sound-layer validation
+
+Ran the complete repository verification after the focused checks:
+
+```sh
+python3 -m unittest discover -s tests -v
+python3 -m py_compile tools/*.py tests/*.py
+tools/check_documentation.py
+tools/inspect_symbol_map.py \
+  --rizin-flags build/analysis/cb-flags.txt \
+  > build/analysis/final-sound-symbols.txt
+bash -n run.sh tools/build_qemu_dos_trace.sh
+tools/build_qemu_dos_trace.sh \
+  build/qemu-trace/qemu_dos_trace.so
+mdbook build docs
+test -f build/docs-book/index.html
+test -f build/docs-book/sound-drivers.html
+git diff --check
+```
+
+All 104 tests passed in 4.300 seconds. Every Python source compiled; the
+checker reported 23 chapters plus README; the 175-entry catalog and Rizin
+flags remained synchronized; both shell scripts parsed; the C plugin rebuilt
+without warnings; mdBook generated the new sound-driver chapter; both HTML
+checks passed; and Git found no whitespace errors. The remaining PLAN work is
+interactive input/save tracing, representative major-screen exercise, and the
+user's normal-exit confirmation. This sound-driver slice is deliberately left
+uncommitted until the user asks for a checkpoint.
+
+A final C review noticed that `trace_interrupt` called the EAX accessor before
+checking `have_eax`; harmless on the tested i386 target but unsafe for the
+documented fallback path. Made initialization conditional, normalized the EAX/
+EBX branch formatting, rebuilt the plugin without warnings, reran the
+23-chapter documentation check and mdBook build, and repeated
+`git diff --check`. All passed.
+
+### Sound-driver checkpoint
+
+The user requested a commit. Rechecked the complete 18-path worktree with
+`git status --short` and `git diff --check`, reran the documentation checker,
+and audited the 175-entry symbol catalog. The checker again reported 23
+chapters plus README, the symbol audit succeeded, and no whitespace errors
+were present. Reviewed the change statistics and prepared one detailed commit
+covering the tracer, static symbols, AIL inspector and tests, book chapter,
+PLAN/README reconciliation, and this append-only log.
+
+Created commit `0b34759` with subject
+`audio: Recover DIGPAK and MIDPAK interfaces`. Git recorded 846 insertions and
+83 deletions across 18 files, including the executable timbre inspector, its
+tests, and the sound-driver chapter. Appended this success record, staged only
+the progress log, and amended the same checkpoint so the working tree would
+remain a single coherent commit.

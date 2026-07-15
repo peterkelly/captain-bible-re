@@ -18,6 +18,7 @@
 - [World Maps](world-maps.md)
 - [Unibot and Endgame Progression](endgame.md)
 - [Audio Formats](audio-formats.md)
+- [Sound Drivers and MIDPAK Timbres](sound-drivers.md)
 - [Text Resource Formats](text-formats.md)
 - [Save-Game Formats](save-formats.md)
 - [Known Gaps and Evidence Boundaries](known-gaps.md)

@@ -11,6 +11,7 @@
 QEMU_PLUGIN_EXPORT int qemu_plugin_version = QEMU_PLUGIN_VERSION;
 
 struct register_handles {
+    struct qemu_plugin_register *eax;
     struct qemu_plugin_register *ebx;
     struct qemu_plugin_register *ecx;
     struct qemu_plugin_register *edx;
@@ -25,6 +26,8 @@ struct register_handles {
 
 struct pending_call {
     bool active;
+    uint8_t vector;
+    uint16_t ax;
     uint64_t sequence;
     uint16_t cs;
     uint16_t ip;
@@ -37,22 +40,21 @@ static GHashTable *return_addresses;
 static FILE *trace_file;
 static GMutex trace_lock;
 static uint64_t call_count;
+static uint64_t dos_call_count;
+static uint64_t driver_call_count;
+static bool have_eax;
 static bool have_cs_filter;
 static uint16_t cs_filter;
 static bool have_start_filter;
 static uint16_t start_ip;
 static bool tracing_active;
 
-static uint64_t read_register(struct qemu_plugin_register *handle)
+static uint64_t read_register_handle(struct qemu_plugin_register *handle)
 {
     GByteArray *bytes;
     uint64_t value = 0;
     size_t count;
     size_t index;
-
-    if (handle == NULL) {
-        return 0;
-    }
 
     bytes = g_byte_array_new();
     if (!qemu_plugin_read_register(handle, bytes)) {
@@ -66,6 +68,14 @@ static uint64_t read_register(struct qemu_plugin_register *handle)
     }
     g_byte_array_free(bytes, true);
     return value;
+}
+
+static uint64_t read_register(struct qemu_plugin_register *handle)
+{
+    if (handle == NULL) {
+        return 0;
+    }
+    return read_register_handle(handle);
 }
 
 static void append_escaped(char *output, size_t output_size,
@@ -193,8 +203,8 @@ static bool dx_is_asciiz_path(uint8_t function)
     }
 }
 
-static bool infer_dos_function(uint16_t cs, uint16_t ip,
-                               uint8_t *function)
+static bool infer_interrupt_ax(uint16_t cs, uint16_t ip,
+                               uint16_t *ax)
 {
     const size_t lookbehind = MIN((size_t)ip, 48);
     const uint64_t physical = (uint64_t)cs * 16 + ip - lookbehind;
@@ -216,12 +226,13 @@ static bool infer_dos_function(uint16_t cs, uint16_t ip,
     end = bytes->len;
     while (end >= 2) {
         if (bytes->data[end - 2] == 0xb4) {
-            *function = bytes->data[end - 1];
+            *ax = (uint16_t)bytes->data[end - 1] << 8;
             g_byte_array_free(bytes, true);
             return true;
         }
         if (end >= 3 && bytes->data[end - 3] == 0xb8) {
-            *function = bytes->data[end - 1];
+            *ax = (uint16_t)bytes->data[end - 2] |
+                  (uint16_t)bytes->data[end - 1] << 8;
             g_byte_array_free(bytes, true);
             return true;
         }
@@ -234,6 +245,9 @@ static bool infer_dos_function(uint16_t cs, uint16_t ip,
 
 static void trace_interrupt(unsigned int vcpu_index, void *userdata)
 {
+    uint8_t vector = (uint8_t)GPOINTER_TO_UINT(userdata);
+    uint16_t ax = have_eax ?
+                  (uint16_t)read_register_handle(registers.eax) : 0xffff;
     uint16_t bx = (uint16_t)read_register(registers.ebx);
     uint16_t cx = (uint16_t)read_register(registers.ecx);
     uint16_t dx = (uint16_t)read_register(registers.edx);
@@ -243,42 +257,57 @@ static void trace_interrupt(unsigned int vcpu_index, void *userdata)
     uint16_t ds = (uint16_t)read_register(registers.ds);
     uint16_t es = (uint16_t)read_register(registers.es);
     uint16_t ip = (uint16_t)read_register(registers.eip);
-    uint8_t function = 0xff;
+    uint8_t function;
     char first[324] = "";
     char second[324] = "";
 
     (void)vcpu_index;
-    (void)userdata;
 
     if (!tracing_active || (have_cs_filter && cs != cs_filter)) {
         return;
     }
-    infer_dos_function(cs, ip, &function);
+    if (!have_eax && !infer_interrupt_ax(cs, ip, &ax)) {
+        ax = 0xffff;
+    }
+    function = (uint8_t)(ax >> 8);
 
-    if (dx_is_asciiz_path(function)) {
+    if (vector == 0x21 && dx_is_asciiz_path(function)) {
         read_guest_string(ds, dx, 0, first, sizeof(first));
-    } else if (function == 0x09) {
+    } else if (vector == 0x21 && function == 0x09) {
         read_guest_string(ds, dx, '$', first, sizeof(first));
-    } else if (function == 0x6c) {
+    } else if (vector == 0x21 && function == 0x6c) {
         read_guest_string(ds, si, 0, first, sizeof(first));
     }
-    if (function == 0x56) {
+    if (vector == 0x21 && function == 0x56) {
         read_guest_string(es, di, 0, second, sizeof(second));
     }
 
     g_mutex_lock(&trace_lock);
     ++call_count;
+    if (vector == 0x21) {
+        ++dos_call_count;
+    } else if (vector == 0x66) {
+        ++driver_call_count;
+    }
     pending.active = true;
+    pending.vector = vector;
+    pending.ax = ax;
     pending.sequence = call_count;
     pending.cs = cs;
     pending.ip = ip;
     fprintf(trace_file,
             "CALL %06" PRIu64 " pc=%04X:%04X linear=%05" PRIX64 " "
-            "fn=%02X %-15s "
+            "int=%02X AX=%04X ",
+            call_count, cs, ip, (uint64_t)cs * 16 + ip, vector, ax);
+    if (vector == 0x21) {
+        fprintf(trace_file, "fn=%02X %-15s ",
+                function, dos_call_name(function));
+    } else {
+        fprintf(trace_file, "service=%04X ", ax);
+    }
+    fprintf(trace_file,
             "BX=%04X CX=%04X DX=%04X SI=%04X DI=%04X "
             "DS=%04X ES=%04X",
-            call_count, cs, ip, (uint64_t)cs * 16 + ip,
-            function, dos_call_name(function),
             bx, cx, dx, si, di, ds, es);
     if (first[0] != '\0') {
         fprintf(trace_file, " arg=\"%s\"", first);
@@ -293,9 +322,18 @@ static void trace_interrupt(unsigned int vcpu_index, void *userdata)
 
 static void trace_return(unsigned int vcpu_index, void *userdata)
 {
+    uint16_t ax;
+    uint16_t bx;
+    uint16_t cx;
+    uint16_t dx;
+    uint16_t si;
+    uint16_t di;
+    uint16_t ds;
+    uint16_t es;
     uint16_t cs;
     uint16_t ip;
     uint32_t eflags;
+    char result[324] = "";
 
     (void)vcpu_index;
     (void)userdata;
@@ -304,16 +342,32 @@ static void trace_return(unsigned int vcpu_index, void *userdata)
         return;
     }
 
+    ax = have_eax ? (uint16_t)read_register_handle(registers.eax) : 0xffff;
+    bx = (uint16_t)read_register(registers.ebx);
+    cx = (uint16_t)read_register(registers.ecx);
+    dx = (uint16_t)read_register(registers.edx);
+    si = (uint16_t)read_register(registers.esi);
+    di = (uint16_t)read_register(registers.edi);
+    ds = (uint16_t)read_register(registers.ds);
+    es = (uint16_t)read_register(registers.es);
     cs = (uint16_t)read_register(registers.cs);
     ip = (uint16_t)read_register(registers.eip);
     eflags = (uint32_t)read_register(registers.eflags);
+    if (pending.vector == 0x66 && pending.ax == 0x068c) {
+        read_guest_string(bx, cx, 0, result, sizeof(result));
+    }
 
     g_mutex_lock(&trace_lock);
     fprintf(trace_file,
             "RET  %06" PRIu64 " pc=%04X:%04X from=%04X:%04X "
-            "CF=%u\n",
+            "int=%02X AX=%04X BX=%04X CX=%04X DX=%04X "
+            "SI=%04X DI=%04X DS=%04X ES=%04X CF=%u",
             pending.sequence, cs, ip, pending.cs, pending.ip,
-            eflags & 1);
+            pending.vector, ax, bx, cx, dx, si, di, ds, es, eflags & 1);
+    if (result[0] != '\0') {
+        fprintf(trace_file, " result=\"%s\"", result);
+    }
+    fputc('\n', trace_file);
     fflush(trace_file);
     pending.active = false;
     g_mutex_unlock(&trace_lock);
@@ -339,7 +393,7 @@ static void translate_block(qemu_plugin_id_t id, struct qemu_plugin_tb *tb)
 {
     size_t instruction_count = qemu_plugin_tb_n_insns(tb);
     bool activate_on_entry = false;
-    bool trace_call_on_entry = false;
+    uint8_t trace_vector_on_entry = 0;
     bool trace_return_on_entry = false;
     size_t index;
 
@@ -361,10 +415,11 @@ static void translate_block(qemu_plugin_id_t id, struct qemu_plugin_tb *tb)
         }
 
         if (size == 2 && qemu_plugin_insn_data(instruction, bytes, 2) == 2 &&
-            bytes[0] == 0xcd && bytes[1] == 0x21) {
+            bytes[0] == 0xcd &&
+            (bytes[1] == 0x21 || bytes[1] == 0x66)) {
             g_hash_table_add(return_addresses,
                              GSIZE_TO_POINTER((gsize)(address + size)));
-            trace_call_on_entry = true;
+            trace_vector_on_entry = bytes[1];
         }
         if (have_start_filter &&
             address == (uint64_t)cs_filter * 16 + start_ip) {
@@ -378,9 +433,10 @@ static void translate_block(qemu_plugin_id_t id, struct qemu_plugin_tb *tb)
         qemu_plugin_register_vcpu_tb_exec_cb(
             tb, activate_trace, QEMU_PLUGIN_CB_NO_REGS, NULL);
     }
-    if (trace_call_on_entry) {
+    if (trace_vector_on_entry != 0) {
         qemu_plugin_register_vcpu_tb_exec_cb(
-            tb, trace_interrupt, QEMU_PLUGIN_CB_R_REGS, NULL);
+            tb, trace_interrupt, QEMU_PLUGIN_CB_R_REGS,
+            GUINT_TO_POINTER(trace_vector_on_entry));
     }
     if (trace_return_on_entry) {
         qemu_plugin_register_vcpu_tb_exec_cb(
@@ -404,7 +460,12 @@ static void initialize_vcpu(qemu_plugin_id_t id, unsigned int vcpu_index)
                                     qemu_plugin_reg_descriptor, index);
         name = descriptor->name;
         handle = descriptor->handle;
-        if (g_ascii_strcasecmp(name, "ebx") == 0) registers.ebx = handle;
+        if (g_ascii_strcasecmp(name, "eax") == 0) {
+            registers.eax = handle;
+            have_eax = true;
+        } else if (g_ascii_strcasecmp(name, "ebx") == 0) {
+            registers.ebx = handle;
+        }
         else if (g_ascii_strcasecmp(name, "ecx") == 0) registers.ecx = handle;
         else if (g_ascii_strcasecmp(name, "edx") == 0) registers.edx = handle;
         else if (g_ascii_strcasecmp(name, "esi") == 0) registers.esi = handle;
@@ -427,8 +488,13 @@ static void initialize_vcpu(qemu_plugin_id_t id, unsigned int vcpu_index)
         fprintf(trace_file, " %s", descriptor->name);
     }
     fputc('\n', trace_file);
-    fputs("# fn is inferred from the nearest preceding MOV AH/AX; "
-          "AX is unavailable\n", trace_file);
+    if (have_eax) {
+        fputs("# AX is captured from live EAX at interrupt entry and return\n",
+              trace_file);
+    } else {
+        fputs("# input AX is inferred from the nearest preceding MOV AH/AX; "
+              "return AX is unavailable\n", trace_file);
+    }
     fflush(trace_file);
     g_mutex_unlock(&trace_lock);
     register_descriptors = descriptors;
@@ -440,7 +506,10 @@ static void finish_trace(qemu_plugin_id_t id, void *userdata)
     (void)userdata;
 
     g_mutex_lock(&trace_lock);
-    fprintf(trace_file, "# captured DOS calls: %" PRIu64 "\n", call_count);
+    fprintf(trace_file,
+            "# captured calls: %" PRIu64 " (DOS=%" PRIu64
+            ", driver=%" PRIu64 ")\n",
+            call_count, dos_call_count, driver_call_count);
     fclose(trace_file);
     trace_file = NULL;
     g_mutex_unlock(&trace_lock);

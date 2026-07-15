@@ -23,14 +23,6 @@ The existing startup trace, title/intro memory captures, live dialogue-choice
 table, scene display records, framebuffer comparison, and decoded `D003` PCM
 remain valid independent dynamic checks.
 
-## Third-party sound layer
-
-The game-owned audio formats are recovered: ABT effects decode completely and
-all XMI containers validate. `SOUND.1` through `SOUND.4`, however, are bundled
-DIGPAK/MIDPAK driver and timbre components. Their configured products and DOS
-loading path are identified, but the interrupt-`66h` entry-point ABI and the
-internal `SOUND.4` timbre format are not yet mapped.
-
 ## Partially named runtime structures
 
 - The auxiliary word at ABT offset `0x06` is consumed but unused by the game
@@ -58,9 +50,9 @@ where script transitions or map rendering establish their roles.
 
 ## Static-analysis coverage
 
-The checked catalog contains every project-assigned Rizin name: 108 functions,
+The checked catalog contains every project-assigned Rizin name: 140 functions,
 26 BIN handlers, and 9 data symbols. It is not a claim that the executable has
-only 108 functions. Rizin proposes roughly 340 candidates, including false
+only 140 functions. Rizin proposes roughly 340 candidates, including false
 merges across data and jump tables; unsupported candidates remain unnamed.
 
 Similarly, all 145 opcode operand layouts are known, but only handlers with
@@ -78,6 +70,8 @@ work answered. Current chapters supersede those chronological notes:
 - `CP2.BIN` has a 256-byte 16-node Unibot graph trailer beginning at `0x1D55`.
 - Flags `0x42..0x48` are rescued crew present for the Unibot mission, and
   variables 56 through 62 are the seven energy-pylon results.
+- All 34 game-side interrupt-`66h` sites are assigned DIGPAK/MIDPAK services,
+  and `SOUND.4` is a fully validated 181-entry AIL OPL timbre library.
 - Hall kinds for all seven Cybers, the hidden Spider, stations, cleared combat,
   and exits are correlated with their scripts and manual identities.
 

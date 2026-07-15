@@ -2,11 +2,11 @@
 
 The checked symbol catalog is `analysis/symbol-map.tsv`. It records every
 project-assigned name in `analysis/cb.rz`, rather than only a selected list of
-interesting routines. The current map contains 143 entries:
+interesting routines. The current map contains 175 entries:
 
 | Kind | Count | Meaning |
 |---|---:|---|
-| Function | 108 | Application, decoder, rendering, and Microsoft C routines |
+| Function | 140 | Application, driver API, decoder, rendering, and Microsoft C routines |
 | BIN handler | 26 | Named cases in the 145-entry scene-opcode dispatcher |
 | Data | 9 | Strings and one recovered room-orientation table |
 
@@ -23,8 +23,8 @@ levels:
 
 | Level | Requirement | Current entries |
 |---|---|---:|
-| Verified | Static semantics plus independent agreement with QEMU state, traced I/O, supplied saves, or exhaustive resource decoding | 77 |
-| High | Instruction behavior, callers, data layout, and cross-resource use uniquely support the name | 66 |
+| Verified | Static semantics plus independent agreement with QEMU state, traced I/O, supplied saves, or exhaustive resource decoding | 82 |
+| High | Instruction behavior, callers, data layout, and cross-resource use uniquely support the name | 93 |
 | Medium | Best current interpretation, but a material semantic ambiguity remains | 0 |
 
 “Verified” does not mean source-level names were recovered: the executable has
@@ -45,7 +45,7 @@ and data symbols:
 | Graphics | 14 | ART/PAL validation and QEMU framebuffer comparison |
 | Saves | 10 | Exact supplied SV0/SV1–SV9/SVQ structures and copy directions |
 | Text | 10 | All translation banks and byte-identical QEMU export |
-| Audio | 9 | All ABT/XMI resources and live decoded PCM comparison |
+| Audio | 41 | ABT/XMI validation, live PCM, INT 66h traces, and published driver ABI |
 | State | 9 | Script corpus, saved words, flag masks, and faith behavior |
 | Archive | 7 | Exact extraction of all 369 DD1 members |
 | Input | 7 | Action tables, keyboard/mouse callers, and BIOS interfaces |
@@ -93,7 +93,7 @@ tools/inspect_symbol_map.py \
 ```
 
 The current Rizin run resolves all 26 handlers at the cataloged offsets and
-emits no script errors. Archive-backed unit tests enforce the 108/26/9 counts
+emits no script errors. Archive-backed unit tests enforce the 140/26/9 counts
 and exact catalog-to-script coverage without requiring Rizin during the normal
 test suite.
 
@@ -101,7 +101,7 @@ test suite.
 
 Rizin's recursive analysis currently proposes roughly 340 functions, but
 several candidates cross jump tables or data. The catalog therefore does not
-claim that 108 functions are the whole executable. They are the complete set
+claim that 140 functions are the whole executable. They are the complete set
 of names supported by the reverse-engineering evidence so far.
 
 Likewise, the 26 handler names cover only handlers whose gameplay semantics

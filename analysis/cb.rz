@@ -24,6 +24,70 @@ af @ 0x417f
 afn play_sound_effect_resource @ 0x417f
 af @ 0x4235
 afn stop_sound_effect @ 0x4235
+af @ 0x8c7a
+af @ 0x8c89
+af @ 0x8c9b
+af @ 0x8cb7
+af @ 0x8cbd
+af @ 0x8cfc
+af @ 0x8d02
+af @ 0x8d08
+af @ 0x8d0e
+af @ 0x8d14
+af @ 0x8d1a
+af @ 0x8d20
+af @ 0x8d26
+af @ 0x8d2c
+af @ 0x8d3e
+af @ 0x8f08
+af @ 0x8f28
+af @ 0x8f2e
+af @ 0x8f41
+af @ 0x8f54
+af @ 0x8f67
+af @ 0x8f6d
+af @ 0x8f95
+af @ 0x8f9b
+af @ 0x8fad
+af @ 0x8fb3
+af @ 0x8fc8
+af @ 0x8fce
+af @ 0x8fd8
+af @ 0x8feb
+af @ 0x8ff1
+af @ 0x9000
+afn midpak_play_sequence @ 0x8c7a
+afn midpak_segue_sequence @ 0x8c89
+afn midpak_register_xmidi @ 0x8c9b
+afn midpak_stop_midi @ 0x8cb7
+afn midpak_remap_channel @ 0x8cbd
+afn midpak_get_digitized_capabilities @ 0x8cfc
+afn midpak_report_trigger_count @ 0x8d02
+afn midpak_reset_trigger_count @ 0x8d08
+afn midpak_sleep @ 0x8d0e
+afn midpak_awake @ 0x8d14
+afn midpak_resume @ 0x8d1a
+afn midpak_get_sequence_status @ 0x8d20
+afn midpak_get_relative_volume @ 0x8d26
+afn midpak_set_relative_volume @ 0x8d2c
+afn midpak_register_xmidi_file @ 0x8d3e
+afn digpak_play_8bit_sound @ 0x8f08
+afn digpak_report_status @ 0x8f28
+afn digpak_preformat_sound @ 0x8f2e
+afn digpak_play_preformatted_sound @ 0x8f41
+afn digpak_play_preformatted_data @ 0x8f54
+afn digpak_report_capabilities @ 0x8f67
+afn digpak_get_driver_id @ 0x8f6d
+afn digpak_report_current_sample_address @ 0x8f95
+afn digpak_set_callback_address @ 0x8f9b
+afn digpak_stop_current_sound @ 0x8fad
+afn digpak_set_audio_hardware @ 0x8fb3
+afn digpak_report_callback_address @ 0x8fc8
+afn digpak_wait_until_idle @ 0x8fce
+afn digpak_post_audio_pending @ 0x8fd8
+afn digpak_get_audio_pending_status @ 0x8feb
+afn digpak_set_stereo_panning @ 0x8ff1
+afn detect_digpak_driver @ 0x9000
 af @ 0x3ad2
 afn reset_scene_display_records @ 0x3ad2
 af @ 0x3aff

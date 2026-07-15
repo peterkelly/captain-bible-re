@@ -15,6 +15,38 @@ function	0x4091	play_music_resource	high	audio	MUS and IBM XMI name construction
 function	0x4155	release_sound_effect_buffer	high	audio	Owned ABT buffer check driver stop and far free
 function	0x417f	play_sound_effect_resource	verified	audio	ABT load decode and QEMU-correlated playback buffer
 function	0x4235	stop_sound_effect	high	audio	Active sound check followed by driver stop
+function	0x8c7a	midpak_play_sequence	high	audio	AX 0702h interrupt 66h wrapper with sequence argument in BX
+function	0x8c89	midpak_segue_sequence	high	audio	AX 0703h interrupt 66h wrapper with sequence and activation arguments
+function	0x8c9b	midpak_register_xmidi	high	audio	AX 0704h interrupt 66h wrapper with far data pointer and length
+function	0x8cb7	midpak_stop_midi	high	audio	AX 0705h interrupt 66h wrapper used before music replacement
+function	0x8cbd	midpak_remap_channel	high	audio	AX 0706h interrupt 66h wrapper with sequence and channel arguments
+function	0x8cfc	midpak_get_digitized_capabilities	high	audio	AX 0701h interrupt 66h capability wrapper
+function	0x8d02	midpak_report_trigger_count	high	audio	AX 0707h interrupt 66h trigger-counter wrapper
+function	0x8d08	midpak_reset_trigger_count	high	audio	AX 0708h interrupt 66h trigger-counter reset wrapper
+function	0x8d0e	midpak_sleep	high	audio	AX 0709h interrupt 66h wrapper used around sequence registration
+function	0x8d14	midpak_awake	high	audio	AX 070ah interrupt 66h wrapper used around sequence registration
+function	0x8d1a	midpak_resume	high	audio	AX 070bh interrupt 66h resume wrapper
+function	0x8d20	midpak_get_sequence_status	high	audio	AX 070ch interrupt 66h wrapper observed returning playing status
+function	0x8d26	midpak_get_relative_volume	high	audio	AX 070eh interrupt 66h relative-volume getter
+function	0x8d2c	midpak_set_relative_volume	high	audio	AX 070fh interrupt 66h wrapper with volume and transition time
+function	0x8d3e	midpak_register_xmidi_file	high	audio	AX 070dh interrupt 66h filename-registration wrapper
+function	0x8f08	digpak_play_8bit_sound	high	audio	AX 0688h interrupt 66h wrapper with DS SI sound-structure pointer
+function	0x8f28	digpak_report_status	verified	audio	AX 0689h wrapper and QEMU return values match idle and playing states
+function	0x8f2e	digpak_preformat_sound	verified	audio	AX 068ah wrapper receives the live decoded PCM sound structure
+function	0x8f41	digpak_play_preformatted_sound	verified	audio	AX 068bh wrapper starts the preformatted decoded PCM structure
+function	0x8f54	digpak_play_preformatted_data	high	audio	AX 0694h interrupt 66h wrapper with DS SI sound-data pointer
+function	0x8f67	digpak_report_capabilities	verified	audio	AX 068ch wrapper observed returning Sound Blaster capability mask 0fc1h
+function	0x8f6d	digpak_get_driver_id	high	audio	Capability query followed by copy from returned BX CX ID pointer
+function	0x8f95	digpak_report_current_sample_address	high	audio	AX 068dh interrupt 66h playback-position wrapper
+function	0x8f9b	digpak_set_callback_address	high	audio	AX 068eh interrupt 66h wrapper with callback segment and offset
+function	0x8fad	digpak_stop_current_sound	verified	audio	AX 068fh wrapper called by the recovered sound-effect stop path
+function	0x8fb3	digpak_set_audio_hardware	high	audio	AX 0690h interrupt 66h wrapper with IRQ base and device argument
+function	0x8fc8	digpak_report_callback_address	high	audio	AX 0691h interrupt 66h callback-query wrapper
+function	0x8fce	digpak_wait_until_idle	high	audio	Loops on AX 0689h status until digital playback becomes idle
+function	0x8fd8	digpak_post_audio_pending	high	audio	AX 0695h interrupt 66h pending-play wrapper
+function	0x8feb	digpak_get_audio_pending_status	high	audio	AX 0696h interrupt 66h pending-status wrapper
+function	0x8ff1	digpak_set_stereo_panning	high	audio	AX 0697h interrupt 66h wrapper with panning position in DX
+function	0x9000	detect_digpak_driver	high	audio	Checks INT 66h handler MIDI or KERN signature and probes AX 0701h
 function	0x3ad2	reset_scene_display_records	verified	scene-display	QEMU-correlated record count reset and slot release loop
 function	0x3aff	render_scene_display_records	verified	scene-display	QEMU-correlated ten-byte record dispatcher
 function	0x3b9b	resolve_animation_transform	high	animation	Animation step fields converted to render transform

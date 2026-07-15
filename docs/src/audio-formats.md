@@ -166,3 +166,7 @@ chunk order, event boundaries, variable-length quantities, and end-of-track.
 
 Offsets use the unpacked load-module convention documented elsewhere in this
 book.
+
+The separate sound-driver chapter maps the DIGPAK/MIDPAK interrupt interface,
+the exact playback structure receiving decoded ABT data, and the installed
+OPL timbre library.

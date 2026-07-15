@@ -2,9 +2,9 @@
 
 ## QEMU tracing workflow
 
-`tools/qemu_dos_trace.c` is a QEMU TCG plugin that observes software interrupt
-`21h` without changing the game executable or disk image. Build and run it
-through the normal launcher:
+`tools/qemu_dos_trace.c` is a QEMU TCG plugin that observes DOS interrupt
+`21h` and sound-driver interrupt `66h` without changing the game executable or
+disk image. Build and run it through the normal launcher:
 
 ```sh
 ./run.sh --trace-dos
@@ -23,18 +23,17 @@ The plugin filters on the current game code segment `0627` and remains dormant
 until the reconstructed entry point `0627:CB5C` executes. That prevents an
 earlier FreeDOS program that temporarily occupies the same segment from
 polluting the trace. Each call record contains its exact `CS:IP`, physical
-linear address, inferred DOS function, argument registers, data segments, and
-an escaped pathname when the API uses one. A paired return record preserves
-the carry flag.
+linear address, live AX, argument registers, data segments, and an escaped
+pathname when the DOS API uses one. A paired return record preserves AX, the
+other general and segment registers, and carry.
 
-QEMU 11.0.2's i386 plugin register accessor reports EAX as zero at these
-callbacks even though the other general and segment registers are valid. The
-plugin therefore derives the DOS function from the nearest executed
-`MOV AH,imm8` or `MOV AX,imm16` before the interrupt and explicitly omits AX
-from the log. Trace mode also sets `one-insn-per-tb=on`; without it, plugin
-register reads describe the beginning of a longer translation block rather
-than the interrupt boundary. These limitations are recorded rather than
-silently presenting the zero EAX values as evidence.
+QEMU 11.0.2 represents the first x86 register's opaque plugin handle with
+value zero. The tracer tracks descriptor presence separately instead of
+mistaking that valid EAX handle for a missing register. It retains static
+`MOV AH/AX` inference only as a fallback for targets that do not expose EAX.
+Trace mode also sets `one-insn-per-tb=on`; without it, plugin register reads
+describe the beginning of a longer translation block rather than the
+interrupt boundary.
 
 ## Preserved startup capture
 

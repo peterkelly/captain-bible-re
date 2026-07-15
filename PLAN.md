@@ -32,7 +32,7 @@ This plan is a living checklist. Findings and commands are recorded in
 - [x] Recover a first-pass function map for startup, input, saves, and export.
 - [x] Determine the purpose and format of every game-owned `DD*` and save file.
 - [x] Identify each `SOUND.*` file, configured product, and lock field.
-- [ ] Recover the bundled third-party sound-driver ABI and timbre format.
+- [x] Recover the bundled third-party sound-driver ABI and timbre format.
 
 ## Phase 3: Dynamic analysis
 

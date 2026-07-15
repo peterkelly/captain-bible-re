@@ -103,9 +103,8 @@ Escape, Enter/click, pointer movement, and the four extended arrow codes.
 
 The executable also contains wrappers around DOS interrupt `21h`, BIOS video
 interrupt `10h`, keyboard interrupt `16h`, and a loaded-driver interface on
-interrupt `66h`. Sound data and XMI filenames indicate that the driver layer
-will require a separate focused pass before its entry points can be named with
-the same confidence.
+interrupt `66h`. The sound-driver chapter assigns all 34 `CD 66` sites to
+DIGPAK or MIDPAK services and records their register contracts.
 
 ## Installation lock file and sound drivers
 
@@ -326,7 +325,7 @@ documents both formats and their reproducible tools.
 
 ## Checked symbol catalog
 
-The complete checked map now contains 108 named functions, 26 named BIN
+The complete checked map now contains 140 named functions, 26 named BIN
 handlers, and 9 data symbols. Each entry has its own evidence statement and a
 Verified or High confidence rating. The dedicated symbol-map chapter defines
 those levels, summarizes subsystem coverage, documents address translation,

@@ -112,7 +112,7 @@ Load the current high-confidence names into Rizin with:
 rizin -b 16 -i analysis/cb.rz build/analysis/CB_UNPACKED.EXE
 ```
 
-Audit all 108 named functions, 26 BIN handlers, and 9 data symbols against the
+Audit all 140 named functions, 26 BIN handlers, and 9 data symbols against the
 Rizin script, with per-entry confidence and evidence, using:
 
 ```sh
@@ -122,6 +122,18 @@ tools/inspect_symbol_map.py
 The generated executable and memory dumps remain under ignored `build/`.
 Research results, address conventions, function names, command-line behavior,
 and the recovered save layout are in the mdBook source.
+
+Inspect the installed Miles AIL/MIDPAK OPL timbre library with:
+
+```sh
+tools/inspect_midpak_ad.py CB/SOUND.4
+tools/inspect_midpak_ad.py CB/SOUND.4 --list
+```
+
+The sound-driver chapter maps all 34 game-side `int 66h` sites and the DIGPAK
+and MIDPAK service contracts. `./run.sh --trace-dos` records both DOS `int 21h`
+and driver `int 66h` calls and returns while keeping the Cocoa window visible
+and host audio silent.
 
 ## Extracting `DD1.DAT`
 
@@ -325,13 +337,14 @@ Run the game with the QEMU TCG tracer and monitor socket enabled:
 
 The Cocoa window stays visible and host audio remains muted. Trace mode uses
 one guest instruction per TCG translation block so register values can be
-sampled at DOS interrupt boundaries; it is consequently slower than a normal
-run. The generated plugin, trace, monitor socket, screenshots, and memory
-dumps are kept under the ignored `build/qemu-trace/` directory.
+sampled at DOS and driver interrupt boundaries; it is consequently slower than
+a normal run. The generated plugin, trace, monitor socket, screenshots, and
+memory dumps are kept under the ignored `build/qemu-trace/` directory.
 
 The trace activates at the reconstructed entry point `0627:CB5C` and records
-only `int 21h` calls from code segment `0627`. These addresses are stable for
-the current deterministic FreeDOS image. If the DOS environment or boot
+`int 21h` and `int 66h` calls and returns from code segment `0627`, including
+live AX and the other argument/result registers. These addresses are stable
+for the current deterministic FreeDOS image. If the DOS environment or boot
 configuration changes, re-establish the load segment before relying on the
 filter.
 

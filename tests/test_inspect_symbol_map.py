@@ -27,7 +27,7 @@ class SymbolMapTests(unittest.TestCase):
             kind: sum(symbol.kind == kind for symbol in self.catalog)
             for kind in ("function", "handler", "data")
         }
-        self.assertEqual(counts, {"function": 108, "handler": 26, "data": 9})
+        self.assertEqual(counts, {"function": 140, "handler": 26, "data": 9})
 
     def test_every_symbol_has_evidence_and_controlled_confidence(self):
         self.assertTrue(all(symbol.evidence for symbol in self.catalog))
