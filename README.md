@@ -1,0 +1,85 @@
+# Captain Bible Reverse Engineering
+
+This repository contains a reproducible environment and research notes for
+reverse-engineering *Captain Bible in the Dome of Darkness*, a DOS game from
+the 1990s. The original game files are expected in `CB/` and are intentionally
+ignored by Git.
+
+Work is currently paused at the end of Phase 1 so the user can test the
+FreeDOS/QEMU game environment. See `PLAN.md` for the live task list and
+`docs/src/progress-log.md` for the complete activity log.
+
+## Requirements
+
+- QEMU with `qemu-system-i386` and `qemu-img`
+- mtools (`mformat`, `mcopy`, `mmd`, `mdir`, and `mtype`)
+- `unzip`
+- Python 3
+- A POSIX shell
+- mdBook (for the research book)
+
+The setup is being developed and tested with QEMU 11.0.2 and mdBook 0.5.3 on
+macOS/Apple Silicon.
+
+## Running the game
+
+From the repository root, run:
+
+```sh
+./run.sh
+```
+
+The script opens QEMU and starts Captain Bible automatically. On its first
+run, it creates a persistent play image at
+`build/captain-bible/captain-bible.img`. Saved games are written to that image
+and remain available on later runs. On macOS, the game uses QEMU's visible
+Cocoa display with `zoom-to-fit=on`.
+
+The game supports both mouse and keyboard input. If QEMU captures the pointer,
+use Control-Option-G to release it on macOS. Exit through the game's Escape
+menu before closing QEMU so pending save writes complete cleanly.
+
+To prepare or check the images without opening QEMU:
+
+```sh
+./run.sh --setup-only
+```
+
+To recreate the play image from the current `CB/` directory:
+
+```sh
+./run.sh --rebuild
+```
+
+`--rebuild` replaces the persistent play image and therefore resets any saved
+games held only inside it.
+
+## Rebuilding FreeDOS
+
+The base operating-system image is constructed noninteractively from the
+official FreeDOS 1.4 LiteUSB distribution:
+
+```sh
+tools/setup_freedos_image.py
+```
+
+The result is `build/freedos/freedos.img`. The builder verifies the published
+SHA-256, preserves the source boot code, constructs a new FAT16 partition, and
+copies the FreeDOS filesystem with mtools. It does not run or automate the
+FreeDOS installer.
+
+Run its focused unit tests with:
+
+```sh
+python3 -m unittest discover -s tests -v
+```
+
+## Documentation
+
+Build the research book with:
+
+```sh
+mdbook build docs
+```
+
+The rendered book is written to `build/docs-book/`.

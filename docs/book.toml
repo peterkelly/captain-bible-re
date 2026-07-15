@@ -1,0 +1,12 @@
+[book]
+title = "Reverse Engineering Captain Bible"
+authors = ["Captain Bible reverse-engineering project"]
+description = "Evidence and procedures for Captain Bible in the Dome of Darkness"
+language = "en"
+src = "src"
+
+[build]
+build-dir = "../build/docs-book"
+
+[output.html]
+git-repository-url = ""

@@ -1,0 +1,50 @@
+# Captain Bible Reverse-Engineering Plan
+
+Last updated: 2026-07-15
+
+This plan is a living checklist. Findings and commands are recorded in
+`docs/src/progress-log.md`.
+
+## Phase 1: Reproducible game environment
+
+- [x] Inventory the supplied `CB` directory and available host tools.
+- [x] Confirm the game's documented DOS launch command and memory needs.
+- [x] Adopt the repository's noninteractive LiteUSB/mtools procedure.
+- [x] Stop and discard the superseded installer-driven VM attempt.
+- [x] Implement `tools/setup_freedos_image.py` and focused unit tests.
+- [x] Download and verify the official FreeDOS 1.4 LiteUSB archive.
+- [x] Construct the 1 GiB raw FreeDOS image under `build/freedos/`.
+- [x] Verify the filesystem, boot scripts, MBR, and QEMU boot marker.
+- [x] Add `run.sh` with VGA, mouse, Sound Blaster 16, and AdLib support.
+- [x] Create a persistent play image containing the supplied `CB` directory.
+- [x] Verify that FreeDOS boots and the game reaches its title screen.
+- [ ] Have the user confirm interactive input, audio, and normal game exit.
+
+## Phase 2: Static inventory and executable analysis
+
+- [ ] Record checksums, timestamps, formats, and sizes for every game file.
+- [ ] Identify the executable format, compiler/runtime, and memory model.
+- [ ] Map executable segments, entry points, strings, and imported services.
+- [ ] Analyze the command-line parser and documented hidden/export options.
+- [ ] Determine the purpose and format of each `DD*`, `SOUND.*`, and save file.
+
+## Phase 3: Dynamic analysis
+
+- [ ] Establish a repeatable debugging and tracing workflow.
+- [ ] Trace startup, file access, graphics, input, sound, and save operations.
+- [ ] Correlate runtime behavior with static functions and data structures.
+- [ ] Exercise major screens and gameplay systems while recording evidence.
+
+## Phase 4: File formats and game systems
+
+- [ ] Document data containers, compression, graphics, audio, and text formats.
+- [ ] Document save-game structures and player-name behavior.
+- [ ] Reconstruct maps, entities, conversations, combat, and progression logic.
+- [ ] Build small extraction or inspection tools where they improve confidence.
+
+## Phase 5: Consolidation
+
+- [ ] Produce a symbol/function map with evidence and confidence levels.
+- [ ] Document reproducible procedures and all discovered formats and systems.
+- [ ] Review the mdBook for gaps, contradictions, and unsupported claims.
+- [ ] Build and verify the final book.
