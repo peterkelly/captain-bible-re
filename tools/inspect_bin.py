@@ -46,6 +46,15 @@ class DisplayRecordDefinition:
     art_slot: int | None = None
 
 
+@dataclass(frozen=True)
+class DialogueChoiceDefinition:
+    """One command which adds an option to the current dialogue menu."""
+
+    offset: int
+    target: int
+    text: str | int
+
+
 # Operand layout recovered from execute_bin_commands at load-module offset
 # 0x451b. B is an unsigned byte, H is a little-endian 16-bit word, z is a
 # NUL-terminated CP437 string, 9 is a nine-byte opaque animation record, and
@@ -97,6 +106,8 @@ OPCODE_NAMES = {
     0x07: "animation_step",
     0x0D: "change_scene",
     0x0F: "adjust_thread_delay",
+    0x13: "remove_dialogue_choice",
+    0x14: "show_adversary_dialogue",
     0x1E: "copy_variable",
     0x1F: "set_variable",
     0x20: "jump_if_zero",
@@ -127,7 +138,13 @@ OPCODE_NAMES = {
     0x39: "jump_if_text_record_clear",
     0x3D: "jump",
     0x43: "add_scaled_display_object",
+    0x44: "add_dialogue_choice",
+    0x45: "clear_dialogue_choices",
+    0x46: "present_dialogue_choices",
+    0x48: "show_character_dialogue",
+    0x49: "request_study_bible",
     0x4D: "load_palette",
+    0x4E: "show_captain_bible_dialogue",
     0x52: "play_music",
     0x55: "snapshot_state",
     0x57: "play_sound_effect",
@@ -136,6 +153,7 @@ OPCODE_NAMES = {
     0x66: "advance_display_object_frames",
     0x6D: "load_palette",
     0x70: "unload_last_art",
+    0x72: "suspend_scene_thread",
     0x73: "jump_if_state_flag_clear",
     0x74: "jump_if_state_flag_set",
     0x75: "clear_state_flag",
@@ -144,6 +162,7 @@ OPCODE_NAMES = {
     0x78: "load_map",
     0x7B: "set_current_map_cell_kind",
     0x7C: "set_current_map_cell_parameter_a",
+    0x7D: "configure_study_prompt",
     0x7F: "set_current_map_cell_parameter_b",
     0x81: "reduce_faith",
     0x85: "hide_display_object",
@@ -339,6 +358,28 @@ def display_record_definitions(
     return tuple(definitions)
 
 
+def dialogue_choice_definitions(
+    commands: tuple[BinCommand, ...],
+) -> tuple[DialogueChoiceDefinition, ...]:
+    """Return choices added by a linear command sequence.
+
+    Branches can change which clear, add, and present commands execute. The
+    returned order is therefore a static inventory, not a reconstructed menu
+    for every possible runtime path.
+    """
+
+    definitions: list[DialogueChoiceDefinition] = []
+    for command in commands:
+        if command.opcode != 0x44:
+            continue
+        target = int(command.operands[0].value)
+        text = command.operands[1].value
+        if not isinstance(text, (str, int)):
+            raise AssertionError("dialogue choice has an invalid text operand")
+        definitions.append(DialogueChoiceDefinition(command.offset, target, text))
+    return tuple(definitions)
+
+
 def _format_operand(operand: Operand, is_script_variable: bool = False) -> str:
     if is_script_variable:
         value = int(operand.value)
@@ -383,6 +424,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--objects",
         action="store_true",
         help="summarize display-record definitions after the command listing",
+    )
+    parser.add_argument(
+        "--choices",
+        action="store_true",
+        help="summarize dialogue-choice definitions after the command listing",
     )
     return parser
 
@@ -438,6 +484,22 @@ def main(argv: list[str] | None = None) -> int:
                 if value is not None:
                     fields.append(f"{name}={value:#06x}")
             print(" ".join(fields))
+    if args.choices:
+        definitions = dialogue_choice_definitions(commands)
+        print(
+            "# dialogue choices in linear definition order; "
+            "branches may change each menu"
+        )
+        for index, definition in enumerate(definitions):
+            text = (
+                repr(definition.text)
+                if isinstance(definition.text, str)
+                else f"@{definition.text:#06x}"
+            )
+            print(
+                f"choice[{index:02d}] source={definition.offset:#06x} "
+                f"target={definition.target:#06x} text={text}"
+            )
     return 0
 
 

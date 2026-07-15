@@ -200,6 +200,31 @@ The dedicated scene-display-object chapter documents the layout, commands,
 QEMU addresses, inspector output, and boundary between display state and
 still-unrecovered gameplay entity/combat state.
 
+## Conversation and choice flow
+
+Scene scripts construct dialogue menus in a separate transient table. Opcode
+`0x45` clears the table, opcode `0x44` appends a six-byte target/text record,
+and opcode `0x46` presents the menu and suspends the scene thread. The record
+count is at `DS:B428`; records begin at `DS:B116` and contain an absolute BIN
+target followed by a far pointer to the inline choice text. The generic text
+menu at `0x2556` returns the selected target through `DS:7CBA`, allowing the
+interpreter to resume directly at the chosen branch.
+
+Dialogue opcodes `0x14`, `0x48`, and `0x4E` share a presentation handler but
+serve distinct channels dominated by the adversary, other characters, and
+Captain Bible. Corpus analysis finds 40 choice definitions and 597 dialogue
+commands. A visible, silent QEMU capture of the five-choice `BOSS.BIN` menu
+matched every target and far text pointer from the static decode. Selecting
+the final row wrote target `0x095C` and displayed the dialogue stored at that
+exact branch.
+
+Conversation scripts also invoke the study-Bible browser. Opcode `0x7D`
+selects a victim-conversation, paraphrase, or cyber-lie prompt, and opcode
+`0x49` requests the browser. A correct descriptor sets state flag `0x14`;
+leaving without the expected match sets `0x15`. The conversation-flow
+chapter documents the command lifecycle, runtime structures, BOSS memory
+correlation, study integration, and remaining boundaries.
+
 ## World-map state
 
 The archive contains 21 exact 768-byte map resources: levels A through G for
@@ -261,6 +286,9 @@ documents both formats and their reproducible tools.
 | `0x075F` | `show_map_screen` |
 | `0x0C6C` | `process_current_map_cell` |
 | `0x1191` | `initialize_script_state` |
+| `0x1C88` | `show_study_bible` |
+| `0x2556` | `select_from_text_menu` |
+| `0x2933` | `show_dialogue_message` |
 | `0x3363` | `initialize_hardware_and_data` |
 | `0x3979` | `reduce_faith` |
 | `0x3A1E` / `0x3A30` | Read byte/word BIN operands |
@@ -273,6 +301,7 @@ documents both formats and their reproducible tools.
 | `0x417F` | `play_sound_effect_resource` |
 | `0x4235` | `stop_sound_effect` |
 | `0x43F5` / `0x4413` / `0x4433` | Test/set/clear state flags |
+| `0x446F` | `render_study_prompt` |
 | `0x451B` | `execute_bin_commands` |
 | `0x5AD6` | `find_text_record_by_selector` |
 | `0x5B24` / `0x5B76` / `0x5BBF` | Get/set/clear text-record state |
@@ -287,6 +316,7 @@ documents both formats and their reproducible tools.
 | `0x7D8E` / `0x7E41` | Copy live state to/from save buffers |
 | `0x7F01` / `0x7F58` | Write/read the 243-byte save index |
 | `0x7FD7` / `0x81AC` | Write/read the 2,752-byte save state |
+| `0x834E` | `handle_study_bible_request` |
 | `0x875D` | `main_menu_and_game_loop` |
 | `0x89AF` | `parse_bible_translation_lock` |
 | `0x8A09` | `set_cwd_from_executable_path` |

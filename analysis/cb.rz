@@ -7,6 +7,12 @@ afn game_main @ 0x8a82
 afn set_cwd_from_executable_path @ 0x8a09
 afn parse_bible_translation_lock @ 0x89af
 afn initialize_hardware_and_data @ 0x3363
+af @ 0x1c88
+afn show_study_bible @ 0x1c88
+af @ 0x2556
+afn select_from_text_menu @ 0x2556
+af @ 0x2933
+afn show_dialogue_message @ 0x2933
 afn bin_read_u8 @ 0x3a1e
 afn bin_read_u16 @ 0x3a30
 afn bin_read_cstring_offset @ 0x3a64
@@ -28,6 +34,8 @@ afn update_scene_threads @ 0x7997
 afn initialize_new_session @ 0x7d2b
 afn main_menu_and_game_loop @ 0x875d
 afn poll_input_event @ 0x7bed
+af @ 0x834e
+afn handle_study_bible_request @ 0x834e
 af @ 0x5ad6
 afn find_text_record_by_selector @ 0x5ad6
 af @ 0x5ce2
@@ -48,6 +56,8 @@ afn reduce_faith @ 0x3979
 afn test_state_flag @ 0x43f5
 afn set_state_flag @ 0x4413
 afn clear_state_flag @ 0x4433
+af @ 0x446f
+afn render_study_prompt @ 0x446f
 afn get_text_record_state @ 0x5b24
 afn set_text_record_state @ 0x5b76
 afn clear_text_record_state @ 0x5bbf
@@ -125,3 +135,12 @@ f str_export_open_error 0xd @ 0xf156
 f str_export_title 0x27 @ 0xf1e6
 f str_save_index_suffix 5 @ 0xf39b
 f str_run_art 8 @ 0xf47a
+
+fr case.0x4552.125 bin_handler_configure_study_prompt
+fr case.0x4552.69 bin_handler_clear_dialogue_choices
+fr case.0x4552.68 bin_handler_add_dialogue_choice
+fr case.0x4552.19 bin_handler_remove_dialogue_choice
+fr case.0x4552.70 bin_handler_present_dialogue_choices
+fr case.0x4552.20 bin_handler_show_dialogue
+fr case.0x4552.73 bin_handler_request_study_bible
+fr case.0x4552.114 bin_handler_suspend_scene_thread

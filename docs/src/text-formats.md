@@ -102,6 +102,14 @@ terminal zero record for the last span. `copy_text_record_component` seeks to
 that offset in the open companion file, reads exactly the computed span, and
 walks its tagged NUL strings.
 
+Conversation opcode `0x7D` connects this lookup machinery to the interactive
+study browser. Its prompt byte selects companion tag `*` for victim dialogue,
+`P` for a paraphrase, or `L` for a cyber lie, while its variable operand
+supplies the expected text-record selector. A matching selection returns
+through state flag `0x14`; leaving without the match returns through flag
+`0x15`. The conversation-flow chapter documents the surrounding BIN control
+flow and QEMU-validated menu system.
+
 ## QEMU export validation
 
 Ran the original executable's built-in exporter in a visible, silent FreeDOS

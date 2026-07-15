@@ -112,6 +112,18 @@ progression points:
 transition, although the later flags' most precise gameplay label remains
 open.
 
+Two lower flags carry the result of a conversation's study-Bible prompt:
+
+| Flag | Conversation meaning |
+|---:|---|
+| `0x14` | The player selected the expected text descriptor. |
+| `0x15` | The player left the browser without that match. |
+
+The browser clears both flags before accepting input. Victim scenes branch
+on them after requesting the study screen, so they are transient result flags
+rather than durable progression markers. See the conversation-flow chapter
+for the complete prompt and suspension sequence.
+
 ## Faith
 
 Faith is variable 21 and uses a 0–10,000 scale, so one displayed percentage

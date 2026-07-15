@@ -14,6 +14,7 @@ from inspect_bin import (  # noqa: E402
     SCRIPT_VARIABLE_OPERANDS,
     decode_command,
     decode_stream,
+    dialogue_choice_definitions,
     display_record_definitions,
 )
 
@@ -52,6 +53,46 @@ class BinBytecodeTests(unittest.TestCase):
         self.assertEqual(OPCODE_NAMES[0x66], "advance_display_object_frames")
         self.assertEqual(OPCODE_NAMES[0x85], "hide_display_object")
         self.assertEqual(OPCODE_NAMES[0x86], "show_display_object")
+
+    def test_recovered_conversation_opcode_names(self):
+        self.assertEqual(OPCODE_NAMES[0x14], "show_adversary_dialogue")
+        self.assertEqual(OPCODE_NAMES[0x44], "add_dialogue_choice")
+        self.assertEqual(OPCODE_NAMES[0x45], "clear_dialogue_choices")
+        self.assertEqual(OPCODE_NAMES[0x46], "present_dialogue_choices")
+        self.assertEqual(OPCODE_NAMES[0x48], "show_character_dialogue")
+        self.assertEqual(OPCODE_NAMES[0x49], "request_study_bible")
+        self.assertEqual(OPCODE_NAMES[0x4E], "show_captain_bible_dialogue")
+        self.assertEqual(OPCODE_NAMES[0x7D], "configure_study_prompt")
+
+    def test_boss_dialogue_choices_match_qemu_live_table(self):
+        commands = decode_stream(self.member("BOSS.BIN"))
+        definitions = dialogue_choice_definitions(commands)
+        self.assertEqual(
+            [(definition.target, definition.text) for definition in definitions],
+            [
+                (0x0644, "So what do I do when I get inside?"),
+                (0x07E8, "Can I expect any resistance?"),
+                (0x0751, "What about the people inside?"),
+                (
+                    0x0519,
+                    "Should I expect any problems with my computer bible?",
+                ),
+                (0x095C, "OK!  I'd better go do it!"),
+            ],
+        )
+
+    def test_dialogue_choice_corpus_count(self):
+        count = 0
+        for filename, data in self.bin_members.items():
+            regions = ((0, len(data)),)
+            if filename == "CP2.BIN":
+                regions = ((0, 0x1D5A),)
+            elif filename == "ROOM3.BIN":
+                regions = ((0, 0x0336), (0x0C96, 0x1754), (0x1768, len(data)))
+            for start, limit in regions:
+                commands = decode_stream(data, start, limit)
+                count += len(dialogue_choice_definitions(commands))
+        self.assertEqual(count, 40)
 
     def test_logo_display_definitions_match_qemu_live_table(self):
         commands = decode_stream(self.member("LOGO.BIN"))

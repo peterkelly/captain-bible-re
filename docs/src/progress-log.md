@@ -3354,3 +3354,243 @@ characters, exceeding the repository's 72-character rule. The audit stopped
 the chained status and summary checks before they ran. Rewrapped the message
 without changing its meaning, staged this note, and amended the checkpoint
 again before repeating the complete verification.
+
+## 2026-07-15: Resuming gameplay-system analysis
+
+The user asked to continue after the display-object checkpoint. Confirmed
+that the worktree was clean, then read the living plan, README, tail of this
+log, scene-bytecode chapter, static-analysis chapter, and complete Rizin
+symbol script. The next open bounded area is the relationship among gameplay
+entities, conversation, combat, and the remaining unidentified BIN handlers.
+The investigation will begin with static handler and corpus correlation, then
+use visible, silent QEMU evidence where live state is needed.
+
+### Static dialogue-handler and corpus analysis
+
+Parsed all 145 entries in the BIN dispatch table and compared the handlers
+around the dialogue-heavy opcode cluster. Saved focused Rizin output under
+the ignored `build/analysis/` tree, including `bin-dispatch-hex.txt`,
+`conversation-handlers.txt`, `conversation-state-xrefs.txt`,
+`choice-ui-functions.txt`, `dialogue-ui-disassembly.txt`, and
+`study-selection-flow.txt`. Representative commands were:
+
+```sh
+rizin -q -b 16 -e scr.color=false \
+  build/analysis/CB_UNPACKED.EXE \
+  -c 's 0x51b7; pd 220; q' \
+  > build/analysis/conversation-handlers.txt
+rizin -q -b 16 -e scr.color=false \
+  build/analysis/CB_UNPACKED.EXE \
+  -c 'axt @ 0xb428; axt @ 0xb116; axt @ 0x8934; axt @ 0x7cba; q' \
+  > build/analysis/conversation-state-xrefs.txt
+rizin -q -b 16 -e scr.color=false \
+  build/analysis/CB_UNPACKED.EXE \
+  -c 's 0x2556; pd 300; s 0x2933; pd 300; q' \
+  > build/analysis/dialogue-ui-disassembly.txt
+```
+
+The handler at `0x51B7` clears the word at `DS:B428` and dialogue state at
+`DS:8934`. Handler `0x51C6` appends a record at `DS:B116 + 6*count` containing
+an absolute BIN target word and a far pointer to its inline text. Handler
+`0x5257` enters dialogue state 1 and suspends the current scene thread.
+Function `0x2556` is the generic text-menu renderer and selection loop;
+`poll_input_event` ultimately writes the selected record's target to
+`DS:7CBA`. Handler `0x51FF` removes the first record with a matching target
+and shifts all later six-byte records, although no recovered BIN uses that
+opcode.
+
+Wrote short Python analyses against the existing decoded command model to
+count opcodes across all 64 known code regions and list their resource,
+source offset, target, and string operands. The results were:
+
+```text
+0x44 add choices:        40 uses in 6 resources
+0x45 clear choices:      11 uses in 6 resources
+0x46 present choices:    14 uses in 7 resources
+0x14 adversary dialogue: 10 uses, all in FACE.BIN
+0x48 character dialogue: 306 uses in 12 resources
+0x4E Captain channel:    281 uses in 25 resources
+```
+
+The differing choice counts show that scripts conditionally add entries and
+reuse menus; a linear command inventory is useful evidence but not a full
+control-flow reconstruction. The three string commands share handler
+`0x52A3`. Their dominant uses establish separate adversary, character, and
+Captain Bible presentation channels, but `0x4E` is also reused for captions
+and system text, so the documentation does not claim an enforced speaker
+type.
+
+Decoded the study-request path separately. Opcode `0x7D` stores its byte at
+`DS:0066` and the value of its variable operand at `DS:0068`. The prompt
+renderer at `0x446F` maps `0x2A` to the `*` victim-conversation component,
+`0x64` to the `P` paraphrase, and other nonzero values to the `L` lie.
+Opcode `0x49` sets `DS:79F0` and suspends the thread. The main loop calls the
+study browser through `0x834E`; it clears flags `0x14` and `0x15`, sets
+`0x14` after the expected descriptor is selected, and sets `0x15` on the
+nonmatching departure path. Saved focused `NAGE.BIN` and `JELO.BIN` listings
+as `build/analysis/nage-listing.txt` and `jelo-listing.txt`. `NAGE.BIN`
+demonstrates the complete configure, request, suspend, and result-branch
+sequence.
+
+The initial attempt to add all new names to `analysis/cb.rz` in one patch did
+not apply because the expected `poll_input_event` context appeared in a
+different order. Inspected the file with numbered lines and applied smaller
+patches. The script now names `show_study_bible`, `select_from_text_menu`,
+`show_dialogue_message`, `render_study_prompt`, and
+`handle_study_bible_request`, plus the identified dialogue and suspension
+handlers.
+
+### Live BOSS choice-table correlation
+
+Started the normal diagnostic VM with:
+
+```sh
+./run.sh --trace-dos
+```
+
+This retained the requested Cocoa window and the existing silent audio
+backend. Used QEMU monitor `sendkey ret` commands to advance through the title
+sequence into the BOSS conversation. Captured screenshots and physical
+memory with commands of this form:
+
+```text
+screendump build/qemu-trace/conversation-menu2.ppm
+pmemsave 0 1048576 build/qemu-trace/conversation-menu2-physical-1m.bin
+info registers
+```
+
+The raw PPM was not accepted by the local image-viewing path, so converted it
+to PNG with macOS `sips` and inspected the result. This was only a format
+conversion of ignored evidence, not an edit to game data. The visible screen
+contained the five expected BOSS questions.
+
+At the stable menu, the game data segment was `14E1`. This placed the choice
+count at physical `0x20238` and the record table at physical `0x1FF26`. The
+count word was five. A Python decoder over the memory capture printed:
+
+```text
+0: target=0644 text=4C13:045F
+1: target=07E8 text=4C13:0485
+2: target=0751 text=4C13:04A5
+3: target=0519 text=4C13:04C6
+4: target=095C text=4C13:04FE
+```
+
+Dereferencing each far pointer in the same physical dump produced, byte for
+byte, the five inline strings statically decoded from `BOSS.BIN`:
+
+```text
+So what do I do when I get inside?
+Can I expect any resistance?
+What about the people inside?
+Should I expect any problems with my computer bible?
+OK!  I'd better go do it!
+```
+
+Before selection, `DS:8934` was 1 and `DS:7CBA` was zero. Highlighted the
+last choice and selected it, then captured
+`conversation-selected.png` and another one-megabyte memory image. The
+selected-target word became `0x095C`, dialogue state became 2, and the next
+visible line was `Before you go, I think that we should pray.` That string is
+the opcode-`0x48` message at the exact static target `0x095C`. Stopped QEMU
+cleanly with the monitor `quit` command and waited for the process to exit.
+
+### Choice inspector and documentation
+
+Extended `tools/inspect_bin.py` with conservative semantic names for opcodes
+`0x13`, `0x14`, `0x44` through `0x46`, `0x48`, `0x49`, `0x4E`, `0x72`, and
+`0x7D`. Added a typed `DialogueChoiceDefinition` model and `--choices` output
+that lists the source, absolute target, and decoded text for every linear
+opcode-`0x44` definition. The output warns that branches can alter the menu
+presented at runtime.
+
+Added three focused regression tests: semantic opcode names, the exact five
+BOSS target/text pairs correlated in QEMU, and a complete-corpus total of 40
+choice definitions while respecting mixed code regions. Ran:
+
+```sh
+python3 -m unittest tests.test_inspect_bin -v
+tools/inspect_bin.py build/dd1/all/327_BOSS.BIN --choices
+```
+
+All 17 focused tests passed in 0.116 seconds, and the inspector printed the
+five expected BOSS records.
+
+Added the `Conversation Flow` chapter and linked it from the book summary.
+Updated the scene-bytecode, static-analysis, script-state, and text-format
+chapters; README now demonstrates `--choices`; and the plan now marks choice
+flow, dialogue channels, and study integration complete while leaving combat,
+gameplay entities, and other progression open. The first combined
+documentation patch failed because its expected context split one sentence
+differently in `text-formats.md`; reapplied the changes against the exact
+numbered context. This failure changed no file contents.
+
+### Validation and symbol-script correction
+
+Ran the complete validation set in three independent groups:
+
+```sh
+python3 -m unittest discover -s tests -v
+python3 -m py_compile tools/*.py tests/*.py
+bash -n run.sh
+mdbook build docs
+test -f build/docs-book/conversation-flow.html
+tools/inspect_bin.py build/dd1/all/327_BOSS.BIN --choices \
+  > build/analysis/boss-dialogue-choices.txt
+git diff --check
+```
+
+All 73 tests passed in 2.263 seconds. Every Python source compiled, `run.sh`
+passed shell syntax checking, mdBook built `conversation-flow.html`, the BOSS
+inspector output contained all five expected choices, and the whitespace
+check passed.
+
+The first Rizin symbol audit exposed a script defect despite returning exit
+status zero. The eight new handler lines used `f` to create flags at addresses
+where recursive analysis had already created switch-case flags, so Rizin
+printed name-collision errors. Replaced those lines with `fr` commands that
+rename the existing `case.0x4552.*` flags. A second audit initially used bare
+`f` to list flags; current Rizin requires `fl`, so that audit itself printed a
+usage error unrelated to the symbol script. Repeated it correctly with:
+
+```sh
+rizin -q -b 16 -e scr.color=false -i analysis/cb.rz \
+  -c 'afl; fl; q' build/analysis/CB_UNPACKED.EXE \
+  > build/analysis/conversation-symbol-audit.txt \
+  2> build/analysis/conversation-symbol-audit.err
+rg 'show_study_bible|select_from_text_menu|show_dialogue_message|\
+render_study_prompt|handle_study_bible_request|bin_handler_' \
+  build/analysis/conversation-symbol-audit.txt
+```
+
+The corrected output contains all five conversation/study functions and all
+eight handler flags at their expected addresses, with no collision or usage
+errors from the script. Ran `git diff --check` again after the correction; it
+passed.
+
+### Preparing the conversation-flow checkpoint
+
+The user requested a commit. Inspected `git status --short`, ran
+`git diff --check`, reviewed the diff statistics and path list, and read the
+four most recent commit subjects. The whitespace check passed. The intended
+checkpoint contains the plan, README, Rizin names, book summary, progress
+log, scene-bytecode, static-analysis, script-state, and text-format updates,
+the new conversation-flow chapter, the BIN inspector, and its tests. The
+current verification remains valid: all 73 tests pass, Python sources
+compile, `run.sh` passes shell syntax checking, mdBook builds the new chapter,
+the BOSS choice inventory matches QEMU, and all eight handler names load in
+Rizin.
+
+Staged those 12 paths explicitly, then ran `git diff --cached --check`,
+`git status --short`, `git diff --cached --stat`, and
+`git diff --cached --name-only`. The staged check passed and confirmed that
+no unrelated path was included. Created checkpoint `a0ed22e` with subject
+`scene: Recover conversation runtime` and a detailed body covering the
+runtime model, QEMU evidence, inspector, regression tests, and documentation.
+
+The immediate `awk` audit of `git log -1 --pretty=%B` found three body lines
+of 250, 195, and 126 characters. Multiple `git commit -m` paragraph arguments
+had not wrapped their contents, so the message violated the repository's
+72-character rule. The commit content itself was correct. Added this audit to
+the log and amended the same checkpoint with explicitly wrapped body lines,
+then repeated the message, status, and cleanliness checks.
