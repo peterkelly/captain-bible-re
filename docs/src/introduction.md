@@ -21,7 +21,8 @@ container, graphics,
 scene bytecode, audio, text, saves, maps, combat, conversation, and final
 progression all have reproducible inspectors or archive-backed regressions.
 
-The remaining work is intentionally narrower: interactive coverage of more
-gameplay screens, focused input/save traces, and semantic names for fields that
-the current evidence does not distinguish.
-Those boundaries are recorded in PLAN and in the relevant system chapters.
+Focused input/save traces, representative gameplay screens, and a live combat
+memory capture now supplement the earlier startup evidence. Remaining
+questions concern semantic names and branch-level behavior that the current
+evidence does not distinguish. Those boundaries are recorded in PLAN and in
+the relevant system chapters.

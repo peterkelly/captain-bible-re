@@ -5240,3 +5240,262 @@ Created commit `0f2b4b7` with subject
 `docs: Record interactive playability`. Git recorded 24 insertions and four
 deletions across the four intended files. Appended this success record and
 amended the same checkpoint so the confirmation remains one coherent commit.
+
+## 2026-07-15: Formal input/save and gameplay captures
+
+The user requested the two remaining formal PLAN tasks: focused interactive
+input/save tracing and representative major-screen/gameplay exercise. Reported
+that these would be handled as one visible, silent QEMU pass, including a
+combat-state memory/table capture, before updating the plan and book.
+
+Reviewed `PLAN.md`, the existing dynamic-analysis chapters, save documentation,
+manual controls, prior QEMU monitor transcripts, ignored captures under
+`build/qemu-trace/`, and the current disk-image contents. The existing tracer
+already observed DOS writes but did not observe the BIOS keyboard and DOS mouse
+interfaces. Extended `tools/qemu_dos_trace.c` to recognize game-originated
+interrupts `16h` and `33h`, preserve their AX service value, and count keyboard,
+DOS, mouse, and driver calls separately. Reported this tracer extension to the
+user before starting the focused run.
+
+Built the extended plugin and prepared a disposable analysis image:
+
+```sh
+tools/build_qemu_dos_trace.sh \
+  build/qemu-trace/qemu_dos_trace.so
+mkdir -p build/formal-captures
+cp -c build/captain-bible/captain-bible.img \
+  build/formal-captures/formal-tasks.img
+mdel -i build/formal-captures/formal-tasks.img@@1048576 \
+  ::/CBDOME/SOUND.1 ::/CBDOME/SOUND.2 \
+  ::/CBDOME/SOUND.3 ::/CBDOME/SOUND.4
+```
+
+The four sound drivers were removed only from this generated clone to avoid
+sound-driver status loops during the instruction-boundary trace. The user's
+persistent play image was not changed. Copied the initial `DDGAMES.SV0`; its
+SHA-256 was
+`68c0953383164d281197be5b073d4b911a4785a47a855d78197480e5812c130f`.
+
+Launched QEMU with TCG one-instruction translation blocks, the tracer, silent
+Sound Blaster/AdLib devices, and the required visible display:
+
+```sh
+qemu-system-i386 \
+  -name 'Captain Bible formal capture' \
+  -machine pc -accel tcg,one-insn-per-tb=on \
+  -cpu pentium -m 16 -boot c \
+  -drive file=build/formal-captures/formal-tasks.img,\
+format=raw,if=ide,index=0,media=disk \
+  -vga std \
+  -plugin build/qemu-trace/qemu_dos_trace.so,\
+log=build/formal-captures/formal-calls.log,cs=0x627,start=0xCB5C \
+  -monitor unix:build/formal-captures/formal-monitor.sock,\
+server=on,wait=off \
+  -audiodev none,id=audio0 \
+  -device sb16,audiodev=audio0 \
+  -device adlib,audiodev=audio0 \
+  -display cocoa,zoom-to-fit=on
+```
+
+Captured and visually inspected the initial playable screen. The live trace
+showed keyboard polling at `0627:E9DC`, mouse motion at `0627:8D8A`, and mouse
+position/buttons at `0627:8DCD`.
+
+### Quick save and mouse evidence
+
+Sent F10 through the QEMU monitor. BIOS service `0101` returned AX `4400`, and
+the consuming service `0000` returned the same scan/ASCII word. The next file
+sequence opened `DDGAMES.SV0`, then opened/created/wrote `DDGAMES.SVQ`. The
+write entries covered the recovered 200, 200, 66, 660, four-by-20, five-by-2,
+and two-by-768 state regions, with the C library's buffered leading byte
+accounting for the first 200-byte block split.
+
+Copied both files out after the operation. `SV0` retained its original hash;
+the 2,752-byte quick save had SHA-256
+`5e329e21f32d2e6c3e564d3a3ad717ab07ad55aaedde2587725756945597e43f`.
+`tools/inspect_save.py --variables` decoded translation/music/effects value 1,
+text bank C, `INTRO`/`seg` resource strings, 46 active text descriptors, and
+the expected script-variable blocks. Reported that the F10 input and resulting
+guest write were joined in one timeline.
+
+Queried QEMU monitor help for `mouse_move` and `mouse_button`, moved the mouse
+by `(48,24)`, then held and released the left button in separate monitor
+commands so polling could observe the held state. Service `0003` changed from
+X/Y `0140:0064` to `01D0:0088`; while held, repeated returns had `BX=0001` at
+that position. Extracted the relevant ignored trace portions to
+`build/formal-captures/mouse-focused.log`. Reported this game-boundary mouse
+evidence to the user.
+
+### Normal save and representative screens
+
+Used F9 to return from the accidentally selected commander conversation to the
+quick-saved introduction state. Escape opened the game options menu. Sent two
+Down keys and Enter to choose Save Game, selected a numbered slot, typed
+`formal`, and pressed Enter. The interface appended the typed characters to
+the existing visible label, producing `EMPTYformal` in slot 2 rather than
+clearing `EMPTY`; this UI behavior is preserved as observed rather than
+corrected in the image.
+
+The trace recorded BIOS word `1C0D` for Enter, then rewrote `DDGAMES.SV0` and
+`DDGAMES.SV2`. After stopping QEMU, extracted both files. Their SHA-256 values
+were:
+
+```text
+84c18787ecd4d9190943a188884b612d574dcd682f2480d110cbc8eb5175343d  SV0
+659b27f3ed7412fa66cb69dac6b2b5d0b44c200c5069660b362f299aa67fac63  SV2
+```
+
+The first attempt to run `tools/inspect_save_index.py` failed because no such
+separate tool exists. Corrected the command to
+`tools/inspect_save.py build/formal-captures/normal-after.SV0`; it decoded all
+nine 27-byte labels and the new `EMPTYformal` slot. The state inspector
+confirmed an exact 2,752-byte state with `INTRO`/`seg`, bank C, and the expected
+named variables. Extracted the focused normal-save trace around calls 1000172
+through 1000203.
+
+Started a fresh disposable QEMU clone without the slow tracer, keeping
+`-audiodev none` and `-display cocoa,zoom-to-fit=on`. Used monitor `sendkey`,
+`mouse_move`, `mouse_button`, and `screendump` commands, converting PPM captures
+to PNG with `sips` for visual inspection. Exercised and inspected:
+
+- the primary title and landscape title transition;
+- the commander conversation and its continue dialogue;
+- the difficulty selector and Normal selection;
+- active exterior-platform gameplay and an interior hall;
+- the F1 Bible interface, F2 map, and F3 faith overlay;
+- gameplay options, save-slot selection, and name entry;
+- the later controlled combat and defeat screens.
+
+An F1 sent during the introductory sequence did not open the Bible; it advanced
+to the difficulty selector. After Normal gameplay began, F1 opened the Bible
+interface as expected. Sent repeated Enter keys to advance the commander
+conversation into gameplay. Mouse target experiments used clamped relative
+motion; an initial delta of 143 overflowed the effective signed event range and
+left the pointer at the edge, so subsequent movement used deltas below 128.
+Clicking the exterior door successfully changed to the hall screen. These
+intermediate pointer experiments changed only the disposable image.
+
+### Controlled COMBAT1 entry and runtime tables
+
+Quick-saved from the hall, stopped QEMU, and extracted the resulting `SVQ`.
+`tools/inspect_save.py --variables` identified snapshot/live names
+`MENU`/`CHAL`, extension `seg`, Normal difficulty, and live faith 10,000. Added
+`tools/patch_save_scene.py`, which validates the exact 2,752-byte size and
+changes only the two 20-byte scene-name fields. Added tests for both-field
+replacement, invalid names, and invalid state size.
+
+The first focused test command used pytest, but the project and host use
+standard-library unittest and pytest was not installed. Rewrote the test in
+unittest style and confirmed all three cases passed:
+
+```sh
+python3 -m unittest tests.test_patch_save_scene -v
+python3 tools/patch_save_scene.py \
+  build/formal-captures/hall.SVQ COMBAT1 \
+  build/formal-captures/combat1.SVQ
+python3 tools/inspect_save.py \
+  build/formal-captures/combat1.SVQ --variables
+```
+
+`cmp -l` showed changes only in the two saved scene-name fields. Injected the
+patched quick save with mtools, copied it back out, and confirmed a byte-for-
+byte round trip. Restarted visible, silent QEMU, entered the game, and sent F9.
+The resulting screen visibly showed the COMBAT1 Macho encounter and ATTACK
+selector.
+
+Saved one MiB of physical memory and captured `info registers`; the game was at
+`CS:IP=0627:E9DC` with `DS=ES=SS=14E1`. The first dump had action/animation
+counts 0/1 because it caught initialization between redraws, so it was retained
+as historical evidence but not used for comparison. Sent the A key, observed a
+green attack effect, waited, and saved a second one-MiB dump. The run later
+reached the “Don't Give Up!” defeat screen, consistent with the controlled
+checkpoint's zero snapshot faith; it is not treated as an ordinary combat
+outcome.
+
+The first attempt to inspect static COMBAT1 used stale extraction prefix
+`331_COMBAT1.BIN` and failed with `FileNotFoundError`. Located the current
+member with `rg --files`; the correct path is
+`build/dd1/all/343_COMBAT1.BIN`. A read-only Python comparison then established
+four of four action records and 33 of 33 animation first-step/interval pairs.
+
+Added executable `tools/inspect_runtime_tables.py` to make that comparison
+reproducible. It accepts a physical dump and runtime DS, decodes the counted
+ten-byte action and 12-byte animation records, preserves ten 16-byte thread
+records, and optionally compares a loaded BIN. Added three tests for exact
+field decoding, short dumps, and implausible counts. The first direct tool run
+failed with permission denied because `chmod +x` followed it in the same
+command block. Applied the executable bit, reran it successfully, and obtained:
+
+```text
+actions: 4
+animations: 33
+threads: current=0; shown=10
+comparison: actions=4/4; animations=33/33
+```
+
+ATTACK, DEFEND, and RETREAT were active; COMBAT was present and inactive.
+Thread slots 0, 5, 7, and 8 had active byte 1. The stable memory dump has
+SHA-256
+`becc98dd2eba0bad502f1bf6b7aef4ef2638fa48d0e0e62688ad879085bc1654`.
+Reported the successful live table match and controlled-entry caveat to the
+user.
+
+### Tracer return matching and interruption
+
+While reviewing the combined input/save trace, noticed DOS return callbacks at
+`0070:018C`. Translation-time return callbacks are global: adding input vectors
+made it more likely that an interrupt inside DOS would execute at an address
+registered for some other interrupt while a game call was pending. Entry
+records remained correct, but these return records could not be trusted.
+
+Added the exact pending linear return address to `struct pending_call` and made
+`trace_return` require the current `CS:IP` to match it. Built a separate fixed
+plugin and ran another visible, silent disposable-image capture. It ended with:
+
+```text
+# captured calls: 119824 (keyboard=39903, DOS=115, mouse=79806, driver=0)
+```
+
+An `rg` audit found no `pc=0070:018C` false returns. The new run also showed
+correct paired DOS startup returns and paired keyboard/mouse polling returns.
+
+The user then said to stop. Closed every QEMU instance and reported that the
+captures and tools were complete but PLAN/README/mdBook/progress-log updates
+and final validation remained unfinished. No commit was made at that point.
+
+### Preparing the formal-capture checkpoint
+
+The user subsequently requested a commit. Resumed only the consolidation work:
+checked both Phase 3 PLAN tasks, updated README and the reproduction guide for
+the two new tools and four traced vectors, documented focused input/save and
+representative-screen evidence, replaced the obsolete combat-capture gap with
+the live COMBAT1 result, and preserved the controlled scene-entry limitation in
+both Combat Runtime and Known Gaps. Prepared to run the complete repository
+verification before creating the checkpoint.
+
+Full validation passed:
+
+```sh
+git diff --check
+python3 -m unittest discover -s tests -v
+python3 -m py_compile tools/*.py tests/*.py
+tools/check_documentation.py
+tools/inspect_symbol_map.py
+bash -n run.sh tools/build_qemu_dos_trace.sh
+tools/build_qemu_dos_trace.sh build/qemu-trace/qemu_dos_trace.so
+mdbook build docs
+test -f build/docs-book/index.html
+test -f build/docs-book/dynamic-analysis.html
+test -f build/docs-book/combat-runtime.html
+```
+
+All 110 tests passed in 4.261 seconds. Every Python source compiled, the
+checker reported 23 chapters plus README, the 175-entry symbol catalog passed,
+both shell scripts parsed, the QEMU plugin rebuilt without warnings, mdBook
+generated the complete book and both updated chapters, and Git found no
+whitespace errors.
+
+Created the requested checkpoint with subject `dynamic: Validate input saves
+and combat`. Git recorded 13 changed files, 965 insertions, and 50 deletions,
+including four new tested/executable support files. Appended this success
+record for the same checkpoint before its final amendment.

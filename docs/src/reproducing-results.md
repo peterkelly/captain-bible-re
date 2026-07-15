@@ -180,8 +180,23 @@ Launch the visible QEMU session with the game-filtered DOS-call plugin:
 
 The dynamic-analysis and sound-driver chapters document generated paths,
 deterministic segment assumptions, preserved startup hashes, live AX capture,
-and the `int 21h`/`int 66h` record formats. This is an interactive capture, not
-part of the fast test suite.
+and the `int 16h`/`21h`/`33h`/`66h` record formats. This is an interactive
+capture, not part of the fast test suite.
+
+For a controlled scene-entry experiment, patch both scene names in a research
+copy of a state and inspect a subsequent physical-memory dump:
+
+```sh
+tools/patch_save_scene.py input.SVQ COMBAT1 output.SVQ
+tools/inspect_runtime_tables.py memory.bin \
+  --data-segment 0x14e1 \
+  --bin build/dd1/all/343_COMBAT1.BIN
+```
+
+The combat-runtime chapter states the provenance limitation: the preserved
+COMBAT1 capture entered through a patched hall quick-save, not by walking to
+the encounter naturally. The loaded action and animation tables nonetheless
+match the selected BIN resource byte for byte in every compared definition.
 
 ## 10. Run the complete noninteractive verification
 
@@ -207,6 +222,7 @@ executable. The final HTML is written to `build/docs-book/`.
 
 The noninteractive suite proves deterministic parsing, structural invariants,
 known byte-level regressions, documentation integrity, and book generation. It
-does not claim to automate subjective gameplay checks. Interactive input,
-complete major-screen coverage, and focused traces of save writes remain
-separate dynamic tasks in PLAN.
+does not claim to automate subjective gameplay checks. The completed
+interactive pass is recorded separately because it used a visible QEMU
+session, monitor input, screenshots, guest save files, and physical-memory
+dumps rather than the fast suite.

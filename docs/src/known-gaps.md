@@ -5,20 +5,16 @@ not distinguish their semantics. The list below consolidates those boundaries
 so an unresolved detail in one chapter is not mistaken for a contradiction in
 another.
 
-## Dynamic captures still wanted
+## Dynamic-capture boundary
 
-- Capture focused keyboard/mouse input and normal save/quick-save writes with
-  the DOS tracer or monitor, then connect them to the already named input and
-  save functions.
-- Capture the animation, action-target, and BIN-thread tables during a live
-  combat encounter. Their static layouts are recovered, but the first attempted
-  automated encounter capture stopped during a black transition in a loaded
-  sound-driver segment.
-- Exercise a representative screen from each major gameplay system while
-  recording scene names, script state, and expected inspector output.
-The existing startup trace, title/intro memory captures, live dialogue-choice
-table, scene display records, framebuffer comparison, and decoded `D003` PCM
-remain valid independent dynamic checks.
+Focused keyboard/mouse input, quick and normal saves, representative screens,
+and all three COMBAT1 runtime table families now have preserved dynamic
+evidence. The combat capture deliberately used a saved-scene patch to enter
+COMBAT1, so it validates loaded runtime structures and action execution but not
+the natural map-to-encounter transition or an ordinary outcome. The startup
+trace, title/intro memory captures, live dialogue-choice table, scene display
+records, framebuffer comparison, and decoded `D003` PCM remain independent
+dynamic checks.
 
 ## Partially named runtime structures
 
@@ -71,6 +67,12 @@ work answered. Current chapters supersede those chronological notes:
   and `SOUND.4` is a fully validated 181-entry AIL OPL timbre library.
 - Hall kinds for all seven Cybers, the hidden Spider, stations, cleared combat,
   and exits are correlated with their scripts and manual identities.
+- BIOS keyboard and mouse polling are captured at the named game call sites;
+  F10 and normal menu saves are joined to their exact guest writes.
+- The live COMBAT1 action table matches all four static targets, and all 33
+  captured animation records match their static first-step and interval fields.
+- Representative startup, story, exploration, study, map, faith, menu, save,
+  combat, and defeat screens were exercised in visible, silent QEMU.
 
 The append-only progress log is intentionally historical and can contain an
 earlier hypothesis followed by its correction. Format and system chapters are

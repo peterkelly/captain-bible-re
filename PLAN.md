@@ -42,8 +42,8 @@ This plan is a living checklist. Findings and commands are recorded in
 - [x] Capture and interpret a startup-to-story-introduction DOS API trace.
 - [x] Trace startup, resource file access, driver loading, and decoded audio.
 - [x] Correlate captured runtime state with static functions and data structures.
-- [ ] Capture focused interactive input and save/write traces.
-- [ ] Exercise major screens and gameplay systems while recording evidence.
+- [x] Capture focused interactive input and save/write traces.
+- [x] Exercise major screens and gameplay systems while recording evidence.
 
 ## Phase 4: File formats and game systems
 

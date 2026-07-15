@@ -29,6 +29,7 @@ struct pending_call {
     uint8_t vector;
     uint16_t ax;
     uint64_t sequence;
+    uint64_t return_linear;
     uint16_t cs;
     uint16_t ip;
 };
@@ -40,7 +41,9 @@ static GHashTable *return_addresses;
 static FILE *trace_file;
 static GMutex trace_lock;
 static uint64_t call_count;
+static uint64_t keyboard_call_count;
 static uint64_t dos_call_count;
+static uint64_t mouse_call_count;
 static uint64_t driver_call_count;
 static bool have_eax;
 static bool have_cs_filter;
@@ -284,8 +287,12 @@ static void trace_interrupt(unsigned int vcpu_index, void *userdata)
 
     g_mutex_lock(&trace_lock);
     ++call_count;
-    if (vector == 0x21) {
+    if (vector == 0x16) {
+        ++keyboard_call_count;
+    } else if (vector == 0x21) {
         ++dos_call_count;
+    } else if (vector == 0x33) {
+        ++mouse_call_count;
     } else if (vector == 0x66) {
         ++driver_call_count;
     }
@@ -293,6 +300,7 @@ static void trace_interrupt(unsigned int vcpu_index, void *userdata)
     pending.vector = vector;
     pending.ax = ax;
     pending.sequence = call_count;
+    pending.return_linear = (uint64_t)cs * 16 + ip + 2;
     pending.cs = cs;
     pending.ip = ip;
     fprintf(trace_file,
@@ -342,6 +350,12 @@ static void trace_return(unsigned int vcpu_index, void *userdata)
         return;
     }
 
+    cs = (uint16_t)read_register(registers.cs);
+    ip = (uint16_t)read_register(registers.eip);
+    if ((uint64_t)cs * 16 + ip != pending.return_linear) {
+        return;
+    }
+
     ax = have_eax ? (uint16_t)read_register_handle(registers.eax) : 0xffff;
     bx = (uint16_t)read_register(registers.ebx);
     cx = (uint16_t)read_register(registers.ecx);
@@ -350,8 +364,6 @@ static void trace_return(unsigned int vcpu_index, void *userdata)
     di = (uint16_t)read_register(registers.edi);
     ds = (uint16_t)read_register(registers.ds);
     es = (uint16_t)read_register(registers.es);
-    cs = (uint16_t)read_register(registers.cs);
-    ip = (uint16_t)read_register(registers.eip);
     eflags = (uint32_t)read_register(registers.eflags);
     if (pending.vector == 0x66 && pending.ax == 0x068c) {
         read_guest_string(bx, cx, 0, result, sizeof(result));
@@ -416,7 +428,8 @@ static void translate_block(qemu_plugin_id_t id, struct qemu_plugin_tb *tb)
 
         if (size == 2 && qemu_plugin_insn_data(instruction, bytes, 2) == 2 &&
             bytes[0] == 0xcd &&
-            (bytes[1] == 0x21 || bytes[1] == 0x66)) {
+            (bytes[1] == 0x16 || bytes[1] == 0x21 ||
+             bytes[1] == 0x33 || bytes[1] == 0x66)) {
             g_hash_table_add(return_addresses,
                              GSIZE_TO_POINTER((gsize)(address + size)));
             trace_vector_on_entry = bytes[1];
@@ -507,9 +520,11 @@ static void finish_trace(qemu_plugin_id_t id, void *userdata)
 
     g_mutex_lock(&trace_lock);
     fprintf(trace_file,
-            "# captured calls: %" PRIu64 " (DOS=%" PRIu64
+            "# captured calls: %" PRIu64 " (keyboard=%" PRIu64
+            ", DOS=%" PRIu64 ", mouse=%" PRIu64
             ", driver=%" PRIu64 ")\n",
-            call_count, dos_call_count, driver_call_count);
+            call_count, keyboard_call_count, dos_call_count,
+            mouse_call_count, driver_call_count);
     fclose(trace_file);
     trace_file = NULL;
     g_mutex_unlock(&trace_lock);

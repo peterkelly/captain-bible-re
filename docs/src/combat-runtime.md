@@ -215,15 +215,50 @@ The summaries follow linear definition order. Calls and branches can skip or
 repeat definitions, and enable/disable commands determine which action
 targets are live at a particular moment.
 
-## Dynamic-analysis boundary
+## Live COMBAT1 table validation
 
-The static model is supported by handler call flow, table strides, all seven
-combat programs, and rendered `COMBTAGS` labels. An attempted visible,
-silent QEMU navigation to the first encounter did not yield a usable combat
-memory capture: automated input reached a black transition screen while the
-CPU was in a loaded sound-driver segment. QEMU was stopped cleanly, and no
-live-table claim is based on that run. Dynamic validation of the animation,
-action-target, and thread tables remains open.
+A visible, silent QEMU capture now validates the three runtime table families.
+The route was controlled rather than a natural walk to an encounter: a genuine
+hall quick-save contained snapshot/live scene names `MENU`/`CHAL`, and
+`tools/patch_save_scene.py` changed only both 20-byte scene-name fields to
+`COMBAT1`. The modified state round-tripped through the FAT image byte for
+byte. Loading it with F9 produced the Macho combat screen, and the A key
+started a visible green attack effect.
+
+The first dump caught scene initialization between visible redraws, with
+counts 0 and 1, so it is not used for table comparison. A second one-MiB
+physical dump after the attack input had SHA-256
+`becc98dd2eba0bad502f1bf6b7aef4ef2638fa48d0e0e62688ad879085bc1654`.
+QEMU reported `DS=14E1`; `tools/inspect_runtime_tables.py` therefore read the
+same data offsets documented above at physical base `0x14E10`.
+
+The stable capture contains four action records and 33 animation records. All
+four action target/X/Y/selector-offset tuples match the static COMBAT1
+definitions. ATTACK, DEFEND, and RETREAT are active; the automatic COMBAT
+target is present but inactive. Every animation record's first-step offset and
+interval matches its corresponding BIN definition, 33 of 33. Current-step,
+link, state, render-slot, and timing values are retained as live values rather
+than forced to equal their initial definitions.
+
+The first ten 16-byte scheduler records were also saved. Current slot is zero;
+slots 0, 5, 7, and 8 have active byte 1. Slot 0 has cursor `0x0C35` and signed
+delay -824 at the sampled instant. The remaining opaque bytes are emitted in
+hex so later field naming will not lose evidence. The exact comparison command
+is:
+
+```sh
+tools/inspect_runtime_tables.py \
+  build/formal-captures/combat-after-a-memory.bin \
+  --data-segment 0x14e1 \
+  --bin build/dd1/all/343_COMBAT1.BIN
+```
+
+This validates the table addresses, strides, counts, and statically comparable
+fields. It does not prove a natural map-to-encounter transition, nor does the
+controlled state preserve a normal combat outcome: the patched checkpoint had
+zero snapshot faith, and the run subsequently reached the “Don't Give Up!”
+screen. Those provenance limits are intentional and recorded rather than
+being generalized to ordinary play.
 
 ## Remaining questions
 
@@ -233,5 +268,3 @@ action-target, and thread tables remains open.
   BIN scheduler slots field by field.
 - Correlate every randomized branch with the exact enemy phase and rendered
   successful, harmless, or damaging sequence.
-- Capture the three runtime tables during a live encounter and compare them
-  byte for byte with the static definitions.

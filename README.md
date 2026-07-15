@@ -5,8 +5,8 @@ reverse-engineering *Captain Bible in the Dome of Darkness*, a DOS game from
 the 1990s. The original game files are expected in `CB/` and are intentionally
 ignored by Git.
 
-The FreeDOS/QEMU environment is complete and executable analysis is in
-progress. See `PLAN.md` for the live task list and
+The FreeDOS/QEMU environment and the planned static and dynamic analysis are
+complete. See `PLAN.md` for the living checklist and
 `docs/src/progress-log.md` for the complete activity log.
 
 ## Requirements
@@ -222,6 +222,22 @@ The combat-runtime chapter documents their runtime tables, BIN scheduler,
 action outcome branches, faith effects, shared victory/retreat epilogue, and
 map transitions.
 
+Patch both scene-name fields in a disposable 2,752-byte state for controlled
+scene-entry experiments, then compare a physical-memory capture with its BIN
+definitions using:
+
+```sh
+tools/patch_save_scene.py input.SVQ COMBAT1 output.SVQ
+tools/inspect_runtime_tables.py memory.bin \
+  --data-segment 0x14e1 \
+  --bin build/dd1/all/343_COMBAT1.BIN
+```
+
+The patcher changes only the two saved 20-byte scene-name fields; use it only
+on research copies. The runtime inspector decodes the counted action and
+animation tables plus ten BIN-thread records. With `--bin`, it compares action
+targets and animation definition fields against the static command stream.
+
 `CP2.BIN` ends with the complete 16-node Unibot navigation graph. Inspect its
 four-heading exits, seven pylon nodes, Tower, lower-right-map coordinates, and
 per-node transition values with:
@@ -342,9 +358,10 @@ a normal run. The generated plugin, trace, monitor socket, screenshots, and
 memory dumps are kept under the ignored `build/qemu-trace/` directory.
 
 The trace activates at the reconstructed entry point `0627:CB5C` and records
-`int 21h` and `int 66h` calls and returns from code segment `0627`, including
-live AX and the other argument/result registers. These addresses are stable
-for the current deterministic FreeDOS image. If the DOS environment or boot
+BIOS keyboard `int 16h`, DOS `int 21h`, mouse `int 33h`, and sound-driver
+`int 66h` calls and returns from code segment `0627`, including live AX and
+the other argument/result registers. These addresses are stable for the
+current deterministic FreeDOS image. If the DOS environment or boot
 configuration changes, re-establish the load segment before relying on the
 filter.
 
@@ -360,6 +377,7 @@ mdbook build docs
 The checker validates SUMMARY coverage, local chapter links and anchors, and
 repository commands used in shell examples. The Reproducing the Results
 chapter gives a single end-to-end command sequence for every recovered format
-and system. Known Gaps and Evidence Boundaries separates confirmed results from
-the remaining dynamic captures and deliberately unnamed fields.
+and system. Known Gaps and Evidence Boundaries separates confirmed results
+from deliberately unnamed fields and the limits of controlled scene-entry
+captures.
 The rendered book is written to `build/docs-book/`.

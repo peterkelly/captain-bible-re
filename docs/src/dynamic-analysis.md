@@ -2,9 +2,10 @@
 
 ## QEMU tracing workflow
 
-`tools/qemu_dos_trace.c` is a QEMU TCG plugin that observes DOS interrupt
-`21h` and sound-driver interrupt `66h` without changing the game executable or
-disk image. Build and run it through the normal launcher:
+`tools/qemu_dos_trace.c` is a QEMU TCG plugin that observes BIOS keyboard
+interrupt `16h`, DOS interrupt `21h`, mouse interrupt `33h`, and sound-driver
+interrupt `66h` without changing the game executable or disk image. Build and
+run it through the normal launcher:
 
 ```sh
 ./run.sh --trace-dos
@@ -130,3 +131,66 @@ companion text bank C; `DDLA` through `DDLG` and `DDLR` use the same recovered
 record stream. The direct opens are therefore runtime confirmation that DDL
 text lives beside the main container, while the extensionless verse indexes
 live inside `DD1.DAT`. The text-format chapter documents their exact join.
+
+## Focused input and save capture
+
+A later visible, silent QEMU run added `int 16h` and `int 33h` to the same
+instruction-boundary tracer. The game polls BIOS keyboard service `0101` at
+`0627:E9DC`, mouse motion service `000B` at `0627:8D8A`, and mouse
+position/buttons service `0003` at `0627:8DCD`. These sites independently
+match the statically named input wrappers.
+
+Moving the monitor mouse changed the returned position from X/Y `0140:0064`
+to `01D0:0088`, or `(320, 100)` to `(464, 136)`. Holding the left button then
+produced repeated service-`0003` returns with `BX=0001` at the new position.
+This proves that the guest driver state reaches the game's own polling path,
+not merely that QEMU accepted host events.
+
+F10 produced BIOS scan/ASCII word `4400` first through the non-consuming
+service and then through service `0000`. The next DOS activity opened the
+existing `DDGAMES.SV0`, then created and wrote `DDGAMES.SVQ`. After QEMU
+stopped, the quick save was exactly 2,752 bytes with SHA-256
+`5e329e21f32d2e6c3e564d3a3ad717ab07ad55aaedde2587725756945597e43f`.
+The before/after `.SV0` hashes were identical, confirming that quick save does
+not rewrite the normal-slot label index.
+
+The normal in-game Escape/Save Game path ended name entry with BIOS word
+`1C0D` and then rewrote the 243-byte `DDGAMES.SV0` followed by the selected
+2,752-byte `DDGAMES.SV2`. The low-level writes follow the recovered state
+layout: 200-byte snapshot and live blocks, 66 flags, 660 bytes of text
+descriptors, four 20-byte strings, five words, and two 768-byte maps. Parsing
+the copied slot with `tools/inspect_save.py` recovered the expected settings,
+bank C, `INTRO`/`seg` scene strings, and named script-variable state. This
+connects BIOS input, the menu path, `write_save_state`, Microsoft C low-level
+I/O, and the two on-disk formats in one run.
+
+Adding more interrupt vectors exposed a tracer bookkeeping bug: an interrupt
+instruction inside DOS could have the same registered return callback active
+while a game call was pending. Return records from the affected capture are
+therefore not used for DOS-result claims; its call-entry paths and write
+arguments remain valid. The plugin now stores the pending call's exact linear
+return address and ignores callbacks at every other `CS:IP`. A fresh bounded
+run recorded 119,824 paired calls—39,903 keyboard, 115 DOS, and 79,806
+mouse—with no false DOS-internal return.
+
+## Representative interactive coverage
+
+The visible Cocoa session exercised and captured these distinct paths:
+
+| System | Observed evidence |
+|---|---|
+| Startup | Main title, landscape title transition, and difficulty selector. |
+| Story | Opening narration and multi-step commander conversation. |
+| Exploration | Captain Bible on the exterior platform and inside a hall. |
+| Study | F1 Bible interface reporting no loaded verses. |
+| Navigation | F2 map interface with the current node graph. |
+| State | F3 faith overlay reporting 100 percent. |
+| Menus/saves | Gameplay options, normal-save slot list, and name entry. |
+| Combat | COMBAT1 action screen, A-key attack effect, and defeat screen. |
+
+Function keys were sent only after normal gameplay began; an earlier F1 during
+the introductory sequence advanced into the difficulty selector instead of
+opening the Bible. The distinction is useful evidence that the same input is
+routed by scene state rather than handled as an unconditional global hotkey.
+The combat chapter records the controlled scene-entry provenance and table
+dump in detail.
