@@ -157,6 +157,17 @@ use `--opaque-zero` when reproducing an opaque draw. The mdBook graphics
 chapter documents the format and its byte-for-byte correlation with QEMU VGA
 memory.
 
+Generate an annotated contact sheet of every full-screen ART frame, with PAL
+associations inferred from the scene programs:
+
+```sh
+tools/render_fullscreen_gallery.py \
+  CB/DD1.DAT \
+  --output build/graphics/full-screen-gallery.png
+```
+
+Use `--scale 2` for a nearest-neighbor enlarged sheet.
+
 ## Inspecting scene bytecode
 
 The 62 extracted `BIN` resources contain scene programs. The recovered

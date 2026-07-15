@@ -47,6 +47,7 @@ This plan is a living checklist. Findings and commands are recorded in
 - [x] Implement and verify a reproducible `DD1.DAT` extractor.
 - [x] Recover the `PAL`, `ART`, and related sprite metadata formats.
 - [x] Implement and verify reproducible artwork rendering tools.
+- [x] Generate an annotated gallery of every full-screen ART frame.
 - [x] Recover the `BIN` scene-command stream and startup sequencing.
 - [x] Recover the `ABT` sound-effect and `XMI` music formats.
 - [x] Implement and verify reproducible audio inspection/conversion tools.

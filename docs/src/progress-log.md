@@ -2087,3 +2087,145 @@ scripts parsed, both audio CLIs completed, and Rizin listed all eight new
 effect/ABT symbols at their intended offsets. mdBook generated the audio
 chapter. Tracked and new files have no whitespace errors. The audio-pass
 changes remain uncommitted pending a requested checkpoint.
+
+## 2026-07-15: Annotated full-screen artwork gallery
+
+### Full-screen frame and palette inventory
+
+Started from a clean worktree and searched the archive for `ART` descriptors
+whose origin is `(0, 0)` and whose dimensions are exactly 320×200. The first
+short Python probe attempted to import a nonexistent `parse_art` helper from
+`tools/render_art.py` and failed with `ImportError`. Inspected that module,
+used its actual `ArtResource.from_bytes` interface, and repeated the probe.
+
+The corrected enumeration found exactly 11 full-screen frames, all at frame
+index 0: archive entries 006 `INTRO.ART`, 063 `PRAY.ART`, 073 `OVER.ART`, 090
+`LAW1.ART`, 093 `KABLAM1.ART`, 097 `SPEAKER.ART`, 100 `HOLE.ART`, 122
+`DOME.ART`, 130 `DENY1.ART`, 133 `CULTA.ART`, and 165 `BOSS.ART`.
+
+Decoded the resource-loading command context in every `BIN` scene program.
+Associated the active palette selected by opcode `0x4D` or `0x6D` with the
+subsequent ART load at opcode `0x01`. This produced one unambiguous palette
+for every full-screen resource:
+
+```text
+INTRO.ART   TITLE.PAL
+PRAY.ART    PRAY.PAL
+OVER.ART    1.PAL
+LAW1.ART    LAW.PAL
+KABLAM1.ART KABLAM.PAL
+SPEAKER.ART 1.PAL
+HOLE.ART    HOLE.PAL
+DOME.ART    DOME.PAL
+DENY1.ART   DENY.PAL
+CULTA.ART   1.PAL
+BOSS.ART    BOSS.PAL
+```
+
+### Reproducible gallery tool
+
+Added executable `tools/render_fullscreen_gallery.py`. It reads `DD1.DAT`
+directly, validates and discovers all full-screen ART frames, decodes the
+known command regions of the scene programs to infer their palettes, and
+renders an RGB contact sheet in archive order. Labels sit outside the game
+frames and give the archive identifier, ART name, frame number, and palette.
+The optional `--scale` argument enlarges pixels with nearest-neighbor sampling.
+
+Added `tests/test_fullscreen_gallery.py`. Its tests lock down the exact set and
+order of 11 identifiers, the inferred ART-to-PAL mapping, and the dimensions
+and mode of the native four-column sheet. The first focused run passed the two
+inventory tests but failed the layout assertion because the expected height
+was miscalculated as 828 rather than 816 pixels. Corrected the expected value
+and repeated the focused suite; all three tests passed.
+
+Generated both native and two-times artifacts and inspected each rendered PNG:
+
+```sh
+chmod +x tools/render_fullscreen_gallery.py
+python3 -m py_compile \
+  tools/render_fullscreen_gallery.py tests/test_fullscreen_gallery.py
+python3 -m unittest -v tests.test_fullscreen_gallery
+tools/render_fullscreen_gallery.py \
+  CB/DD1.DAT \
+  --output build/graphics/full-screen-gallery.png
+tools/render_fullscreen_gallery.py \
+  CB/DD1.DAT --scale 2 \
+  --output build/graphics/full-screen-gallery-2x.png
+file \
+  build/graphics/full-screen-gallery.png \
+  build/graphics/full-screen-gallery-2x.png
+shasum -a 256 \
+  build/graphics/full-screen-gallery.png \
+  build/graphics/full-screen-gallery-2x.png
+```
+
+The native sheet is a 1348×816 RGB PNG with SHA-256
+`f9d5e6330041ad736f072ae9a90fc7328355857a8adc8f26bfc70e7dbf41dfcb`.
+The enlarged sheet is a 2696×1632 RGB PNG with SHA-256
+`d91fcb4254eddee5458713f661f08269d138410d1ef224662fc13ab8904d7ef1`.
+Visual inspection confirmed all 11 labels, frame boundaries, palette colors,
+and nearest-neighbor scaling.
+
+`KABLAM1.ART` appeared almost entirely black, so counted its raw pixel values
+to distinguish a rendering error from source content. It has 16 distinct
+indices, dominated by indices 100 through 107; `KABLAM.PAL` maps those entries
+to very dark colors. Retained it because it is a genuine full-screen base
+frame used with subsequent KABLAM overlay artwork. Updated `README.md`,
+`PLAN.md`, and this book's graphics chapter with the reproducible command,
+inventory, and palette evidence. Reported the completed visual check and this
+reason for retaining the dark frame to the user.
+
+The user briefly expanded the requested scope to all ART resources, then
+restored it to full-screen images only before implementation changed. During
+that check, enumerated the broader population as 143 ART resources containing
+1,178 frames. The scene-command association pass gives one palette to 113
+resources, multiple possible palettes to 17, and no direct association to 13.
+Kept the completed 11-frame gallery design and artifacts unchanged, as
+requested.
+
+### Gallery verification
+
+Ran the complete repository verification after the scope confirmation:
+
+```sh
+python3 -m unittest discover -s tests -v
+python3 -m py_compile tools/*.py tests/*.py
+bash -n run.sh tools/build_qemu_dos_trace.sh
+tools/render_fullscreen_gallery.py \
+  CB/DD1.DAT \
+  --output build/graphics/full-screen-gallery.png
+tools/render_fullscreen_gallery.py \
+  CB/DD1.DAT --scale 2 \
+  --output build/graphics/full-screen-gallery-2x.png
+file \
+  build/graphics/full-screen-gallery.png \
+  build/graphics/full-screen-gallery-2x.png
+shasum -a 256 \
+  build/graphics/full-screen-gallery.png \
+  build/graphics/full-screen-gallery-2x.png
+mdbook build docs
+test -f build/docs-book/graphics-formats.html
+git diff --check
+rg -n '[[:blank:]]+$' \
+  PLAN.md README.md docs/src/graphics-formats.md \
+  docs/src/progress-log.md tests/test_fullscreen_gallery.py \
+  tools/render_fullscreen_gallery.py
+git status --short
+```
+
+All 44 tests passed in 1.930 seconds. Every Python source compiled, both shell
+scripts parsed, both gallery variants regenerated with the documented sizes
+and hashes, and mdBook rebuilt the graphics chapter. The generated sources
+have no whitespace errors. The gallery implementation and documentation are
+uncommitted pending a requested checkpoint. Reported both image paths, the
+reproduction command, test result, and the intentional inclusion of the dark
+`KABLAM1.ART` frame to the user.
+
+The user requested a commit checkpoint. Inspected the complete diff, including
+the two new source files, and confirmed it contains only the full-screen
+gallery generator, its regression tests, and the corresponding plan, README,
+graphics chapter, and progress-log updates. Prepared these six files as one
+cohesive gallery commit after the successful 44-test verification above.
+Staged the six files, ran `git diff --cached --check`, and created the commit
+with subject `docs: Add full-screen artwork gallery`. Verified that every
+commit-message line is at most 72 characters and that the worktree is clean.

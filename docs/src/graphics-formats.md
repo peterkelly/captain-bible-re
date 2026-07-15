@@ -129,6 +129,41 @@ color-keyed game path. `--opaque-zero` preserves it as a visible palette color
 and selects opaque composition. `--width` and `--height` change canvas size;
 `--scale` applies nearest-neighbor integer scaling.
 
+## Full-screen gallery
+
+Exactly 11 frames have origin `(0, 0)` and dimensions 320×200. The scene
+programs select the following palettes before loading them:
+
+| Archive index | ART frame | Scene-selected palette |
+|---:|---|---|
+| 006 | `INTRO.ART` frame 0 | `TITLE.PAL` |
+| 063 | `PRAY.ART` frame 0 | `PRAY.PAL` |
+| 073 | `OVER.ART` frame 0 | `1.PAL` |
+| 090 | `LAW1.ART` frame 0 | `LAW.PAL` |
+| 093 | `KABLAM1.ART` frame 0 | `KABLAM.PAL` |
+| 097 | `SPEAKER.ART` frame 0 | `1.PAL` |
+| 100 | `HOLE.ART` frame 0 | `HOLE.PAL` |
+| 122 | `DOME.ART` frame 0 | `DOME.PAL` |
+| 130 | `DENY1.ART` frame 0 | `DENY.PAL` |
+| 133 | `CULTA.ART` frame 0 | `1.PAL` |
+| 165 | `BOSS.ART` frame 0 | `BOSS.PAL` |
+
+`tools/render_fullscreen_gallery.py` discovers those frames directly from the
+archive, infers each ART-to-PAL association from the resource-loading commands
+in the `BIN` scene programs, and labels every image with its archive index,
+resource name, frame number, and palette. Generate the native-pixel contact
+sheet with:
+
+```sh
+tools/render_fullscreen_gallery.py \
+  CB/DD1.DAT \
+  --output build/graphics/full-screen-gallery.png
+```
+
+Pass `--scale 2` for a nearest-neighbor enlarged sheet. `KABLAM1.ART` appears
+almost black under `KABLAM.PAL`, but is not an empty image: it contains 16
+distinct pixel indices and acts as a base for later overlay frames.
+
 ## Executable routines
 
 | Load offset | Current name | Evidence |
