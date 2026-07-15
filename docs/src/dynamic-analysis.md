@@ -126,6 +126,8 @@ This is direct evidence that names such as `RUN.ART` refer to members indexed
 inside `DD1.DAT`, not sibling files in the DOS directory.
 
 `DDLC`, by contrast, is opened as a separate DOS pathname twice during the
-captured interval. Its role and the purposes of the other `DDL*` files remain
-open questions; the trace narrows the first dynamic file-format pass to
-`DD1.DAT`, `DDLC`, and the resource lookup around `0xB818`.
+captured interval. Later static and format analysis identifies it as tagged
+companion text bank C; `DDLA` through `DDLG` and `DDLR` use the same recovered
+record stream. The direct opens are therefore runtime confirmation that DDL
+text lives beside the main container, while the extensionless verse indexes
+live inside `DD1.DAT`. The text-format chapter documents their exact join.

@@ -19,7 +19,8 @@ This plan is a living checklist. Findings and commands are recorded in
 - [x] Create a persistent play image containing the supplied `CB` directory.
 - [x] Copy the game into both current images at `C:\CBDOME`.
 - [x] Verify that FreeDOS boots and the game reaches its title screen.
-- [ ] Have the user confirm interactive input, audio, and normal game exit.
+- [x] Have the user confirm the visible play image contains and starts the game.
+- [ ] Have the user confirm interactive input and normal game exit.
 
 ## Phase 2: Static inventory and executable analysis
 
@@ -29,7 +30,9 @@ This plan is a living checklist. Findings and commands are recorded in
 - [x] Map the initial segments, entry points, strings, and DOS/BIOS services.
 - [x] Analyze the command-line parser and documented export options.
 - [x] Recover a first-pass function map for startup, input, saves, and export.
-- [ ] Determine the purpose and format of each `DD*`, `SOUND.*`, and save file.
+- [x] Determine the purpose and format of every game-owned `DD*` and save file.
+- [x] Identify each `SOUND.*` file, configured product, and lock field.
+- [ ] Recover the bundled third-party sound-driver ABI and timbre format.
 
 ## Phase 3: Dynamic analysis
 
@@ -37,8 +40,9 @@ This plan is a living checklist. Findings and commands are recorded in
 - [x] Capture and correlate a title-screen physical-memory snapshot.
 - [x] Build a QEMU TCG plugin for game-originated DOS interrupt tracing.
 - [x] Capture and interpret a startup-to-story-introduction DOS API trace.
-- [ ] Trace startup, file access, graphics, input, sound, and save operations.
-- [ ] Correlate runtime behavior with static functions and data structures.
+- [x] Trace startup, resource file access, driver loading, and decoded audio.
+- [x] Correlate captured runtime state with static functions and data structures.
+- [ ] Capture focused interactive input and save/write traces.
 - [ ] Exercise major screens and gameplay systems while recording evidence.
 
 ## Phase 4: File formats and game systems
@@ -71,6 +75,6 @@ This plan is a living checklist. Findings and commands are recorded in
 ## Phase 5: Consolidation
 
 - [x] Produce a symbol/function map with evidence and confidence levels.
-- [ ] Document reproducible procedures and all discovered formats and systems.
-- [ ] Review the mdBook for gaps, contradictions, and unsupported claims.
-- [ ] Build and verify the final book.
+- [x] Document reproducible procedures and all discovered formats and systems.
+- [x] Review the mdBook for gaps, contradictions, and unsupported claims.
+- [x] Build and verify the consolidated book.

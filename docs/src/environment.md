@@ -83,5 +83,6 @@ of the play image reached the Captain Bible title screen at 640×400.
 
 The supplied `MANUAL.TXT` says to change to the installation directory and
 run `CB`. It reports that the game needs approximately 500 KiB of conventional
-memory. It also documents optional command-line switches and a player name,
-which will be investigated in a later phase.
+memory. Its optional command-line switches and player-name prefix are now
+recovered from `game_main` and documented in the static-analysis and save-game
+chapters.

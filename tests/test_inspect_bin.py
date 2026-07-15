@@ -404,6 +404,26 @@ class BinBytecodeTests(unittest.TestCase):
         commands = decode_stream(cp2, 0, 0x1D55)
         self.assertEqual(commands[-1].end, 0x1D55)
 
+    def test_complete_command_corpus_count(self):
+        commands = []
+        region_count = 0
+        for filename, data in self.bin_members.items():
+            regions = ((0, len(data)),)
+            if filename == "CP2.BIN":
+                regions = ((0, 0x1D55),)
+            elif filename == "ROOM3.BIN":
+                regions = (
+                    (0, 0x0336),
+                    (0x0C96, 0x1754),
+                    (0x1768, len(data)),
+                )
+            for start, limit in regions:
+                commands.extend(decode_stream(data, start, limit))
+                region_count += 1
+        self.assertEqual(region_count, 64)
+        self.assertEqual(len(commands), 25_840)
+        self.assertEqual(len({command.opcode for command in commands}), 122)
+
     def test_conditional_extra_word_after_negative_operand(self):
         command = decode_command(bytes.fromhex("11 01 f8 ff e6 01"), 0)
         self.assertEqual(command.end, 6)

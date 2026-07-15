@@ -4776,3 +4776,205 @@ four new catalog, chapter, inspector, and test files. The deletion count is the
 old partial function table replaced by the checked catalog summary. Added this
 success record and amended it into the same checkpoint, then verified the
 final message line lengths and clean worktree.
+
+## 2026-07-15: Reproducibility and book consistency audit
+
+The user asked to continue for a sustained interval rather than stopping after
+one small task. Started a five-step consolidation plan: audit structure and
+claims, add end-to-end reproduction and automatic documentation checks,
+resolve contradictions, reconcile PLAN, and run the full verification stack.
+The observed starting HEAD was `024ccce`, and the worktree was clean.
+
+Read all of PLAN, `book.toml`, SUMMARY, the file inventory, environment,
+introduction, dynamic-analysis and save chapters, plus targeted sections in
+every format/system chapter. Searched current documentation (excluding this
+historical log where appropriate) for TODO language, unresolved claims,
+repeated resource counts, old test totals, bytecode boundaries, and command
+paths.
+
+The initial audit found two genuinely stale narrative statements:
+
+- Dynamic Analysis still called the role of `DDLC` and the other `DDL*` files
+  open even though the text-format work has recovered and exhaustively joined
+  them.
+- Environment still said command-line switches and player prefixes would be
+  investigated later even though their parser and save behavior are complete.
+
+Reported both stale claims to the user before changing them.
+
+### Automated documentation integrity
+
+Added executable `tools/check_documentation.py`. It checks that every Markdown
+chapter appears exactly once in SUMMARY, no SUMMARY entry is nonexistent,
+local Markdown targets exist, referenced heading anchors exist, shell examples
+parse, and repository commands beginning with `tools/` or `./` exist and have
+an execute bit. It scans README as well as the book.
+
+Added `tests/test_check_documentation.py` with a live repository regression,
+heading-slug examples, and a synthetic repository containing an unlisted
+chapter, broken local link, and missing command. Set the checker executable and
+ran:
+
+```sh
+python3 -m unittest tests.test_check_documentation -v
+tools/check_documentation.py
+```
+
+All three tests passed in 0.012 seconds. The first live run reported 20
+chapters plus README; later runs advanced to 21 and 22 as the two consolidation
+chapters were added.
+
+### Reproduction and evidence-boundary chapters
+
+Added Reproducing the Results after the environment chapter. It gives one
+ordered path through input hashes, FreeDOS setup, EXEPACK reconstruction,
+Rizin, the checked symbol catalog, DD1 extraction, graphics/gallery generation,
+BIN/gameplay inspection, audio/text conversion, saves/maps, optional QEMU DOS
+tracing, and the complete fast verification suite. It distinguishes tracked
+research outputs from ignored generated artifacts and says explicitly which
+interactive checks are outside the noninteractive suite.
+
+Added Known Gaps and Evidence Boundaries before the progress log. It
+consolidates the remaining dynamic captures, third-party sound-driver ABI,
+partially named runtime fields, conservative world-map states, and static
+coverage limits. It also lists former gaps which current chapters have
+resolved, clarifying that early progress-log hypotheses are chronological and
+not the current format reference.
+
+Linked both chapters from SUMMARY and README. Added the documentation checker
+to README and the end-to-end verification command list. An initial README patch
+left the old standalone mdBook command immediately after the new combined
+checker/build block; inspected the tail and removed that duplication.
+
+Updated Dynamic Analysis to identify directly opened `DDLC` as tagged companion
+text bank C and link it to the recovered external DDL versus internal index
+split. Updated Environment and Introduction with the completed CLI, formats,
+systems, and honest remaining scope.
+
+### Numeric and claim audit
+
+One `rg` command accidentally placed Markdown backticks inside the shell command
+string. Bash attempted to run `BIN` and printed `BIN: command not found`; the
+surrounding read-only searches still ran. Repeated later searches without
+backticks and recorded this quoting error rather than treating it as a source
+failure.
+
+The CP2 code/data correction exposed a stale global command count. The first
+read-only Python recount passed a string to `DD1Archive.from_path`, which
+expects a `Path`, and failed with `AttributeError: 'str' object has no attribute
+'read_bytes'`. Repeated with `Path("CB/DD1.DAT")` and the 64 exact code regions.
+The corrected corpus contains 25,840 commands and 122 opcodes, not the old
+25,837 figure. Reported this correction to the user.
+
+Updated Scene Bytecode and Static Analysis to 25,840. Added
+`test_complete_command_corpus_count`, which independently requires 64 regions,
+25,840 commands, and 122 used opcodes with the CP2 and ROOM3 boundaries stated
+explicitly. The documentation checker plus 26 BIN-focused tests all passed.
+
+Repeated searches found no current references to 25,837, a 251-byte CP2
+trailer, `0x1D5A`, the obsolete DDL open question, or future CLI analysis.
+The remaining “not yet” and “open” phrases all correspond to entries in Known
+Gaps: unnamed world-map environments, save bytes, scene-object fields,
+dialogue formatting, and live combat tables.
+
+### PLAN reconciliation
+
+Split broad stale tasks rather than marking ambiguous work complete. PLAN now
+records that the visible game-bearing play image was user-confirmed, while
+interactive input/normal exit remains open and host audio is intentionally
+silent. It marks game-owned DD/save formats complete, separately records all
+SOUND file/product/lock identifications, and leaves the third-party driver ABI
+and timbre format open.
+
+Likewise, it marks startup/resource/driver/audio tracing and runtime/static
+correlation complete while retaining focused interactive input/save traces and
+major-screen coverage. Marked reproducible procedures and discovered-system
+documentation complete after adding the end-to-end chapter and checker.
+
+### Replayed noninteractive results
+
+Ran the main reproduction path rather than only checking that its commands
+were spelled correctly:
+
+```sh
+tools/analyze_cb_exe.py CB/CB.EXE \
+  --output build/analysis/CB_UNPACKED.EXE
+tools/extract_dd1.py --extract-all build/dd1/all CB/DD1.DAT
+tools/render_art.py build/dd1/all/003_LOGO.ART \
+  --palette build/dd1/all/002_LOGO.PAL --canvas --scale 2 \
+  --output build/graphics/logo-repro.png
+tools/render_fullscreen_gallery.py CB/DD1.DAT \
+  --output build/graphics/full-screen-gallery-repro.png
+tools/convert_abt.py build/dd1/all/306_D003.ABT \
+  --output build/audio/d003-repro.wav
+tools/inspect_xmi.py build/dd1/all/267_MUS001.XMI
+tools/inspect_text_resources.py CB/DD1.DAT --data-dir CB \
+  --translation N --bank A --record 0
+```
+
+Also ran the object, choice, combat, room, hall-feature, Unibot, save-variable,
+and symbol inspectors, saving their output under ignored `build/analysis/`
+`*-repro.txt` files. Every command succeeded. The executable hash remained
+`4875f83d...9747643`; the gallery contained the same 11 full-screen frames;
+`D003` decoded to 9,064 samples at 9,000 Hz; `MUS001` reported 12 timbres and
+446 events; and NIV bank A record zero joined to Exodus 20:15.
+
+Hashed the reconstructed executable and generated graphics/audio outputs,
+counted all inspector reports, and compared the new gallery and WAV with their
+prior generated counterparts. Both comparisons were byte-identical. Ran
+`./run.sh --setup-only`; it returned success without opening QEMU or printing
+errors.
+
+Finally reran Rizin with `analysis/cb.rz`, saved complete `fl` output, and
+validated it with the symbol inspector. Rizin emitted no stderr and the audit
+again reported 143 symbols: 108 functions, 26 handlers, 9 data, 77 Verified,
+and 66 High.
+
+### Full validation and consolidation closeout
+
+Ran the complete final suite:
+
+```sh
+python3 -m unittest discover -s tests -v
+python3 -m py_compile tools/*.py tests/*.py
+tools/check_documentation.py
+tools/inspect_symbol_map.py \
+  --rizin-flags build/analysis/final-book-flags.txt \
+  > build/analysis/final-verification-symbols.txt
+bash -n run.sh tools/build_qemu_dos_trace.sh
+mdbook build docs
+test -f build/docs-book/index.html
+test -f build/docs-book/reproducing-results.html
+test -f build/docs-book/known-gaps.html
+git diff --check
+```
+
+All 101 tests passed in 4.235 seconds. Every Python file compiled, the 22-book-
+chapter plus README integrity audit passed, all 143 symbols and handler
+addresses remained synchronized, both shell scripts parsed, mdBook generated
+the index and both new chapters, and Git found no whitespace errors.
+
+Marked the reproducible-procedures, book-review, and consolidated-book build
+tasks complete in PLAN. Did not erase the remaining research scope: focused
+interactive input/save traces, broad major-screen exercise, normal-exit user
+confirmation, and the third-party sound-driver ABI remain explicit open tasks.
+This long consolidation slice remains uncommitted pending the user's next
+instruction.
+
+### Reproducibility-audit checkpoint
+
+The user requested a commit. Audited all 14 modified/new paths, whitespace,
+tracked statistics, new-file line counts, documentation integrity, the focused
+documentation tests, the 25,840-command corpus regression, and a fresh mdBook
+build. The checker again reported 22 chapters plus README, all four focused
+tests passed in 0.075 seconds, and the book built without warnings. Confirmed
+that the file set is limited to the plan reconciliation, reproduction and
+known-gap chapters, stale-claim/count corrections, checker, tests, and this
+complete log. Prepared to stage those 14 files for one detailed checkpoint.
+
+Created the checkpoint with subject `docs: Consolidate reproducible research`.
+Git reported 780 insertions and 16 deletions across 14 files, including the two
+new chapters, checker, and checker tests. Added this success record to the same
+checkpoint. The first post-commit message audit found body line 12 was 73
+characters, one over the repository limit. Rewrapped that sentence, amended
+again, and then verified every message line and the clean worktree.

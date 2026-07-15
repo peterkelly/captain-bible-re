@@ -2,6 +2,7 @@
 
 - [Introduction](introduction.md)
 - [Environment and Running the Game](environment.md)
+- [Reproducing the Results](reproducing-results.md)
 - [Executable Reconstruction](executable.md)
 - [Static Analysis Findings](static-analysis.md)
 - [Symbol and Function Map](function-map.md)
@@ -19,4 +20,5 @@
 - [Audio Formats](audio-formats.md)
 - [Text Resource Formats](text-formats.md)
 - [Save-Game Formats](save-formats.md)
+- [Known Gaps and Evidence Boundaries](known-gaps.md)
 - [Progress Log](progress-log.md)

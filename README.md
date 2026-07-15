@@ -337,10 +337,16 @@ filter.
 
 ## Documentation
 
-Build the research book with:
+Run the documentation integrity check and build the research book with:
 
 ```sh
+tools/check_documentation.py
 mdbook build docs
 ```
 
+The checker validates SUMMARY coverage, local chapter links and anchors, and
+repository commands used in shell examples. The Reproducing the Results
+chapter gives a single end-to-end command sequence for every recovered format
+and system. Known Gaps and Evidence Boundaries separates confirmed results from
+the remaining dynamic captures and deliberately unnamed fields.
 The rendered book is written to `build/docs-book/`.

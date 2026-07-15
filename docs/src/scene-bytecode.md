@@ -9,7 +9,7 @@ animation. The executable's interpreter dispatches opcodes `0x01` through
 `0x91` through a 145-entry near-pointer table at load offset `0x59AB`.
 
 The operand layout has been recovered for every dispatched opcode. Linear
-decoding identifies 25,837 commands in 64 code regions and uses 122 of the 145
+decoding identifies 25,840 commands in 64 code regions and uses 122 of the 145
 possible opcodes. Semantic names remain conservative: operand boundaries are
 known for the whole instruction set, while many handlers still need gameplay
 correlation before their purpose can be named.
