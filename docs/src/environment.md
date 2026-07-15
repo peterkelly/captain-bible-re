@@ -79,6 +79,11 @@ wrote `FREEDOS_READY` to `C:\BOOT.OK` from both patched boot-script paths, and
 the marker was read with mtools after QEMU stopped. A separate bounded launch
 of the play image reached the Captain Bible title screen at 640×400.
 
+The user subsequently verified the complete interactive path: keyboard and
+mouse input work in the visible QEMU session, and the game exits normally
+through its menus. This closes the environment/playability check independently
+of the automated boot and title-screen evidence.
+
 ## Initial game requirements
 
 The supplied `MANUAL.TXT` says to change to the installation directory and

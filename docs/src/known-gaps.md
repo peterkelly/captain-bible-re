@@ -16,9 +16,6 @@ another.
   sound-driver segment.
 - Exercise a representative screen from each major gameplay system while
   recording scene names, script state, and expected inspector output.
-- Confirm normal interactive exit from the persistent play image. Host audio
-  remains deliberately silent at the user's request.
-
 The existing startup trace, title/intro memory captures, live dialogue-choice
 table, scene display records, framebuffer comparison, and decoded `D003` PCM
 remain valid independent dynamic checks.

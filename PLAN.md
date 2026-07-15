@@ -20,7 +20,7 @@ This plan is a living checklist. Findings and commands are recorded in
 - [x] Copy the game into both current images at `C:\CBDOME`.
 - [x] Verify that FreeDOS boots and the game reaches its title screen.
 - [x] Have the user confirm the visible play image contains and starts the game.
-- [ ] Have the user confirm interactive input and normal game exit.
+- [x] Have the user confirm interactive input and normal game exit.
 
 ## Phase 2: Static inventory and executable analysis
 

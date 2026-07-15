@@ -5217,3 +5217,26 @@ Created commit `0b34759` with subject
 tests, and the sound-driver chapter. Appended this success record, staged only
 the progress log, and amended the same checkpoint so the working tree would
 remain a single coherent commit.
+
+## 2026-07-15: Interactive environment confirmation
+
+The user reported that keyboard and mouse input work and that Captain Bible
+exits normally through its menus. Recorded this as user-verified evidence in
+the environment chapter, checked the final Phase 1 PLAN item, and removed the
+now-stale normal-exit request from Known Gaps. This confirmation complements
+the existing automated boot marker and bounded title-screen capture; it does
+not replace the still-open focused input/save tracing or representative major-
+screen capture tasks.
+
+### Interactive-confirmation checkpoint
+
+The user requested a commit. Audited the four modified files, ran
+`git diff --check`, repeated the 23-chapter documentation integrity check, and
+reviewed the complete patch. The changes are limited to the user-confirmed
+playability result, PLAN closure, removal of the stale gap, and this log.
+Prepared one detailed documentation checkpoint.
+
+Created commit `0f2b4b7` with subject
+`docs: Record interactive playability`. Git recorded 24 insertions and four
+deletions across the four intended files. Appended this success record and
+amended the same checkpoint so the confirmation remains one coherent commit.
