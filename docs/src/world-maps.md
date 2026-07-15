@@ -101,6 +101,69 @@ study result clears that byte in the adjacent cell. This identifies both
 bytes as mutable encounter state in that class without assuming that they
 have the same meaning in Prayer, Communications, or Jump Tunnel rooms.
 
+## Connected hallway features
+
+When the connection mask is nonzero, the low nibble describes the hallway
+cell rather than a room. The following meanings have independent script,
+resource, or transition evidence:
+
+| Kind | Hall feature | Evidence |
+|---:|---|---|
+| `0x0` | Empty connected hallway | No feature branch or parameters. |
+| `0x1` | Macho Cyber | Selects `COMBAT1`, whose enemy resources are `BIG*`. |
+| `0x2` | Armored Cyber | Selects `COMBAT2`, whose enemy resource is `HELMET`. |
+| `0x3` | Mantis Cyber | Selects `COMBAT3` and `MANTIS*`. |
+| `0x4` | Snake Cyber | Selects `COMBAT4` and `SNAKE*`. |
+| `0x5` | Spider Cyber | Selects `COMBAT5` and its internally named `CRAB` art. |
+| `0x6` | Leech-covered Scripture station | Selects `COMBAT6` and `GUARD*`; victory restores a station. |
+| `0x7` | Zapper Cyber | Selects `COMBAT7` and `ZAP*`; passing beneath it damages faith. |
+| `0x9` | Hidden Spider trigger | A successful trigger replaces it with kind `0x5`. |
+| `0xA` | Scripture station | Enables Get Verse using parameter A. |
+| `0xB` | Cleared encounter | Written by ordinary combat victories. |
+| `0xE` | Level exit | Every hall program branches from this kind to its exit sequence. |
+
+The seven hall programs dynamically patch `SML1` to load `SML1` through
+`SML7`, and their Confront Cyber actions enter `POWER`. That scene patches
+`combat1` from the current kind and returns to `COMBAT1` through `COMBAT7`.
+This joins the map kinds, hallway sprites, and combat resources without
+depending only on visual resemblance. The manual supplies the player-facing
+Cyber names. `CRAB` is the Spider: the separate kind-`0x9` ambush state
+conditionally turns into kind `0x5`, matching the documented Spider that can
+drop behind Captain Bible.
+
+Kind `0x6` has the strongest transition evidence. Its special combat victory
+writes kind `0xA`, copies parameter B to parameter A, and clears parameter B.
+The result is a normal Scripture station whose verse selector is now in the
+field used by Get Verse. This matches the manual's Leech Cyber, which sits on
+top of Scripture stations. Kind `0x7` can be walked under, but its hall branch
+applies base faith loss 400; defeating it restores full faith in `COMBAT7`.
+Both behaviors match the Zapper description.
+
+Cyber parameter A selects the lie used by the confrontation. The covered
+station's parameter B is preserved as the verse selector revealed after the
+Leech is defeated. A normal station uses parameter A, sets the corresponding
+text-record state, and displays `Verse loaded: &` when Get Verse succeeds.
+
+Connected kinds `0xC`, `0xD`, and `0xF` control visual or environmental hall
+states, but their exact player-facing meanings remain unproven. Kind `0x8`
+does not occur on a connected cell in any shipped map. The inspector leaves
+all four unnamed rather than folding them into the entity table.
+
+The hall action selectors now also have direct labels:
+
+| Selector | Action |
+|---|---|
+| `.u`, `.d`, `.l`, `.r` | Move Up, Down, Left, or Right |
+| `.c` | Confront Cyber |
+| `.x` | Unlock |
+| `.v` | Get Verse |
+
+The three Unlock targets operate on a locked Trap-room door to the right,
+left, or above the hall. They use the adjacent room's parameter B as the
+study prompt and clear it after the correct verse is applied. This separates
+the door lock from parameter A, which controls the encounter inside the Trap
+room.
+
 ## Runtime state and scene commands
 
 The loaded resource becomes mutable gameplay state. The following commands
@@ -171,13 +234,15 @@ Inspect a resource directly from the archive:
 tools/inspect_map.py CB/DD1.DAT --map CE
 tools/inspect_map.py CB/DD1.DAT --map CE --cells
 tools/inspect_map.py CB/DD1.DAT --map CE --rooms
+tools/inspect_map.py CB/DD1.DAT --map CE --hall-features
 ```
 
 The compact display prints the low location-kind nibble at every coordinate.
 `--cells` adds the packed byte, named connection directions, kind, and both
 parameters for every nonzero cell. `--rooms` lists decoded room class,
-entrance side, and parameters. Compare a resource with the live grid in a
-state save with:
+entrance side, and parameters. `--hall-features` lists only connected cells
+with proven nonempty features; unresolved environmental kinds remain visible
+in `--cells`. Compare a resource with the live grid in a state save with:
 
 ```sh
 tools/inspect_map.py \
@@ -188,7 +253,8 @@ The parser requires an exact 768-byte grid and a valid level/difficulty name.
 Tests cover all 21 archive members, row-major addressing, connection
 directions, the complete encoded room domain, the 14 combinations present in
 the corpus, room/victim scene resources, all seven script level selectors,
-invalid inputs, and the four saved mutations above.
+hall features and combat resources, the hidden-Spider transition, invalid
+inputs, and the four saved mutations above.
 
 ## Relevant executable functions and data
 

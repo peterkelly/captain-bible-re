@@ -4257,3 +4257,177 @@ the inspector and archive-backed coverage, contextual separation of hallway
 kinds, Trap parameters, Rizin symbol, and synchronized documentation. Added
 this successful checkpoint record afterward for amendment into the same
 commit, rather than leaving the action log outside the work it describes.
+
+## 2026-07-15: Connected hallway entities
+
+### Hall-program and resource correlation
+
+The user asked to continue after the room-decoding checkpoint. Verified the
+worktree was clean at commit `2d24588`, read the remaining Phase 4 item, and
+searched existing chapters for hallway, endgame, GANTRY, BOSS, and Unibot
+findings. Reported that the next step would trace connected-cell low kinds
+across all seven hall programs and correlate branches with actions, scene
+changes, artwork, and map mutations before assigning names.
+
+Decoded `AHAL.BIN` through `GHAL.BIN` into ignored command listings under
+`build/analysis/`. The first display loop used a glob that omitted the
+archive-index prefixes and passed the literal nonexistent path
+`[a-g]hal-commands.txt` to `rg`; it failed without changing tracked files.
+Listed the generated filenames, corrected the glob to
+`*hal-commands.txt`, and extracted references to variables 13--18, action
+targets, scene changes, map mutations, flags, and resource loads.
+
+Traced the common hall feature dispatcher in detail, particularly AHAL's
+kind branches at `0x0EC8`, dynamic `SML1` patch at `0x1008`, Confront Cyber
+targets, Get Verse path, Spider conversion, movement entry points, and room
+dispatch. Compared all seven programs to distinguish shared behavior from
+level-specific animation and exit logic.
+
+Searched the manual sections for Cybers, stations, locked doors, hall
+behavior, and the Unibot. Section 7 supplies eight player-facing Cyber names
+and specifically states that the Spider may drop behind the player, the
+Leech sits on Scripture stations, and the Zapper may be walked under while
+damaging faith. Section 7 also names the Get Verse, Confront Cyber, and
+Unlock actions.
+
+Inspected the resource headers for all seven combat programs:
+
+```text
+COMBAT1  BIG*      Macho
+COMBAT2  HELMET    Armored
+COMBAT3  MANTIS*   Mantis
+COMBAT4  SNAKE*    Snake
+COMBAT5  CRAB      Spider
+COMBAT6  GUARD*    Leech
+COMBAT7  ZAP*      Zapper
+```
+
+The scripts join connected kinds `1` through `7` to these same combat
+numbers. Their hall renderer patches the digit of `SML1` from the current
+kind; Confront Cyber enters `POWER`, which patches `combat1` and returns to
+the selected combat program.
+
+Two state transitions independently resolve the nonliteral internal names.
+Kind `0x9` conditionally writes kind `0x5` in every hall program, matching
+the manual's hidden Spider drop and the `CRAB` combat. Kind `0x6` enters the
+special `GUARD` combat; victory writes kind `0xA`, copies parameter B to A,
+and clears B. Kind `0xA` is the Get Verse station state, so the transition
+reveals the station and its saved verse selector exactly as described for the
+Leech Cyber.
+
+Kind `0x7` has a passive hallway branch that applies base faith loss 400,
+while `COMBAT7` restores full faith on victory. This matches both halves of
+the Zapper description. Kind `0xA` enables Get Verse from parameter A and
+sets the associated text-record state. Ordinary victories write kind `0xB`,
+and kind `0xE` enters the per-level exit sequence. Cyber parameter A selects
+the lie used by the confrontation; kind-`0x6` parameter B preserves the verse
+which becomes active when the station is freed.
+
+Reported the emerging mapping to the user twice: first that kinds `1..15`
+formed the earlier five-by-three room model, and in this slice that kinds
+`1..7` select the seven combat programs, with kind `6` restoring a station
+and kind `9` becoming the Spider combat state.
+
+Ran a read-only corpus inventory over all 21 MAP members, counting connected
+low kinds, parameters, and sample coordinates. The resources use kinds `0`,
+`1`--`7`, `9`, `A`, `C`--`F`. No connected kind `8` or initial kind `B`
+occurs; `B` is a runtime cleared state. Kinds `C`, `D`, and `F` are common
+visual/environmental states whose exact player-facing meanings remain
+unproven, so they were deliberately left unnamed.
+
+Listed and rendered selected `CRAB` and `GUARD` ART frames with their native
+palettes into ignored files under `build/graphics/`, then inspected the
+images. The GUARD art visibly depicts the station-covering Cyber, but the
+documented mapping rests on the stronger map transition and manual evidence.
+An unused shell loop while locating those files constructed no useful path;
+the subsequent `rg --files` query found the correct archive-indexed ART and
+PAL resources.
+
+### Inspector and action labels
+
+Added conservative `hall_feature` decoding to `tools/inspect_map.py` for the
+seven Cybers, hidden Spider trigger, Scripture station, cleared encounter,
+and level exit. Added `--hall-features`, which lists only proven nonempty
+features and leaves kinds `C`, `D`, and `F` visible only in the raw cell view.
+This preserves the important distinction between connected hall kinds and
+zero-connection room codes.
+
+Added hall selector labels to `tools/inspect_bin.py`: movement for `.u`,
+`.d`, `.l`, and `.r`; Confront Cyber for `.c`; Unlock for `.x`; and Get Verse
+for `.v`. The three Unlock targets use parameter B of an adjacent Trap-room
+cell as their study prompt and clear it after the correct verse, while the
+Trap encounter inside uses parameter A.
+
+Added archive-backed tests for the conservative hall feature table, all
+seven combat resource families, every hall program's kind-`9` to kind-`5`
+transition, `POWER` and Verse-loaded paths, and the complete 12-target AHAL
+action selector sequence. The first focused run covered ten map tests plus
+the new action test; all 11 passed. Ran `--hall-features` on `CE.MAP`, which
+identified Cybers, stations, two covered stations, and the level exit with
+their directions and parameters. Ran AHAL with `--actions`; all movement,
+Confront Cyber, Unlock, and Get Verse labels appeared as expected.
+
+Updated the world-map, combat-runtime, scene-bytecode, and static-analysis
+chapters, plus README and PLAN. The combat table now joins the internal ART
+bases to the manual identities and corrects the earlier conservative GUARD
+description to the Leech-covered station. Split the completed hallway work
+from the still-open endgame and Unibot task.
+
+One combined scene-bytecode/README patch failed atomically because the README
+context began on a different wrapped line; neither file changed. Reapplied
+the scene-bytecode hunk separately. A second larger README hunk also missed
+the exact wrapping, so changed the two affected label lines with a smaller
+patch. An earlier large documentation patch for the principal chapters
+applied successfully.
+
+### Validation
+
+Ran the complete regression and documentation pass:
+
+```sh
+python3 -m unittest discover -s tests -v
+python3 -m py_compile tools/*.py tests/*.py
+mdbook build docs
+test -f build/docs-book/world-maps.html
+test -f build/docs-book/combat-runtime.html
+bash -n run.sh
+tools/inspect_map.py CB/DD1.DAT --map CE --hall-features | \
+  rg 'armored-cyber|leech-covered-station|scripture-station|level-exit'
+tools/inspect_bin.py build/dd1/all/368_AHAL.BIN --actions | \
+  rg 'CONFRONT CYBER|UNLOCK|GET VERSE|MOVE (UP|DOWN|LEFT|RIGHT)'
+git diff --check
+git status --short
+git diff --stat
+```
+
+All 86 tests passed in 3.568 seconds and every Python source compiled. mdBook
+rebuilt both affected HTML chapters, the run script passed shell syntax
+checking, and the two live inspector filters showed all requested feature and
+action labels. `git diff --check` found no whitespace errors. Eleven tracked
+files are modified: plan, README, four book chapters plus this log, both
+inspectors, and their test modules. Left the completed hallway slice
+uncommitted because the user asked only to continue.
+
+### Hallway-entity checkpoint
+
+The user requested a commit. Audited status, whitespace, statistics, and
+path names for the 11 modified files. Staged exactly the plan, README, combat,
+bytecode, static-analysis, world-map, and progress chapters, both inspectors,
+and both inspector test modules. `git diff --cached --check` passed; the
+staged change contained 381 insertions and 26 deletions.
+
+Checked a detailed proposed commit message against the repository's
+72-column rule. Seven intermediate drafts were rejected locally as individual
+lines of 73, 73, 73, 75, 73, 74, and 73 columns were found. Rewrapped each
+sentence until all 16 lines were at most 72 columns, then created commit
+`68b446c` with subject:
+
+```text
+maps: Decode connected hallway features
+```
+
+The body records the combat-resource, hall-transition, and manual evidence;
+the conservative unresolved-state boundary; the new inspector views and
+labels; archive-backed regressions; and synchronized documentation. Added
+this successful checkpoint entry afterward so it can be amended into the
+same commit rather than leaving the action log outside the work it records.

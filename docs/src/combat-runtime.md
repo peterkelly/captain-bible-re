@@ -12,16 +12,16 @@ record.
 Every combat program loads `COMBTAGS.ART`, `COMBAT.ART`, and one or more
 enemy-specific ART resources:
 
-| Program | Bytes | Commands | Animation sequences | Steps | Actions | Enemy ART bases |
-|---|---:|---:|---:|---:|---:|---|
-| `COMBAT1.BIN` | 3,300 | 625 | 33 | 182 | 4 | `BIG`, `BIG2`, `BIG3`, `BIG4` |
-| `COMBAT2.BIN` | 7,230 | 973 | 30 | 594 | 4 | `HELMET` |
-| `COMBAT3.BIN` | 4,381 | 782 | 38 | 260 | 4 | `MANTIS`, `MANTIS2`, `MANTIS3` |
-| `COMBAT4.BIN` | 7,434 | 1,073 | 29 | 581 | 4 | `SNAKE`, `SNAKE2` |
-| `COMBAT5.BIN` | 6,501 | 919 | 34 | 523 | 4 | `CRAB` |
-| `COMBAT6.BIN` | 2,314 | 351 | 15 | 163 | 3 | `GUARD`, `GUARD2` |
-| `COMBAT7.BIN` | 4,289 | 720 | 35 | 293 | 4 | `ZAP`, `ZAP2`, `SPRK` |
-| **Total** | **35,449** | **5,443** | **214** | **2,596** | **27** | |
+| Program | Manual identity | Bytes | Commands | Animation sequences | Steps | Actions | Enemy ART bases |
+|---|---|---:|---:|---:|---:|---:|---|
+| `COMBAT1.BIN` | Macho | 3,300 | 625 | 33 | 182 | 4 | `BIG`, `BIG2`, `BIG3`, `BIG4` |
+| `COMBAT2.BIN` | Armored | 7,230 | 973 | 30 | 594 | 4 | `HELMET` |
+| `COMBAT3.BIN` | Mantis | 4,381 | 782 | 38 | 260 | 4 | `MANTIS`, `MANTIS2`, `MANTIS3` |
+| `COMBAT4.BIN` | Snake | 7,434 | 1,073 | 29 | 581 | 4 | `SNAKE`, `SNAKE2` |
+| `COMBAT5.BIN` | Spider | 6,501 | 919 | 34 | 523 | 4 | `CRAB` |
+| `COMBAT6.BIN` | Leech | 2,314 | 351 | 15 | 163 | 3 | `GUARD`, `GUARD2` |
+| `COMBAT7.BIN` | Zapper | 4,289 | 720 | 35 | 293 | 4 | `ZAP`, `ZAP2`, `SPRK` |
+| **Total** | | **35,449** | **5,443** | **214** | **2,596** | **27** | |
 
 The programs branch on script variables and progression flags, including the
 Sword and Shield power flags `0x30` and `0x31`. They use opcode `0x81` to
@@ -103,7 +103,9 @@ routine at `0x7A5C`.
 | `.13` | `RETREAT` | 7 |
 | `.14` | `COMBAT` | 7 |
 
-`COMBAT6.BIN` is the only program without a `DEFEND` target. For example,
+The world-map chapter documents the independent hall-kind and transition
+evidence for these manual identities. `COMBAT6.BIN` is the only program
+without a `DEFEND` target. For example,
 `COMBAT7.BIN` defines:
 
 | Source | Target | X | Y | Action |
@@ -181,8 +183,9 @@ flag and disables the Automatic Combat menu target while it is set. Flag
 `0x38` is therefore the combat-active lock, while flag `0x37` stores the
 Automatic Combat setting itself. `COMBAT6` is exceptional: it has no
 `DEFEND` target, never changes flag `0x38`, contains no faith-loss opcode,
-and produces a different map transition. It is a scripted guard encounter,
-not one more instance of the six ordinary cyber fights.
+and produces a different map transition. Its internally named `GUARD`
+encounter is the Leech Cyber covering a Scripture station: victory reveals
+the station and transfers its saved verse selector into the active field.
 
 After victory or retreat, the programs clear current-cell parameter A and
 select a hall scene. Variable 67 chooses the literal `GHALB` or `GHALS`

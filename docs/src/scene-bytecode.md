@@ -237,13 +237,15 @@ preserving useful structure without assigning speculative semantics.
 Add `--objects` to append a linear summary of commands which define display
 records, `--choices` to inventory dialogue target/text pairs, or
 `--animations --actions` to inventory animation sequences and selectable
-screen targets. The
+screen targets. Action summaries name the four combat selectors and the hall
+selectors for movement, Confront Cyber, Unlock, and Get Verse. The
 [scene-display-object chapter](scene-objects.md) documents the ten-byte
 runtime record, while the [conversation-flow chapter](conversation-flow.md)
 documents the six-byte choice table. The
 [combat-runtime chapter](combat-runtime.md) documents animation slots, action
-targets, and the BIN scheduler. These summaries warn that branches can change
-which definitions execute.
+targets, and the BIN scheduler; the [world-map chapter](world-maps.md)
+correlates the hall actions with map-cell features. These summaries warn that
+branches can change which definitions execute.
 
 ## Executable routines
 

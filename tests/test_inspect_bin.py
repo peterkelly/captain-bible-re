@@ -10,6 +10,7 @@ from extract_dd1 import DD1Archive  # noqa: E402
 from inspect_bin import (  # noqa: E402
     BinFormatError,
     COMBAT_ACTION_LABELS,
+    HALL_ACTION_LABELS,
     OPCODE_NAMES,
     OPCODE_SCHEMAS,
     SCRIPT_VARIABLE_OPERANDS,
@@ -112,6 +113,29 @@ class BinBytecodeTests(unittest.TestCase):
                 (0x0C11, 0x0EAB, 136, 153, ".12", "DEFEND"),
                 (0x0C1C, 0x1053, 15, 167, ".13", "RETREAT"),
                 (0x0C27, 0x0FA7, 157, 62, ".14", "COMBAT"),
+            ],
+        )
+
+    def test_hall_action_selectors_match_manual_actions(self):
+        definitions = action_target_definitions(decode_stream(self.member("AHAL.BIN")))
+        self.assertEqual(
+            [
+                (definition.selector, HALL_ACTION_LABELS[definition.selector])
+                for definition in definitions
+            ],
+            [
+                (".d", "MOVE DOWN"),
+                (".u", "MOVE UP"),
+                (".c", "CONFRONT CYBER"),
+                (".c", "CONFRONT CYBER"),
+                (".c", "CONFRONT CYBER"),
+                (".c", "CONFRONT CYBER"),
+                (".x", "UNLOCK"),
+                (".x", "UNLOCK"),
+                (".x", "UNLOCK"),
+                (".r", "MOVE RIGHT"),
+                (".l", "MOVE LEFT"),
+                (".v", "GET VERSE"),
             ],
         )
 

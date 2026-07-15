@@ -40,6 +40,19 @@ ROOM_ENTRANCE_SIDES = (
     "east",
     "south",
 )
+HALL_FEATURES = {
+    0x1: "macho-cyber",
+    0x2: "armored-cyber",
+    0x3: "mantis-cyber",
+    0x4: "snake-cyber",
+    0x5: "spider-cyber",
+    0x6: "leech-covered-station",
+    0x7: "zapper-cyber",
+    0x9: "hidden-spider-trigger",
+    0xA: "scripture-station",
+    0xB: "cleared-encounter",
+    0xE: "level-exit",
+}
 
 
 class MapFormatError(ValueError):
@@ -81,6 +94,12 @@ class MapCell:
         if self.room_class is None:
             return None
         return ROOM_ENTRANCE_SIDES[(self.location_kind - 1) % 3]
+
+    @property
+    def hall_feature(self) -> str | None:
+        if not self.connection_mask:
+            return None
+        return HALL_FEATURES.get(self.location_kind)
 
 
 @dataclass(frozen=True)
@@ -195,6 +214,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="list decoded room cells and their entrance sides",
     )
     parser.add_argument(
+        "--hall-features",
+        action="store_true",
+        help="list decoded nonempty features on connected hall cells",
+    )
+    parser.add_argument(
         "--compare-save",
         type=Path,
         help="compare the resource with the live grid in a state save",
@@ -248,6 +272,18 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 f"({cell.x:02d},{cell.y:02d}) class={cell.room_class} "
                 f"entrance={cell.room_entrance_side} "
+                f"kind={cell.location_kind:#x} "
+                f"a={cell.parameter_a:#04x} b={cell.parameter_b:#04x}"
+            )
+
+    if args.hall_features:
+        print("decoded hall features:")
+        for cell in world_map.cells:
+            if cell.hall_feature is None:
+                continue
+            print(
+                f"({cell.x:02d},{cell.y:02d}) feature={cell.hall_feature} "
+                f"directions={','.join(cell.connection_directions)} "
                 f"kind={cell.location_kind:#x} "
                 f"a={cell.parameter_a:#04x} b={cell.parameter_b:#04x}"
             )

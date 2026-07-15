@@ -264,8 +264,11 @@ The map screen also consults a 16-word exploration bitmap. Scene commands can
 process the current cell, mutate each cell field, normalize location kinds,
 and mark coordinates explored. The supplied `SV3` and `SV4` grids match
 `CE.MAP` except for four explained field changes. The dedicated world-map
-chapter gives the format, opcodes, save correlation, inspection tool, and
-remaining semantic questions.
+chapter gives the format, opcodes, save correlation, and inspection tool. It
+also decodes connection directions, five room classes and orientations, the
+seven hallway Cybers, Scripture stations, hidden Spider triggers, cleared
+encounters, level exits, and locked-room actions while keeping three
+environmental kinds explicitly unresolved.
 
 ## Script state and progression
 

@@ -80,6 +80,61 @@ class MapResourceTests(unittest.TestCase):
         self.assertIsNone(hall.room_entrance_side)
         self.assertIsNone(empty.room_class)
 
+    def test_connected_kinds_decode_only_proven_hall_features(self):
+        expected = {
+            0x1: "macho-cyber",
+            0x2: "armored-cyber",
+            0x3: "mantis-cyber",
+            0x4: "snake-cyber",
+            0x5: "spider-cyber",
+            0x6: "leech-covered-station",
+            0x7: "zapper-cyber",
+            0x9: "hidden-spider-trigger",
+            0xA: "scripture-station",
+            0xB: "cleared-encounter",
+            0xE: "level-exit",
+        }
+        for kind, feature in expected.items():
+            cell = parse_map(bytes((0x10 | kind, 0, 0)) + bytes(765)).cell(0, 0)
+            self.assertEqual(cell.hall_feature, feature)
+
+        for kind in (0x0, 0x8, 0xC, 0xD, 0xF):
+            cell = parse_map(bytes((0x10 | kind, 0, 0)) + bytes(765)).cell(0, 0)
+            self.assertIsNone(cell.hall_feature)
+        room = parse_map(bytes((0x04, 0, 0)) + bytes(765)).cell(0, 0)
+        self.assertIsNone(room.hall_feature)
+
+    def test_hall_programs_encode_spider_trigger_and_feature_resources(self):
+        members = {
+            entry.filename: self.archive.extract(entry)
+            for entry in self.archive.entries
+        }
+        combat_resources = {
+            "COMBAT1.BIN": b"BIG\0",
+            "COMBAT2.BIN": b"HELMET\0",
+            "COMBAT3.BIN": b"MANTIS\0",
+            "COMBAT4.BIN": b"SNAKE\0",
+            "COMBAT5.BIN": b"CRAB\0",
+            "COMBAT6.BIN": b"GUARD\0",
+            "COMBAT7.BIN": b"ZAP\0",
+        }
+        for filename, resource_name in combat_resources.items():
+            self.assertIn(resource_name, members[filename])
+
+        for level in "ABCDEFG":
+            commands = decode_stream(members[level + "HAL.BIN"])
+            has_hidden_spider_transition = any(
+                command.opcode == 0x1F
+                and tuple(operand.value for operand in command.operands)
+                == (0x0005, 0x003A)
+                and commands[index + 1].opcode == 0x7B
+                and commands[index + 1].operands[0].value == 0x003A
+                for index, command in enumerate(commands[:-1])
+            )
+            self.assertTrue(has_hidden_spider_transition, level)
+            self.assertIn(b"POWER\0", members[level + "HAL.BIN"])
+            self.assertIn(b"Verse loaded: &\0", members[level + "HAL.BIN"])
+
     def test_archive_room_cells_use_fourteen_class_orientation_pairs(self):
         observed = set()
         for level in "ABCDEFG":

@@ -197,7 +197,8 @@ dialogue-choice source offsets, absolute branch targets, and inline text. See
 the conversation-flow chapter for its six-byte runtime table, study-Bible
 integration, and live QEMU correlation. The `--animations` view groups each
 animation header with its contiguous nine-byte steps; `--actions` lists
-screen coordinates, absolute targets, selectors, and recovered combat labels.
+screen coordinates, absolute targets, selectors, and recovered combat and
+hall-action labels.
 The combat-runtime chapter documents their runtime tables, BIN scheduler,
 action outcome branches, faith effects, shared victory/retreat epilogue, and
 map transitions.
@@ -273,11 +274,15 @@ cells. Display the location-kind grid and optionally list its nonzero cells:
 tools/inspect_map.py CB/DD1.DAT --map CE
 tools/inspect_map.py CB/DD1.DAT --map CE --cells
 tools/inspect_map.py CB/DD1.DAT --map CE --rooms
+tools/inspect_map.py CB/DD1.DAT --map CE --hall-features
 ```
 
 The cell view names the four connection directions. The room view decodes
 the five room classes—Victim, Trap, Prayer, Communications, and Jump
 Tunnel—together with each room's entrance side and mutable parameters.
+The hall-feature view identifies the seven Cyber types, hidden Spider
+triggers, Scripture stations, cleared encounters, and level exits while
+leaving unresolved environmental states unnamed.
 
 Compare an original map with the live grid serialized in a save:
 
@@ -288,8 +293,8 @@ tools/inspect_map.py \
 
 The mdBook world-map chapter documents resource naming, cell addressing,
 packed fields, room dispatch and orientation encoding, scene commands,
-exploration bits, map-screen behavior, and the byte-level identification of
-supplied save grids.
+hallway entities and transitions, exploration bits, map-screen behavior, and
+the byte-level identification of supplied save grids.
 
 ## QEMU DOS-call tracing
 

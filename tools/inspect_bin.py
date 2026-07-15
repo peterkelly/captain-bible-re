@@ -81,6 +81,16 @@ COMBAT_ACTION_LABELS = {
     ".13": "RETREAT",
     ".14": "COMBAT",
 }
+HALL_ACTION_LABELS = {
+    ".d": "MOVE DOWN",
+    ".u": "MOVE UP",
+    ".r": "MOVE RIGHT",
+    ".l": "MOVE LEFT",
+    ".c": "CONFRONT CYBER",
+    ".x": "UNLOCK",
+    ".v": "GET VERSE",
+}
+ACTION_LABELS = COMBAT_ACTION_LABELS | HALL_ACTION_LABELS
 
 
 # Operand layout recovered from execute_bin_commands at load-module offset
@@ -645,7 +655,7 @@ def main(argv: list[str] | None = None) -> int:
                 f"y={definition.y}",
                 f"selector={selector}",
             ]
-            label = COMBAT_ACTION_LABELS.get(definition.selector)
+            label = ACTION_LABELS.get(definition.selector)
             if label is not None:
                 fields.append(f"label={label}")
             print(" ".join(fields))
