@@ -14,6 +14,7 @@
 - [Conversation Flow](conversation-flow.md)
 - [Script State and Progression](game-state.md)
 - [World Maps](world-maps.md)
+- [Unibot and Endgame Progression](endgame.md)
 - [Audio Formats](audio-formats.md)
 - [Text Resource Formats](text-formats.md)
 - [Save-Game Formats](save-formats.md)

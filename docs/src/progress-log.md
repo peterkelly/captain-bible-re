@@ -4431,3 +4431,199 @@ the conservative unresolved-state boundary; the new inspector views and
 labels; archive-backed regressions; and synchronized documentation. Added
 this successful checkpoint entry afterward so it can be amended into the
 same commit rather than leaving the action log outside the work it records.
+
+## 2026-07-15: Unibot graph and endgame state machine
+
+The user asked to continue the reverse-engineering work. Began with
+`git status --short`, `git log -1 --oneline`, targeted `rg` searches, and
+reads of PLAN, README, the book summary, and the existing state and bytecode
+chapters. The worktree was clean and the observed HEAD was `fe06da8`. The only
+open Phase 4 system task was the endgame and Unibot progression.
+
+Reported the intended scope to the user: start at `GANTRY.BIN`'s seven-rescue
+gate and follow every transition through the Unibot, energy pylons, Tower,
+and ending, grounding the result in bytecode rather than resource names.
+
+### Resource and command-stream inspection
+
+Listed the late archive members and extracted-BIN paths with `rg`, `find`, and
+the existing DD1 tooling. The relevant sequence is archive members 309 through
+317 (`OVER`, `WIN`, `KABLAM`, `FACE`, `ROBOT`, `CP3`, `CP2`, `CP1`, and
+`GANTRY`), with approach programs `CW6` through `CW1` at 344 through 349.
+
+Decoded each relevant resource with `tools/inspect_bin.py`, saving ignored
+listings under `build/analysis/`:
+
+```text
+OVER-commands.txt       WIN-commands.txt        KABLAM-commands.txt
+FACE-commands.txt       ROBOT-commands.txt      CP3-commands.txt
+CP2-commands.txt        CP1-commands.txt        GANTRY-commands.txt
+BOSS-commands.txt       HOLE1-commands.txt      HOLE-commands.txt
+DOME-commands.txt       344_CW6-commands.txt    345_CW5-commands.txt
+346_CW4-commands.txt    347_CW3-commands.txt    348_CW2-commands.txt
+349_CW1-commands.txt
+```
+
+Used targeted `rg` searches over those listings for variable writes/tests,
+flag operations, selectors, resource loads, and scene changes. Used `wc -c`,
+`xxd`, and read-only Python `struct.unpack` table dumps to locate and test the
+CP2 trailer. One display loop used `printf` separators even though repository
+command guidance discourages noisy separators; it changed nothing, and later
+output inspection used direct file reads and `rg` instead.
+
+`GANTRY.BIN` tests rescue flags `0x3A..0x40` and mirrors them one-for-one into
+crew flags `0x42..0x48`. `CP1.BIN` counts those seven flags in variable 27.
+Zero crew produces the empty-craft/eight-people message; one through six
+reports the number still needed; exactly seven enters `ROBOT`. `ROBOT.BIN`
+clears powerup flags `0x30..0x34`, initializes variables 53, 54, and 55 to
+zero, and changes to `CP2`. `CW1..CW6` also mirror the rescue flags but belong
+to the outdoor approach traversal, not the CP2 navigation graph.
+
+The exact 7,765-byte CP2 layout is:
+
+- commands through offset `0x1D54`;
+- 64 next-node words at `0x1D55`;
+- 16 node-type words at `0x1DD5`;
+- 16 transition/render words at `0x1DF5`;
+- 32 coordinate words at `0x1E15`.
+
+The first table is 16 nodes by four headings. Heading zero is north, with
+east, south, and west following right turns; `100` means blocked. All edges
+are reciprocal and the coordinates reproduce the lower-right map. Pylons are
+nodes 3, 5, 7, 8, 10, 11, and 13; node 14 is the Tower. Variables 54 and 55
+are the node and heading, 56 through 62 are the seven pylon results, 63 is the
+looked-up next node, 64 is the active pylon, and 65 drives the final Tower
+dialogue. Variable 53 is used as a turn/rotation offset. Added those names to
+`tools/inspect_save.py`, which also improves operand annotations emitted by
+`tools/inspect_bin.py`.
+
+Reported this intermediate result to the user, including the seven exact
+pylon nodes, Tower node 14, and the gate requiring all seven variables. A
+second report stated the heading order, blocked sentinel, exact node set, and
+plan to make the tables inspectable with archive-backed tests.
+
+The CP2 actions are `.r`, `.l`, and `.u` for right, left, and forward. The
+ordinary-road branch contains the manual's one-time Annoy Cyber event: it
+loads `ANNOY`, removes verses, sets flag `0x54`, and does not start combat.
+Each pylon dispatches to selector `0x11..0x17`; success sets the matching
+variable 56 through 62, destroys the pylon, and recovers its captive crew
+member, while failure enters `OVER`. Moving into the Tower with any pylon
+variable clear also enters `OVER`.
+
+Decoded the complete final state machine. `FACE.BIN` renders states 0, 1, 2,
+and 9. `CP3.BIN` advances 0 to 1; in state 1, study selector `0x20` advances a
+correct response to 2 or a wrong response to 9. State 2 enters `KABLAM`, which
+enters `WIN`; state 9 enters `OVER`. CP3's exact scene-change sequence in file
+order is `KABLAM`, three `FACE` branches, and `OVER`.
+
+### Inspector and regression tests
+
+Created executable `tools/inspect_unibot.py`. It parses all four CP2 tables,
+prints every node and compass exit, and validates exact size, destination
+domain, node types, reciprocal edges, the pylon-node set, and Tower node 14.
+Ran:
+
+```sh
+chmod +x tools/inspect_unibot.py
+tools/inspect_unibot.py build/dd1/all/315_CP2.BIN
+```
+
+The output listed all 16 nodes successfully. The graph begins at node 0,
+branches from node 1 toward the Tower and the east/west road networks, and
+contains the seven expected dead-end pylon nodes. Kept the fourth table's
+label conservative as `transition_value`, because its exact visual use is
+not yet proven.
+
+Created `tests/test_inspect_unibot.py` with seven archive-backed tests. They
+cover the graph and coordinates, pylon and Tower nodes, GANTRY flag mirroring,
+the CP1 crew gate, ROBOT initialization, pylon result assignments, the
+FACE/CP3 success and failure states, the ending resource chain, and rejection
+of wrong-sized or nonreciprocal input. The focused command was:
+
+```sh
+python3 -m unittest tests.test_inspect_unibot -v
+```
+
+All seven tests passed. A prior five-test version also passed before the CP1
+and Tower-state regressions were added.
+
+### Documentation and validation
+
+Added the Unibot and Endgame Progression chapter and linked it from the book
+summary. It records the rescue gate, trailer schema, every node, variables,
+Annoy event, pylon branches, Tower gate, and ending state machine. Updated the
+state, bytecode, and static-analysis chapters, README inspector instructions,
+and marked the endgame task complete in PLAN.
+
+An initial combined `apply_patch` failed atomically because its final
+static-analysis context did not match the current wrapping; no part of that
+patch applied. Reapplied the tool, new chapter, and plan changes, then the
+remaining documentation in smaller successful patches. This failure was not
+a source or data error.
+
+Ran the complete regression suite:
+
+```sh
+python3 -m unittest discover -s tests -v
+```
+
+All 93 tests passed in 4.160 seconds. Then ran:
+
+```sh
+python3 -m py_compile tools/*.py tests/*.py
+mdbook build docs
+test -f build/docs-book/endgame.html
+bash -n run.sh
+tools/inspect_unibot.py build/dd1/all/315_CP2.BIN
+git diff --check
+git status --short
+git diff --stat
+```
+
+Every Python file compiled, mdBook generated the new HTML chapter, the run
+script passed shell syntax checking, the inspector again printed the complete
+graph, and the whitespace check passed. At this pre-log checkpoint, seven
+tracked files were modified and the new chapter, inspector, and test module
+were untracked. The work remains uncommitted because the user asked only to
+continue.
+
+A final consistency search found three older `tests/test_inspect_bin.py`
+bounds still ending CP2 at `0x1D5A`. Examined the boundary directly with:
+
+```sh
+xxd -g 1 -s 0x1d40 -l 64 build/dd1/all/315_CP2.BIN
+tools/inspect_bin.py \
+  build/dd1/all/315_CP2.BIN --start 0x1d30 --limit 0x1d5a
+```
+
+The actual final instruction is the one-byte `return` at `0x1D54`. When the
+decoder is deliberately allowed to continue, the first five table bytes
+coincidentally resemble two valid commands. Corrected all three generic test
+bounds to `0x1D55`, so the regression suite now enforces the recovered
+code/data boundary instead of accepting those false commands.
+
+Reran `python3 -m unittest discover -s tests -v` after that correction. All
+93 tests passed again in 4.171 seconds, including the corrected complete-region
+regression and the seven new Unibot tests.
+
+Repeated Python compilation, mdBook generation, the new HTML existence check,
+run-script syntax validation, a silent full Unibot inspector run, whitespace
+checking, status, and diff statistics after the log update. Every check passed.
+The final worktree contains nine modified tracked files plus three new files:
+the endgame chapter, Unibot inspector, and Unibot test module.
+
+### Unibot/endgame checkpoint
+
+The user requested a commit. Audited the complete worktree with status,
+whitespace, statistics, tracked diffs, and explicit no-index diffs for each
+new file. The file set contains only the Unibot/endgame implementation,
+regressions, plan, README, and book updates described above. Wrapped three
+long assertions in the new test module during that review without changing
+their behavior. Prepared a detailed commit message under the repository's
+72-column limit and staged all 12 files for a single checkpoint.
+
+Created the checkpoint with subject `scripts: Decode Unibot endgame`. Git
+reported 725 insertions and 9 deletions across the 12 files, including the
+three new files. Verified the resulting commit metadata, checked every message
+line against the 72-column rule, and confirmed that the worktree was clean.
+Amended this final success record into the same checkpoint.

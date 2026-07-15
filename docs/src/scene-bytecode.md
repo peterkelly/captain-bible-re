@@ -199,8 +199,10 @@ to live interpreter state.
 Sixty members decode linearly from byte zero through end of file. Two members
 contain non-code regions:
 
-- `CP2.BIN` has commands from `0x0000` through `0x1D5A`, followed by a
-  251-byte structured data trailer.
+- `CP2.BIN` has commands at `0x0000..0x1D54`, followed by a 256-byte
+  structured data trailer at `0x1D55..0x1E54`. It contains a 16-node
+  four-heading adjacency table, node types, transition values, and lower-right
+  map coordinates. The Unibot chapter decodes every entry.
 - `ROOM3.BIN` has command regions `0x0000..0x0336`,
   `0x0C96..0x1754`, and `0x1768..0x19DB`. A 2,400-byte zero-filled block and
   a 20-byte zero-filled block separate them.
@@ -225,6 +227,7 @@ tools/inspect_bin.py \
   build/dd1/all/334_ROOM3.BIN --start 0x0c96 --limit 0x1754
 tools/inspect_bin.py \
   build/dd1/all/334_ROOM3.BIN --start 0x1768
+tools/inspect_unibot.py build/dd1/all/315_CP2.BIN
 ```
 
 Output includes the file-offset range, opcode, current semantic name, and

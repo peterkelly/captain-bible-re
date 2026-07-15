@@ -137,8 +137,32 @@ progression points:
 
 `GANTRY.BIN` tests those seven flags and mirrors the set members into
 `0x42..0x48` before the Unibot sequence. The bytecode proves the one-to-one
-transition, although the later flags' most precise gameplay label remains
-open.
+transition. `CP1.BIN` counts those later flags as the rescued crew physically
+present aboard the Unibot and requires all seven before departure.
+
+One further durable flag is specific to the Unibot road network:
+
+| Flag | Meaning |
+|---:|---|
+| `0x54` | The one-time Annoy Cyber verse-loss event has occurred. |
+
+The late-game programs also give exact meanings to variables 53 through 65:
+
+| Index | Byte offset | Current meaning |
+|---:|---:|---|
+| 53 | `0x6A` | Unibot turn/rotation offset. |
+| 54 | `0x6C` | Current Unibot node. |
+| 55 | `0x6E` | Heading: north `0`, east `1`, south `2`, west `3`. |
+| 56–62 | `0x70..0x7C` | Pylons 1–7 rescued/destroyed. |
+| 63 | `0x7E` | Next node selected by forward movement. |
+| 64 | `0x80` | Active pylon number; `100` means none. |
+| 65 | `0x82` | Tower confrontation state: `0`, `1`, `2`, or failure `9`. |
+
+`ROBOT.BIN` initializes variables 53 through 55. `CP2.BIN` uses variables
+56 through 62 as both pylon-completion state and the seven-part Tower gate.
+`FACE.BIN` and `CP3.BIN` alternate on variable 65 to implement the final
+study prompt and its success/failure branches. See the Unibot and endgame
+chapter for the complete graph and state machine.
 
 Two lower flags carry the result of a conversation's study-Bible prompt:
 

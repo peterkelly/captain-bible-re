@@ -65,7 +65,7 @@ This plan is a living checklist. Findings and commands are recorded in
 - [x] Trace combat outcomes, faith depletion, and encounter map transitions.
 - [x] Decode room classes, entrance orientations, and Trap-room state.
 - [x] Decode hallway Cybers, stations, exits, locks, and ambush states.
-- [ ] Reconstruct endgame and Unibot progression.
+- [x] Reconstruct endgame and Unibot progression.
 - [x] Build small extraction or inspection tools where they improve confidence.
 
 ## Phase 5: Consolidation

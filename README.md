@@ -203,6 +203,18 @@ The combat-runtime chapter documents their runtime tables, BIN scheduler,
 action outcome branches, faith effects, shared victory/retreat epilogue, and
 map transitions.
 
+`CP2.BIN` ends with the complete 16-node Unibot navigation graph. Inspect its
+four-heading exits, seven pylon nodes, Tower, lower-right-map coordinates, and
+per-node transition values with:
+
+```sh
+tools/inspect_unibot.py build/dd1/all/315_CP2.BIN
+```
+
+The Unibot and endgame chapter follows the seven-rescue boarding gate through
+all pylon encounters, the one-time Annoy Cyber event, the Tower gate, and the
+successful and failed ending chains.
+
 ## Inspecting audio resources
 
 The 41 `ABT` members are compressed 9,000 Hz unsigned eight-bit mono sound

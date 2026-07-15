@@ -182,6 +182,23 @@ variables, and implement absolute jumps, calls, and returns. The dedicated
 scene-bytecode chapter documents the complete structural schema, startup
 sequence, mixed code/data regions, inspection tool, and QEMU memory check.
 
+## Unibot and final sequence
+
+The final programs form a fully recoverable script state machine. `GANTRY`
+mirrors seven victim-rescue flags into seven crew-present flags; `CP1` counts
+them and refuses departure until all seven are aboard. `ROBOT` clears the five
+powerups, initializes the Unibot position and heading, and enters `CP2`.
+
+The 256-byte trailer of `CP2.BIN` stores a reciprocal 16-node road graph with
+four compass headings, seven pylon endpoints, one Tower endpoint, node types,
+and lower-right-map coordinates. Seven persistent variables record pylon
+rescues. An incomplete pylon encounter or premature Tower assault enters
+`OVER`; all seven allow the alternating `FACE`/`CP3` confrontation. Its correct
+study response reaches `KABLAM` and `WIN`, while the wrong response sets state
+9 and reaches `OVER`. A separate flag makes the road-network Annoy Cyber's
+verse loss a one-time event. The dedicated Unibot chapter gives every table
+entry, variable, branch, and reproducible inspection command.
+
 ## Scene display objects
 
 Scene programs append up to 100 ten-byte display records at `DS:A2AC`, with
