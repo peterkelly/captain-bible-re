@@ -9,7 +9,9 @@ sys.path.insert(0, str(ROOT / "tools"))
 from extract_dd1 import DD1Archive  # noqa: E402
 from inspect_bin import (  # noqa: E402
     BinFormatError,
+    OPCODE_NAMES,
     OPCODE_SCHEMAS,
+    SCRIPT_VARIABLE_OPERANDS,
     decode_command,
     decode_stream,
 )
@@ -32,6 +34,30 @@ class BinBytecodeTests(unittest.TestCase):
 
     def test_has_layout_for_every_dispatched_opcode(self):
         self.assertEqual(set(OPCODE_SCHEMAS), set(range(1, 0x92)))
+
+    def test_recovered_state_opcode_names(self):
+        self.assertEqual(OPCODE_NAMES[0x1E], "copy_variable")
+        self.assertEqual(OPCODE_NAMES[0x20], "jump_if_zero")
+        self.assertEqual(OPCODE_NAMES[0x21], "jump_if_nonzero")
+        self.assertEqual(OPCODE_NAMES[0x36], "set_text_record_state")
+        self.assertEqual(OPCODE_NAMES[0x73], "jump_if_state_flag_clear")
+        self.assertEqual(OPCODE_NAMES[0x81], "reduce_faith")
+
+    def test_script_variable_operands_are_even_offsets_in_primary_state(self):
+        for filename, data in self.bin_members.items():
+            regions = ((0, len(data)),)
+            if filename == "CP2.BIN":
+                regions = ((0, 0x1D5A),)
+            elif filename == "ROOM3.BIN":
+                regions = ((0, 0x0336), (0x0C96, 0x1754), (0x1768, len(data)))
+            for start, limit in regions:
+                for command in decode_stream(data, start, limit):
+                    positions = SCRIPT_VARIABLE_OPERANDS.get(command.opcode, ())
+                    for position in positions:
+                        value = command.operands[position].value
+                        self.assertIsInstance(value, int)
+                        self.assertEqual(value % 2, 0)
+                        self.assertLess(value, 200)
 
     def test_decodes_complete_startup_scripts(self):
         expected = {
@@ -62,6 +88,25 @@ class BinBytecodeTests(unittest.TestCase):
             tuple(operand.value for operand in scene_change.operands),
             ("dome", "seg"),
         )
+
+    def test_victim_scenes_set_their_distinct_rescue_flags(self):
+        expected = {
+            "JELO.BIN": 0x3A,
+            "FEAR.BIN": 0x3B,
+            "CULT.BIN": 0x3C,
+            "LAW.BIN": 0x3D,
+            "RICH.BIN": 0x3E,
+            "DENY.BIN": 0x3F,
+            "NAGE.BIN": 0x40,
+        }
+        for filename, identifier in expected.items():
+            commands = decode_stream(self.bin_members[filename])
+            set_flags = {
+                command.operands[0].value
+                for command in commands
+                if command.opcode == 0x76
+            }
+            self.assertIn(identifier, set_flags, filename)
 
     def test_all_bin_command_regions_follow_recovered_layouts(self):
         self.assertEqual(len(self.bin_members), 62)

@@ -2887,3 +2887,215 @@ conservative inspector model, save correlation, tests, and documentation.
 Verified the initial message with `awk`; every line is at most 72 characters.
 Added this final commit action to the log and amended it into the same
 checkpoint.
+
+## 2026-07-15: script state and progression
+
+### Initial state-block inventory
+
+Continued with the next open game-system slice: player state, progression,
+and the script commands which operate on them. Began by checking the worktree,
+recent commits, plan, README, existing save documentation, scene-bytecode
+notes, executable symbols, and the two primary 200-byte blocks already
+identified in each save. Used commands including:
+
+```sh
+git status --short
+git log --oneline -5
+rg -n "primary|727a|7bf2|variable|faith|flag" \
+  PLAN.md README.md analysis docs/src tools tests
+xxd -g 2 -l 200 CB/DDGAMES.SV0
+xxd -g 2 -s 200 -l 200 CB/DDGAMES.SV0
+```
+
+Examined initialization and references to `DS:727A` and `DS:7BF2` with
+Rizin, saving larger listings under the ignored `build/analysis/` directory:
+
+```sh
+rizin -q -b 16 -e scr.color=false -i analysis/cb.rz \
+  -c 'aaa; axt @ 0x727a; axt @ 0x7bf2; q' \
+  build/analysis/CB_UNPACKED.EXE
+rizin -q -b 16 -e scr.color=false -i analysis/cb.rz \
+  -c 'aaa; pdr @ 0x1191; q' build/analysis/CB_UNPACKED.EXE
+```
+
+Function `0x1191` sets `CX=0x64`, `DI=0x727A`, clears `AX`, and executes
+`rep stosw`. This proves that the primary live block is 100 words rather than
+an opaque 200-byte structure. The save snapshot at file offset `0x000` maps
+to `DS:7BF2`, while the live copy at file offset `0x0C8` maps to `DS:727A`.
+
+Initially described opcode `0x1F` too broadly and assigned the next operation
+to `0x20`. That interpretation treated Rizin's decimal switch labels as
+hexadecimal. Corrected the mistake before changing the parser: `0x1E` copies
+a variable, `0x1F` assigns an immediate, `0x20` branches on zero, and `0x21`
+branches on nonzero. Reported both the false start and the correction.
+
+### Variable opcode family
+
+Dumped the interpreter's switch handlers and direct byte ranges, then traced
+the shift-and-index sequence used for variable operands:
+
+```sh
+rizin -q -b 16 -e scr.color=false -i analysis/cb.rz \
+  -c 'aaa; pdr @ 0x451b; q' build/analysis/CB_UNPACKED.EXE \
+  > build/analysis/variable-opcode-handlers.txt
+rizin -q -b 16 -e scr.color=false \
+  -c 'pD 8192 @ 0x451b; q' build/analysis/CB_UNPACKED.EXE \
+  > build/analysis/variable-opcode-linear.txt
+```
+
+Some Rizin listings crossed analyzed data or incorrectly inferred function
+boundaries and displayed invalid instructions. Direct bytes, handler control
+flow, and the complete BIN corpus were therefore compared before assigning
+semantics. Recovered this core family:
+
+- `0x1E..0x21`: copy, assign, branch on zero, branch on nonzero.
+- `0x22..0x29`: equality, inequality, signed greater-than, and signed
+  less-than branches using variable or immediate right operands.
+- `0x2A..0x31`: addition, subtraction, signed multiplication, and signed
+  division using variable or immediate right operands.
+- `0x32..0x33`: increment and decrement.
+- `0x8F..0x90`: bitwise AND with a variable or immediate.
+
+The encoded references are even byte offsets within the 200-byte block. The
+interpreter shifts each reference right once before indexing. A Python corpus
+scan over all known executable regions in all 62 BIN resources found 39 of
+the 100 slots in use and no odd or out-of-range core-variable operands. The
+scan was saved as `build/analysis/script-state-usage.txt`.
+
+An initial ad hoc scan passed a string to `DD1Archive.from_path` and failed
+with `AttributeError: 'str' object has no attribute 'read_bytes'`. Re-ran it
+with a `Path`. Attempts to render `247_GANTRY`, `242_FIRST`, and `296_ROBOT`
+also failed because those archive indices were guessed incorrectly. Listing
+the archive found the correct member paths: `317_GANTRY`, `325_FIRST`, and
+`313_ROBOT`.
+
+`FIRST.BIN` establishes initial gameplay values: X is zero, Y is six, one
+unidentified variable is eight, state flag `0x36` is set, faith is `0x2710`
+(10,000), and the current map cell is processed. Cross-references identify
+the following live fields with high confidence:
+
+- variable 0: difficulty (`0` easy, `1` normal, `2` difficult);
+- variables 11 and 12: current map X and Y;
+- variable 16: current map level letter;
+- variables 17 and 18: current cell parameters A and B;
+- variable 21: faith in hundredths of one percent.
+
+### Flags, faith, and text state
+
+Traced helpers at `0x43F5`, `0x4413`, and `0x4433`. Words 3 through 10 of
+the primary state also form a 128-bit flag bank. The test helper selects word
+`identifier >> 4` and mask `1 << (identifier & 15)`; the other helpers set
+or clear the same bit. Scene opcodes `0x73..0x76` branch on clear/set and
+clear/set a flag. Corpus analysis found 78 identifiers through `0x55`.
+
+`process_current_map_cell` clears the first three flag words (`0x00..0x2F`)
+and rebuilds them from the current cell and its neighbors. Flags `0x30` and
+above survive this transient rebuild. UI checks establish these powerups:
+
+- `0x30` sword, `0x31` shield, `0x32` no-trap protection;
+- `0x33` candle and `0x34` flight.
+
+Seven victim scene scripts set distinct rescue flags: JELO `0x3A`, FEAR
+`0x3B`, CULT `0x3C`, LAW `0x3D`, RICH `0x3E`, DENY `0x3F`, and NAGE `0x40`.
+`GANTRY.BIN` tests all seven and mirrors set members to `0x42..0x48` before
+the Unibot sequence. The exact later meaning of that mirror bank remains
+open and was not overnamed.
+
+Traced `reduce_faith` at `0x3979`, called by scene opcode `0x81`. It skips the
+loss while a no-combat state is active, halves the operand on Easy, preserves
+it on Normal, and multiplies it by four on Difficult. The status renderer
+clamps faith to `0..10000`, divides by 100, and presents a percentage.
+
+The helpers at `0x5B24`, `0x5B76`, and `0x5BBF` get, set, and clear one of 66
+text-descriptor state bytes. Opcodes `0x36..0x39` update them or branch on
+their state; `0x88` clears all 66. This connects dialogue and study records
+to scene progression, although the exact user-visible meaning varies by
+record and remains documented conservatively.
+
+Compared both primary blocks in every supplied save with `od`, `xxd`, and a
+small Python decoder. All snapshots and live blocks have map-level variable
+16 equal to `-1`. Live variable 28 contains
+`191, 189, 192, 195, 193, 195, 192, 195, 204`; `SV9` also has variable 27
+equal to five. None of the supplied blocks has an active state flag. Variables
+27 and 28 were left unnamed because the evidence only supports their being
+general scene temporaries.
+
+### Inspectors, tests, and documentation
+
+Extended `tools/inspect_save.py` with exact-size decoding of the 100 signed
+words, the embedded flag bank, named fields, powerups, and victim flags. The
+new `--variables` view prints named, nonzero, or changed variables without
+misrepresenting the flag-bank words as independent values. Extended
+`tools/inspect_bin.py` with the recovered opcode names and renders recognized
+operands as, for example, `var[21:faith]@0x002a`.
+
+Added focused tests for signed values, exact sizes, supplied-save
+regressions, the complete-corpus even-offset invariant, semantic opcode
+names, and the seven exact rescue flags. The first test edit accidentally
+placed helper functions after `unittest.main()` and referenced
+`self.decoded_regions` from another test module. The focused run produced
+three errors. Corrected the imports and iterated archive BIN members and
+their known executable regions directly; the next focused run passed all 22
+tests.
+
+Named the recovered executable functions in `analysis/cb.rz`. Added the
+`Script State and Progression` mdBook chapter and linked it from the summary.
+Updated the save-format, scene-bytecode, and static-analysis chapters, plus
+the README and living plan. Reported that the recovered system consists of
+three coordinated mechanisms: 100 signed script words, a 128-bit flag bank,
+and 66 text-state bytes, with static proof for powerups, victim flags, and
+faith handling.
+
+### Script-state commit preparation
+
+At the user's request, inspected the unstaged scope with:
+
+```sh
+git status --short
+git diff --stat
+git diff --check
+git diff -- PLAN.md README.md docs/src/SUMMARY.md docs/src/game-state.md
+git diff -- tools/inspect_bin.py tools/inspect_save.py \
+  tests/test_inspect_bin.py tests/test_inspect_save.py
+```
+
+The diff check was clean. Found that the new state-flag helper row followed
+the later bytecode-interpreter row in the high-confidence function table and
+reordered those two rows before final validation. Reported that the set is a
+cohesive, still-unstaged script-state change and that the chronological log
+would include the failed experiments and the corrected opcode
+interpretation.
+
+Ran the complete verification set:
+
+```sh
+python3 -m unittest discover -s tests -v
+python3 -m py_compile tools/*.py tests/*.py
+mdbook build docs
+test -f build/docs-book/game-state.html
+tools/inspect_save.py CB/DDGAMES.SV9 --variables \
+  > build/analysis/inspect-save-variables.txt
+tools/inspect_bin.py build/dd1/all/325_FIRST.BIN \
+  > build/analysis/inspect-first-bin.txt
+rg -n 'faith|set_variable|state_flag' \
+  build/analysis/inspect-first-bin.txt
+rizin -q -b 16 -e scr.color=false -i analysis/cb.rz \
+  -c 'afl~initialize_script_state; afl~reduce_faith; afl~state_flag; \
+afl~text_record_state; q' build/analysis/CB_UNPACKED.EXE
+git diff --check
+```
+
+All 68 tests passed in 2.228 seconds, every Python source compiled, mdBook
+built `game-state.html`, and the whitespace check passed. The FIRST listing
+showed the expected annotated map assignments, flag `0x36`, and faith
+assignment `0x2710` to `var[21:faith]@0x002a`. Rizin loaded all eight added
+symbols: script-state initialization, faith reduction, three flag helpers,
+and three text-record-state helpers. Reported these results before staging.
+
+Staged the 13 intended paths and ran `git diff --cached --check`; it passed.
+The staged change contained 719 insertions and 15 deletions. Created the
+requested checkpoint with subject `state: Recover script progression model`
+and a four-paragraph body explaining the primary-state model, recovered
+opcode families, named progression fields, conservative inspectors, tests,
+and documentation. Added this final commit action to the progress log and
+amended it into the same checkpoint.

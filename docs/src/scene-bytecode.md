@@ -78,12 +78,18 @@ control-flow behavior:
 | `0x07` | `9` | `skip_animation_record` | Advances over a fixed nine-byte record. |
 | `0x0D` | `zz` | `change_scene` | Selects a new scene and secondary segment name. |
 | `0x0F` | `H` | `adjust_thread_delay` | Updates the current command thread's wait value. |
-| `0x1F` | `HH` | `set_variable` | Stores a value in a numbered script variable. |
-| `0x21` | `HH` | `jump_if_zero` | Tests a variable and selects an absolute target. |
+| `0x1E` | `HH` | `copy_variable` | Copies one signed script-variable word to another. |
+| `0x1F` | `HH` | `set_variable` | Stores an immediate in a script variable. |
+| `0x20` | `HH` | `jump_if_zero` | Selects an absolute target when a variable is zero. |
+| `0x21` | `HH` | `jump_if_nonzero` | Selects an absolute target when a variable is nonzero. |
+| `0x22`–`0x29` | `HHH` | variable comparisons | Compare variable/variable or variable/immediate pairs and conditionally jump. |
+| `0x2A`–`0x31` | `HH` | variable arithmetic | Add, subtract, multiply, or divide a destination by a variable or immediate. |
 | `0x32` | `H` | `increment_variable` | Increments a numbered variable. |
 | `0x33` | `H` | `decrement_variable` | Decrements a numbered variable. |
 | `0x34` | `H` | `call` | Saves a return offset and jumps to an absolute target. |
 | `0x35` | none | `return` | Resumes the saved bytecode return offset. |
+| `0x36` / `0x37` | `B` | set/clear text-record state | Mutates persistent descriptor byte `+4` selected by record identifier. |
+| `0x38` / `0x39` | `BH` | branch on text-record state | Selects a target when a record state is set / clear. |
 | `0x3D` | `H` | `jump` | Replaces the cursor with an absolute file offset. |
 | `0x4D` | `z` | `load_palette` | Calls `load_palette_resource`, which appends `.PAL`. |
 | `0x52` | `B` | `play_music` | Builds `MUS###` or `IBM###` and loads an XMI member. |
@@ -92,14 +98,18 @@ control-flow behavior:
 | `0x58` | none | `stop_sound_effect` | Stops active digital playback and releases its PCM buffer. |
 | `0x6D` | `z` | `load_palette` | Uses the same palette-loading path as `0x4D`. |
 | `0x70` | none | `unload_last_art` | Releases the most recently loaded art slot. |
+| `0x73` / `0x74` | `BH` | branch on state flag | Selects a target when a boolean state flag is clear / set. |
+| `0x75` / `0x76` | `B` | clear/set state flag | Mutates one identifier in the 128-bit state bank. |
 | `0x77` | none | `process_current_map_cell` | Calls the current-cell handler, which consults the cell and its neighbors. |
 | `0x78` | `B` | `load_map` | Combines a level letter with the current `E`/`N`/`D` difficulty code and loads a `.MAP` member. |
 | `0x7B` | `H` | `set_current_map_cell_kind` | Replaces the low nibble of the current cell from a script variable. |
 | `0x7C` | `H` | `set_current_map_cell_parameter_a` | Writes the current cell's second byte from a script variable. |
 | `0x7F` | `H` | `set_current_map_cell_parameter_b` | Writes the current cell's third byte from a script variable. |
+| `0x81` | `H` | `reduce_faith` | Subtracts a difficulty-scaled immediate from faith unless no-combat mode is active. |
 | `0x87` | none | `normalize_map_cells` | Applies recovered location-kind and parameter transitions across the grid. |
 | `0x88` | none | `clear_text_record_states` | Clears persistent byte `+4` in all 66 text descriptors. |
 | `0x89` | none | `mark_current_map_cell_explored` | Sets the current X bit in the current Y exploration row. |
+| `0x8F` / `0x90` | `HH` | variable bitwise AND | ANDs a destination with a variable / immediate. |
 
 The suffix strings are present in the executable data segment and were also
 checked in the QEMU process image: `.PAL` at `DS:0434`, `.ART` at `DS:0490`,
@@ -173,10 +183,11 @@ tools/inspect_bin.py \
 ```
 
 Output includes the file-offset range, opcode, current semantic name, and
-typed operands. Words with their high bit set are displayed in both unsigned
-hexadecimal and signed decimal forms. Unidentified handlers retain names such
-as `opcode_2a`, preserving useful structure without assigning speculative
-semantics.
+typed operands. Variable operands show both their word index and encoded byte
+offset, with recovered names such as `var[21:faith]@0x002a`. Other words with
+their high bit set are displayed in both unsigned hexadecimal and signed
+decimal forms. Unidentified handlers retain names such as `opcode_3a`,
+preserving useful structure without assigning speculative semantics.
 
 ## Executable routines
 

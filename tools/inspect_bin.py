@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 import sys
 
+from inspect_save import SCRIPT_VARIABLE_NAMES
+
 
 class BinFormatError(ValueError):
     """Raised when a BIN command or operand extends outside the input."""
@@ -76,12 +78,34 @@ OPCODE_NAMES = {
     0x07: "skip_animation_record",
     0x0D: "change_scene",
     0x0F: "adjust_thread_delay",
+    0x1E: "copy_variable",
     0x1F: "set_variable",
-    0x21: "jump_if_zero",
+    0x20: "jump_if_zero",
+    0x21: "jump_if_nonzero",
+    0x22: "jump_if_variables_equal",
+    0x23: "jump_if_variable_equals",
+    0x24: "jump_if_variables_not_equal",
+    0x25: "jump_if_variable_not_equal",
+    0x26: "jump_if_variable_greater_than_variable",
+    0x27: "jump_if_variable_greater_than",
+    0x28: "jump_if_variable_less_than_variable",
+    0x29: "jump_if_variable_less_than",
+    0x2A: "add_variable",
+    0x2B: "add_to_variable",
+    0x2C: "subtract_variable",
+    0x2D: "subtract_from_variable",
+    0x2E: "multiply_variables",
+    0x2F: "multiply_variable",
+    0x30: "divide_variables",
+    0x31: "divide_variable",
     0x32: "increment_variable",
     0x33: "decrement_variable",
     0x34: "call",
     0x35: "return",
+    0x36: "set_text_record_state",
+    0x37: "clear_text_record_state",
+    0x38: "jump_if_text_record_set",
+    0x39: "jump_if_text_record_clear",
     0x3D: "jump",
     0x4D: "load_palette",
     0x52: "play_music",
@@ -90,14 +114,54 @@ OPCODE_NAMES = {
     0x58: "stop_sound_effect",
     0x6D: "load_palette",
     0x70: "unload_last_art",
+    0x73: "jump_if_state_flag_clear",
+    0x74: "jump_if_state_flag_set",
+    0x75: "clear_state_flag",
+    0x76: "set_state_flag",
     0x77: "process_current_map_cell",
     0x78: "load_map",
     0x7B: "set_current_map_cell_kind",
     0x7C: "set_current_map_cell_parameter_a",
     0x7F: "set_current_map_cell_parameter_b",
+    0x81: "reduce_faith",
     0x87: "normalize_map_cells",
     0x88: "clear_text_record_states",
     0x89: "mark_current_map_cell_explored",
+    0x8F: "and_variables",
+    0x90: "and_variable",
+}
+
+
+# These operands are even byte offsets into the 200-byte primary-state block.
+# The interpreter divides them by two before indexing its 100 signed words.
+SCRIPT_VARIABLE_OPERANDS = {
+    0x1E: (0, 1),
+    0x1F: (1,),
+    0x20: (0,),
+    0x21: (0,),
+    0x22: (0, 1),
+    0x23: (0,),
+    0x24: (0, 1),
+    0x25: (0,),
+    0x26: (0, 1),
+    0x27: (0,),
+    0x28: (0, 1),
+    0x29: (0,),
+    0x2A: (0, 1),
+    0x2B: (1,),
+    0x2C: (0, 1),
+    0x2D: (1,),
+    0x2E: (0, 1),
+    0x2F: (1,),
+    0x30: (0, 1),
+    0x31: (1,),
+    0x32: (0,),
+    0x33: (0,),
+    0x7B: (0,),
+    0x7C: (0,),
+    0x7F: (0,),
+    0x8F: (0, 1),
+    0x90: (1,),
 }
 
 
@@ -190,7 +254,14 @@ def decode_stream(
     return tuple(commands)
 
 
-def _format_operand(operand: Operand) -> str:
+def _format_operand(operand: Operand, is_script_variable: bool = False) -> str:
+    if is_script_variable:
+        value = int(operand.value)
+        if value % 2 == 0 and 0 <= value < 200:
+            index = value // 2
+            name = SCRIPT_VARIABLE_NAMES.get(index)
+            suffix = f":{name}" if name else ""
+            return f"var[{index:02d}{suffix}]@{value:#06x}"
     if operand.kind == "u8":
         return f"{operand.value:#04x}"
     if operand.kind == "u16":
@@ -236,7 +307,11 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     for command in commands:
-        operands = ", ".join(_format_operand(value) for value in command.operands)
+        variable_positions = SCRIPT_VARIABLE_OPERANDS.get(command.opcode, ())
+        operands = ", ".join(
+            _format_operand(value, index in variable_positions)
+            for index, value in enumerate(command.operands)
+        )
         suffix = f" {operands}" if operands else ""
         print(
             f"{command.offset:04x}-{command.end:04x} "

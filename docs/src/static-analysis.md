@@ -197,6 +197,24 @@ and mark coordinates explored. The supplied `SV3` and `SV4` grids match
 chapter gives the format, opcodes, save correlation, inspection tool, and
 remaining semantic questions.
 
+## Script state and progression
+
+The two 200-byte save blocks are checkpoint and live copies of 100 signed
+script-variable words. BIN commands encode variables as even byte offsets
+within this block and provide copy, immediate assignment, signed comparison,
+branching, arithmetic, increment/decrement, and bitwise operations. Static
+handlers and complete-corpus validation identify 39 variables used by that
+core family.
+
+Words 3 through 10 double as a 128-bit state-flag bank. Dedicated scene
+commands branch on, set, and clear flags. The executable rebuilds transient
+map flags `0x00..0x2F`, while flags `0x30..0x34` are the five powerups and
+seven victim scenes set distinct rescue flags `0x3A..0x40`. Variable 21 is
+faith on a 0–10,000 scale; opcode `0x81` applies difficulty-scaled loss.
+Separate text-descriptor state bytes connect obtained or completed text
+records to scene branches. The script-state chapter documents the complete
+recovered families and remaining semantic boundaries.
+
 ## Digital effects and XMIDI music
 
 Opcode `0x57` passes an effect number and rate to `0x417F`. That routine
@@ -224,7 +242,9 @@ documents both formats and their reproducible tools.
 | `0x0457` | `normalize_map_cells` |
 | `0x075F` | `show_map_screen` |
 | `0x0C6C` | `process_current_map_cell` |
+| `0x1191` | `initialize_script_state` |
 | `0x3363` | `initialize_hardware_and_data` |
+| `0x3979` | `reduce_faith` |
 | `0x3A1E` / `0x3A30` | Read byte/word BIN operands |
 | `0x3A64` | `bin_read_cstring_offset` |
 | `0x4001` | `load_palette_resource` |
@@ -232,8 +252,10 @@ documents both formats and their reproducible tools.
 | `0x4155` | `release_sound_effect_buffer` |
 | `0x417F` | `play_sound_effect_resource` |
 | `0x4235` | `stop_sound_effect` |
+| `0x43F5` / `0x4413` / `0x4433` | Test/set/clear state flags |
 | `0x451B` | `execute_bin_commands` |
 | `0x5AD6` | `find_text_record_by_selector` |
+| `0x5B24` / `0x5B76` / `0x5BBF` | Get/set/clear text-record state |
 | `0x5CE2` | `copy_text_record_component` |
 | `0x5EE7` | `write_wrapped_export_text` |
 | `0x5F92` | `export_game_text` |

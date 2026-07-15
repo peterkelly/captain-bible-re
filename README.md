@@ -235,6 +235,7 @@ and a separate `.SVQ` quick save. Inspect either fixed format with:
 ```sh
 tools/inspect_save.py CB/DDGAMES.SV0
 tools/inspect_save.py CB/DDGAMES.SV3 --descriptors
+tools/inspect_save.py CB/DDGAMES.SV9 --variables
 ```
 
 The inspector validates exact sizes, decodes the nine fixed C-string label
@@ -242,6 +243,9 @@ buffers, separates live and checkpoint state blocks, and exposes the saved
 settings and text descriptors. The mdBook save-format chapter documents the
 2,752-byte state layout, player-prefix behavior, quick-save suffix changes,
 snapshot copying, error behavior, and evidence from all supplied saves.
+The `--variables` view decodes the 100 signed script words, named map and
+faith fields, the embedded 128-bit flag bank, powerups, and victim-rescue
+flags.
 
 ## Inspecting world maps
 

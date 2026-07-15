@@ -61,8 +61,8 @@ nine supplied state files have this size.
 
 | File offset | Size | DS offset | Interpretation |
 |---:|---:|---:|---|
-| `0x000` | 200 | `7BF2` | Checkpoint copy of primary state |
-| `0x0C8` | 200 | `727A` | Live primary state |
+| `0x000` | 200 | `7BF2` | Checkpoint copy of 100 script-variable words |
+| `0x0C8` | 200 | `727A` | Live 100-word script state |
 | `0x190` | 66 | `3A66` | Checkpoint copy of descriptor state bytes |
 | `0x1D2` | 660 | `B194` | 66 live ten-byte text descriptors |
 | `0x466` | 20 | `6EA6` | Checkpoint resource-name C-string buffer |
@@ -87,7 +87,10 @@ routine restores those fields and reloads the selected text bank. The normal
 and quick save paths serialize both versions; they do not take a fresh
 checkpoint immediately before writing.
 
-The [world-map chapter](world-maps.md) documents the table's row-major cell
+The [script-state chapter](game-state.md) documents the primary block's 100
+signed words, embedded 128-bit flag bank, identified variables, powerups,
+victim flags, and interpreter commands. The
+[world-map chapter](world-maps.md) documents the table's row-major cell
 layout, packed connection/location byte, scene commands, exploration state,
 and archive-resource correlation. The detailed semantics of the primary state
 and several map kinds and parameters remain open.
@@ -158,12 +161,13 @@ list live text descriptors:
 ```sh
 tools/inspect_save.py CB/DDGAMES.SV0
 tools/inspect_save.py CB/DDGAMES.SV3 --descriptors
+tools/inspect_save.py CB/DDGAMES.SV9 --variables
 ```
 
 The parser rejects every size other than 243 or 2,752 bytes. Its tests cover
 all ten supplied files, stale label tails, exact snapshot relationships,
-scalar meanings, descriptor state copies, and the full NIV bank C structural
-match.
+scalar meanings, script variables and flags, descriptor state copies, and the
+full NIV bank C structural match.
 
 ## Relevant executable functions
 

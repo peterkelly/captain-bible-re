@@ -15,6 +15,35 @@ INDEX_SIZE = INDEX_RECORD_SIZE * INDEX_SLOT_COUNT
 STATE_SIZE = 2752
 DESCRIPTOR_COUNT = 66
 DESCRIPTOR_SIZE = 10
+PRIMARY_STATE_SIZE = 200
+SCRIPT_VARIABLE_COUNT = PRIMARY_STATE_SIZE // 2
+STATE_FLAG_BYTE_OFFSET = 6
+STATE_FLAG_COUNT = 128
+SCRIPT_VARIABLE_NAMES = {
+    0: "difficulty",
+    11: "map_x",
+    12: "map_y",
+    16: "map_level",
+    17: "current_cell_parameter_a",
+    18: "current_cell_parameter_b",
+    21: "faith",
+}
+POWERUP_FLAGS = {
+    0x30: "sword",
+    0x31: "shield",
+    0x32: "no_trap",
+    0x33: "candle",
+    0x34: "flight",
+}
+VICTIM_RESCUE_FLAGS = {
+    0x3A: "jelo",
+    0x3B: "fear",
+    0x3C: "cult",
+    0x3D: "law",
+    0x3E: "rich",
+    0x3F: "deny",
+    0x40: "nage",
+}
 
 
 class SaveFormatError(ValueError):
@@ -60,6 +89,52 @@ class SaveState:
     text_bank_live: int
     three_byte_table_live: bytes
     three_byte_table_snapshot: bytes
+
+    @property
+    def script_variables_snapshot(self) -> tuple[int, ...]:
+        return decode_script_variables(self.primary_snapshot)
+
+    @property
+    def script_variables_live(self) -> tuple[int, ...]:
+        return decode_script_variables(self.primary_live)
+
+    @property
+    def state_flags_snapshot(self) -> tuple[int, ...]:
+        return active_state_flags(self.primary_snapshot)
+
+    @property
+    def state_flags_live(self) -> tuple[int, ...]:
+        return active_state_flags(self.primary_live)
+
+
+def decode_script_variables(block: bytes) -> tuple[int, ...]:
+    """Decode one primary-state block as 100 signed little-endian words."""
+
+    if len(block) != PRIMARY_STATE_SIZE:
+        raise SaveFormatError(
+            f"primary state is {len(block)} bytes; expected {PRIMARY_STATE_SIZE}"
+        )
+    return tuple(
+        int.from_bytes(block[offset : offset + 2], "little", signed=True)
+        for offset in range(0, PRIMARY_STATE_SIZE, 2)
+    )
+
+
+def active_state_flags(block: bytes) -> tuple[int, ...]:
+    """Return set identifiers from the 128-bit primary-state flag bank."""
+
+    if len(block) != PRIMARY_STATE_SIZE:
+        raise SaveFormatError(
+            f"primary state is {len(block)} bytes; expected {PRIMARY_STATE_SIZE}"
+        )
+    flags = block[
+        STATE_FLAG_BYTE_OFFSET : STATE_FLAG_BYTE_OFFSET + STATE_FLAG_COUNT // 8
+    ]
+    return tuple(
+        identifier
+        for identifier in range(STATE_FLAG_COUNT)
+        if flags[identifier // 8] & (1 << (identifier % 8))
+    )
 
 
 def _decode_c_buffer(raw: bytes, context: str) -> tuple[str, bytes]:
@@ -179,6 +254,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="list all nonempty runtime text descriptors",
     )
+    parser.add_argument(
+        "--variables",
+        action="store_true",
+        help="list named, nonzero, or changed script variables and state flags",
+    )
     return parser
 
 
@@ -231,6 +311,41 @@ def main(argv: list[str] | None = None) -> int:
         f"three-byte-table="
         f"{_difference_count(parsed.three_byte_table_snapshot, parsed.three_byte_table_live)}"
     )
+    if args.variables:
+        snapshot = parsed.script_variables_snapshot
+        live = parsed.script_variables_live
+        shown = sorted(
+            set(SCRIPT_VARIABLE_NAMES)
+            | {
+                index
+                for index, (left, right) in enumerate(zip(snapshot, live))
+                if (left or right or left != right) and not 3 <= index <= 10
+            }
+        )
+        print("script variables (signed 16-bit):")
+        for index in shown:
+            name = SCRIPT_VARIABLE_NAMES.get(index, "unknown")
+            print(
+                f"v{index:02d} offset={index * 2:#04x} {name}: "
+                f"snapshot={snapshot[index]} live={live[index]}"
+            )
+        snapshot_flags = parsed.state_flags_snapshot
+        live_flags = parsed.state_flags_live
+        print(
+            "state flags: "
+            f"snapshot={','.join(f'{value:#04x}' for value in snapshot_flags) or 'none'}; "
+            f"live={','.join(f'{value:#04x}' for value in live_flags) or 'none'}"
+        )
+        active_powerups = [
+            name for identifier, name in POWERUP_FLAGS.items() if identifier in live_flags
+        ]
+        rescued = [
+            name
+            for identifier, name in VICTIM_RESCUE_FLAGS.items()
+            if identifier in live_flags
+        ]
+        print(f"powerups: {','.join(active_powerups) or 'none'}")
+        print(f"victim flags: {','.join(rescued) or 'none'}")
     if args.descriptors:
         for number, descriptor in enumerate(parsed.text_descriptors):
             if not any(

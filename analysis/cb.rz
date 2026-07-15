@@ -39,6 +39,14 @@ afn load_map_resource @ 0x34f
 afn normalize_map_cells @ 0x457
 afn show_map_screen @ 0x75f
 afn process_current_map_cell @ 0xc6c
+afn initialize_script_state @ 0x1191
+afn reduce_faith @ 0x3979
+afn test_state_flag @ 0x43f5
+afn set_state_flag @ 0x4413
+afn clear_state_flag @ 0x4433
+afn get_text_record_state @ 0x5b24
+afn set_text_record_state @ 0x5b76
+afn clear_text_record_state @ 0x5bbf
 
 afn copy_live_state_to_save_buffers @ 0x7d8e
 afn copy_save_buffers_to_live_state @ 0x7e41

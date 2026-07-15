@@ -8,9 +8,13 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 from extract_dd1 import DD1Archive  # noqa: E402
 from inspect_save import (  # noqa: E402
+    POWERUP_FLAGS,
+    SCRIPT_VARIABLE_COUNT,
     SaveFormatError,
     SaveIndex,
     SaveState,
+    active_state_flags,
+    decode_script_variables,
     parse_save,
     parse_save_index,
     parse_save_state,
@@ -100,6 +104,34 @@ class SaveInspectorTests(unittest.TestCase):
             parse_save_index(bytes(242))
         with self.assertRaisesRegex(SaveFormatError, "expected 2752"):
             parse_save_state(bytes(2753))
+
+    def test_primary_state_is_signed_script_variables_and_flags(self):
+        block = bytearray(200)
+        block[0:2] = (-1).to_bytes(2, "little", signed=True)
+        block[6 + 0x30 // 8] |= 1 << (0x30 % 8)
+        variables = decode_script_variables(bytes(block))
+        self.assertEqual(len(variables), SCRIPT_VARIABLE_COUNT)
+        self.assertEqual(variables[0], -1)
+        self.assertEqual(active_state_flags(bytes(block)), (0x30,))
+        self.assertEqual(POWERUP_FLAGS[0x30], "sword")
+
+    def test_supplied_primary_state_word_regression(self):
+        for state in self.states:
+            self.assertEqual(state.script_variables_snapshot[16], -1)
+            self.assertEqual(state.script_variables_live[16], -1)
+            self.assertEqual(state.state_flags_snapshot, ())
+            self.assertEqual(state.state_flags_live, ())
+        self.assertEqual(
+            [state.script_variables_live[28] for state in self.states],
+            [191, 189, 192, 195, 193, 195, 192, 195, 204],
+        )
+        self.assertEqual(self.states[-1].script_variables_live[27], 5)
+
+    def test_rejects_wrong_primary_state_size(self):
+        with self.assertRaisesRegex(SaveFormatError, "expected 200"):
+            decode_script_variables(bytes(198))
+        with self.assertRaisesRegex(SaveFormatError, "expected 200"):
+            active_state_flags(bytes(202))
 
 
 if __name__ == "__main__":
