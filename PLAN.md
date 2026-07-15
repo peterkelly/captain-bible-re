@@ -51,7 +51,9 @@ This plan is a living checklist. Findings and commands are recorded in
 - [x] Recover the `BIN` scene-command stream and startup sequencing.
 - [x] Recover the `ABT` sound-effect and `XMI` music formats.
 - [x] Implement and verify reproducible audio inspection/conversion tools.
-- [ ] Document data containers, compression, graphics, audio, and text formats.
+- [x] Recover the extensionless verse indexes and companion `DDL*` text streams.
+- [x] Implement and verify a reproducible text-resource inspector.
+- [x] Document data containers, compression, graphics, audio, and text formats.
 - [ ] Document save-game structures and player-name behavior.
 - [ ] Reconstruct maps, entities, conversations, combat, and progression logic.
 - [ ] Build small extraction or inspection tools where they improve confidence.

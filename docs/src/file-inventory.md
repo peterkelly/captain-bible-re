@@ -13,14 +13,14 @@ is excluded. `file(1)` descriptions are heuristic; in particular, its
 | `CB.ICO` | 766 | `81488f25bc2bfcdfbbb20091c2d9c3c48fb8be2ad5305dbc00c561f179a1780b` | 32×32, 16-color Windows icon |
 | `CB.PIF` | 2,885 | `09818ec07f74adaf49ce5fb1ac31ea7be3fb5c157d04816217647db3d615013a` | Windows Program Information File |
 | `DD1.DAT` | 1,866,068 | `a395fcf9f19d655a6440b5b8ab213983eb7d34a99810b763a9c95360f98f9562` | Main indexed resource container |
-| `DDLA` | 10,065 | `b667b10536f2a7e9cb8b7d92afb8ef764fd2a4872703cb575129b05cf5616572` | Auxiliary game data; format pending |
-| `DDLB` | 8,253 | `44a5ea34fed950e8265c1eb9eaa7e151941d98e934a39324d52de9d544dc364a` | Auxiliary game data; format pending |
-| `DDLC` | 4,020 | `bc2ab554cf0dfdd999c7ac6e357551d693f900dc3f0bc67c8248dff99216e560` | Startup-loaded auxiliary data |
-| `DDLD` | 14,973 | `bf4176fee554a9613a0423c5b5a2df07976ae1171950ba992296071da0220006` | Auxiliary game data; format pending |
-| `DDLE` | 10,489 | `5a7de313baf42f50a47e06774aedc4e98969fc969673ea740b8cd27a77d3ea47` | Auxiliary game data; format pending |
-| `DDLF` | 10,257 | `b4ab910df4ff59433ffcdca44f450cd91e50c10b540f0d810826e4e6e8610ffc` | Auxiliary game data; format pending |
-| `DDLG` | 9,993 | `ab9e8ab9cb8c1bd8d1944dcc8383d045f9ddd7ee8670549d430a037c5299a4b6` | Auxiliary game data; format pending |
-| `DDLR` | 696 | `067cfcfc63f07545e29d26a1d1773d2bd596d397663fd9716014ed4a48b28cc4` | Auxiliary game data; format pending |
+| `DDLA` | 10,065 | `b667b10536f2a7e9cb8b7d92afb8ef764fd2a4872703cb575129b05cf5616572` | Tagged companion text bank A |
+| `DDLB` | 8,253 | `44a5ea34fed950e8265c1eb9eaa7e151941d98e934a39324d52de9d544dc364a` | Tagged companion text bank B |
+| `DDLC` | 4,020 | `bc2ab554cf0dfdd999c7ac6e357551d693f900dc3f0bc67c8248dff99216e560` | Tagged companion text bank C |
+| `DDLD` | 14,973 | `bf4176fee554a9613a0423c5b5a2df07976ae1171950ba992296071da0220006` | Tagged companion text bank D |
+| `DDLE` | 10,489 | `5a7de313baf42f50a47e06774aedc4e98969fc969673ea740b8cd27a77d3ea47` | Tagged companion text bank E |
+| `DDLF` | 10,257 | `b4ab910df4ff59433ffcdca44f450cd91e50c10b540f0d810826e4e6e8610ffc` | Tagged companion text bank F |
+| `DDLG` | 9,993 | `ab9e8ab9cb8c1bd8d1944dcc8383d045f9ddd7ee8670549d430a037c5299a4b6` | Tagged companion text bank G |
+| `DDLR` | 696 | `067cfcfc63f07545e29d26a1d1773d2bd596d397663fd9716014ed4a48b28cc4` | Tagged victim-conversation text bank R |
 | `MANUAL.TXT` | 36,384 | `5f2f583be150e5e6c73a5a760e1847b3986e8635e86175b4f82d8c9f70368a42` | Plain-text game manual |
 | `SETSOUND.BAT` | 597 | `1d863472ef14a164966a93180bcb785ce32c0ce17a0321b6caf0892930fa18a1` | Sound configuration/install batch file |
 | `SOUND.1` | 4,824 | `286ca4901bc2d3c18982b398ea5cef77920e4e542a834c6113902768c5d0e080` | DIGPAK Sound Blaster 16 COM driver |

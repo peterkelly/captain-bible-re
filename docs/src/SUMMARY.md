@@ -10,4 +10,5 @@
 - [Palette and Artwork Formats](graphics-formats.md)
 - [Scene Bytecode](scene-bytecode.md)
 - [Audio Formats](audio-formats.md)
+- [Text Resource Formats](text-formats.md)
 - [Progress Log](progress-log.md)

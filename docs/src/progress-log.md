@@ -2229,3 +2229,228 @@ cohesive gallery commit after the successful 44-test verification above.
 Staged the six files, ran `git diff --cached --check`, and created the commit
 with subject `docs: Add full-screen artwork gallery`. Verified that every
 commit-message line is at most 72 characters and that the worktree is clean.
+
+## 2026-07-15: Verse indexes and companion text
+
+### Remaining-format inventory
+
+After the user asked reverse-engineering work to continue, reported that the
+next pass would recover the text-bearing resources and their runtime
+consumers. Confirmed the worktree was clean at commit `e546d98`, reread the
+open plan items and mdBook summary, and grouped all 369 `DD1.DAT` members by
+extension and expanded size:
+
+```text
+ART       143 resources  4,864,835 bytes
+BIN        62 resources    179,200 bytes
+ABT        41 resources    205,513 bytes
+PAL        37 resources     28,416 bytes
+no suffix  33 resources    215,113 bytes
+XMI        32 resources     34,618 bytes
+MAP        21 resources     16,128 bytes
+```
+
+Selected the 33 extensionless resources because the executable's built-in
+study export provides an independent validation path. The first inventory
+probe incorrectly referenced `DD1Entry.packed_size`; the actual field is
+`stored_size`, so Python raised `AttributeError`. A follow-up sample query
+also tried nonexistent long names such as `GEN` and `MAT` before the complete
+listing showed that the real names are two-character translation/bank pairs.
+Corrected both assumptions and recorded all archive indexes, sizes, headers,
+and tails.
+
+The members are `T`, `R`, `N`, or `K` plus bank `A` through `G` or `R`.
+These prefixes correspond to The Living Bible, Revised Standard Version, New
+International Version, and King James Version. `NG` occurs at indexes 199 and
+206 and the two expanded payloads are byte-identical.
+
+### Verse-index structure
+
+Dumped representative resources with `xxd`, counted control bytes and NUL
+positions, and printed the text around candidate boundaries. Each ordinary
+record begins with a nonzero selector byte, a little-endian word, and a
+NUL-terminated CP437 string containing one `|`. The text on the left of the
+pipe is a citation and the text on the right is a translated verse.
+
+The initial parser treated every three-byte header as an ordinary record and
+failed at the end of `TR` with `ValueError: ('string', 1287)`. Tail inspection
+showed that the final three bytes are instead a zero selector and terminal
+offset with no string. Corrected the parser and validated every extensionless
+member to its exact end.
+
+Compared the selector/offset pairs across translations. All four translations
+have identical structural headers for each corresponding bank. Each bank's
+terminal offset exactly equals its companion file size:
+
+```text
+A 0x2751  B 0x203d  C 0x0fb4  D 0x3a7d
+E 0x28f9  F 0x2811  G 0x2709  R 0x02b8
+```
+
+Offsets can repeat. Those zero-length ranges identify verses that have no
+companion text, rather than malformed records. There are 319 logical verse
+records in every translation.
+
+### Executable text path
+
+Used Rizin with `analysis/cb.rz` to disassemble the existing
+`export_game_text` function and its helpers. Saved ignored working output in
+`build/analysis/export-game-text.txt`, `text-loader-629c.txt`,
+`text-helper-functions.txt`, `text-selector-5ad6.txt`, and focused caller
+dumps.
+
+Function `0x629C` constructs the extensionless name from a translation table
+and the requested bank letter, loads it from `DD1.DAT`, and parses exactly the
+record layout above. It builds ten-byte runtime entries containing the far
+verse pointer, selector, companion offset, and the span obtained by
+subtracting the next offset. It then opens the matching `DDL` file.
+
+Function `0x5AD6` linearly finds a record by selector. Function `0x5CE2`
+copies either the citation/verse or a requested tagged string from the
+companion range. Function `0x5EE7` wraps export text at 70 columns. Named these
+functions `load_text_bank`, `find_text_record_by_selector`,
+`copy_text_record_component`, and `write_wrapped_export_text` in
+`analysis/cb.rz`.
+
+The selector is an exact lookup key. The export routine separately checks for
+selectors at or above `0xE0` when mature topics are disabled, establishing the
+meaning of that range without assigning semantics to the remaining key bits.
+
+### `DDL` tagged strings
+
+Listed and hashed `DDLA` through `DDLR`, then parsed each entire file as an
+ASCII tag followed by a NUL-terminated CP437 string. All 68,746 bytes consume
+exactly as 1,058 records with tags `L`, `P`, `W`, `C`, `E`, `*`, or `M`.
+Correlated the tags with literal export headings and mask checks in the
+executable:
+
+```text
+L  CYBER LIE                         277 records
+P  PARAPHRASE                        123 records
+W  WRONG GUESS                       210 records
+C  CORRECT GUESS                      67 records
+E  EXPLANATION OF CORRECT GUESS       68 records
+*  CONVERSATION WITH VICTIM           58 records
+M  numeric/internal metadata         255 records
+```
+
+The index spans cover 1,057 of those records. `DDLF` has one 26-byte `E`
+preamble before its first indexed offset, so retained it as validated but
+unassociated data. The earlier count of 1,130 companion records was an
+arithmetic mistake; summing the per-tag counts gives 1,058.
+
+A manual search command initially passed a pattern beginning with `-` to
+`rg` without its `--` option, producing `rg: unrecognized flag -|`. Repeated
+the search as `rg -n -- ...` and found the advanced `-sXfilename` and `-gXX`
+options in `MANUAL.TXT`, including the installation-lock warning and all six
+export-mask values.
+
+### Visible QEMU export validation
+
+Created the ignored `build/text/export-autoexec.bat` and a copy-on-write clone
+of the play image. Replaced both FreeDOS startup scripts in that clone with a
+batch file that ran the game exporter, wrote an `EXPORT.OK` marker, and called
+`FDAPM POWEROFF`. Verified the scripts with `mtype`, then launched QEMU visibly
+and without audio:
+
+```sh
+qemu-system-i386 \
+  -name 'Captain Bible text export' \
+  -machine pc -accel tcg -cpu pentium -m 16 -boot c \
+  -drive file=build/text/export.img,format=raw,if=ide,index=0,media=disk \
+  -vga std \
+  -audiodev none,id=audio0 \
+  -device sb16,audiodev=audio0 \
+  -device adlib,audiodev=audio0 \
+  -display cocoa,zoom-to-fit=on \
+  -no-reboot
+```
+
+Inside DOS, the batch invoked `CB -g63 -sTSTUDY.TXT`. QEMU powered off with
+exit status zero after about 13 seconds. Extracted the generated study file
+with `mcopy`; it is 132,510 bytes, 3,854 lines, and has SHA-256
+`c9ebe2cc4fbd00cd709d87761b38f6a8843eae99ceaa75cef842b93364dad0bc`.
+
+The output used NIV wording rather than the requested Living Bible wording.
+Inspected `SOUND.5` as `01 00 00 00`; runtime translation index 1 is NIV, so
+the installed lock overrode `-sT` exactly as the manual describes. Normalized
+the exporter's line wrapping and compared every parsed NIV verse. All 302
+emitted verses match. The 17 missing verses are exactly all records whose
+selectors are `0xE1` through `0xE4`, independently validating the active
+mature-topic filter. The game-authored headings and contents also match the
+parsed companion tags.
+
+### Reproducible inspector and focused tests
+
+Added executable `tools/inspect_text_resources.py`. It validates the terminal
+record, pipe delimiter, CP437 text, nondecreasing offsets, companion size,
+known tags, exact NUL termination, duplicate-resource identity, and requested
+translation/bank. It joins each verse to its tagged `DDL` span and can display
+one record or a whole bank.
+
+Added `tests/test_text_resources.py` with six tests covering all 32 logical
+translation/bank pairs, header equality across translations, the duplicate
+`NG` resources, the QEMU-validated first NIV record, valid zero-length spans,
+and damaged index/companion rejection.
+
+The first focused run produced four errors and one failure because the parser
+compared an integer tag byte with string keys in `TAG_LABELS`. Converted the
+byte to a character before validation. The next run passed five tests but the
+aggregate count expected `4 * 1130`; corrected the arithmetic and explicitly
+validated all companion bytes, including the single unindexed preamble. The
+third focused run passed all six tests in 0.185 seconds.
+
+Exercised the CLI against NIV bank A record zero and confirmed it prints the
+archive index, selector, companion range, citation and verse, followed by the
+expected `L`, `P`, four `W`, `C`, and `E` records. Added
+`docs/src/text-formats.md`, linked it from the mdBook summary, updated the
+file inventory and static function map, documented CLI usage in `README.md`,
+and marked text recovery, tooling, and format documentation complete in
+`PLAN.md`. Reported the corpus counts, exact QEMU validation, mature filtering,
+and documentation consolidation to the user.
+
+### Text-pass verification
+
+Ran the complete repository verification after documentation and symbol
+updates:
+
+```sh
+python3 -m unittest discover -s tests -v
+python3 -m py_compile tools/*.py tests/*.py
+bash -n run.sh tools/build_qemu_dos_trace.sh
+tools/inspect_text_resources.py \
+  CB/DD1.DAT --data-dir CB \
+  --translation N --bank A --record 0 \
+  > build/text/inspect-niv-a0.txt
+rizin -q -b 16 -a x86 -e scr.color=false \
+  -i analysis/cb.rz \
+  -c 'afl~text_; afl~export_game_text; q' \
+  build/analysis/CB_UNPACKED.EXE \
+  > build/text/text-symbols.txt
+mdbook build docs
+test -f build/docs-book/text-formats.html
+git diff --check
+rg -n '[[:blank:]]+$' \
+  PLAN.md README.md analysis/cb.rz \
+  docs/src/file-inventory.md docs/src/static-analysis.md \
+  docs/src/SUMMARY.md docs/src/text-formats.md \
+  docs/src/progress-log.md tests/test_text_resources.py \
+  tools/inspect_text_resources.py
+git status --short
+```
+
+All 50 tests passed in 2.185 seconds. Every Python source compiled, both shell
+scripts parsed, the text inspector produced the expected joined NIV record,
+and Rizin loaded the new text symbols at their intended offsets. mdBook built
+the new text-format chapter successfully. Tracked and new files have no diff
+or whitespace errors. The text-format changes remain uncommitted pending a
+requested checkpoint.
+
+The user requested a commit checkpoint for the text-format pass. Inspected
+the final diff and confirmed it contains only the verse-index and `DDL`
+recovery, inspector and tests, Rizin symbols, mdBook chapter, inventory,
+README, plan, static-analysis, and progress-log updates. Prepared these ten
+files as one cohesive commit after the successful 50-test verification above.
+Staged all ten files, ran `git diff --cached --check`, and created the commit
+with subject `text: Recover study resource formats`. Verified that every
+commit-message line is at most 72 characters and that the worktree is clean.

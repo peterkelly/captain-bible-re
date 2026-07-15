@@ -24,7 +24,15 @@ afn update_scene_threads @ 0x7997
 afn initialize_new_session @ 0x7d2b
 afn main_menu_and_game_loop @ 0x875d
 afn poll_input_event @ 0x7bed
+af @ 0x5ad6
+afn find_text_record_by_selector @ 0x5ad6
+af @ 0x5ce2
+afn copy_text_record_component @ 0x5ce2
+af @ 0x5ee7
+afn write_wrapped_export_text @ 0x5ee7
 afn export_game_text @ 0x5f92
+af @ 0x629c
+afn load_text_bank @ 0x629c
 afn load_art_resource @ 0xb818
 afn load_file_into_far_memory @ 0xacda
 

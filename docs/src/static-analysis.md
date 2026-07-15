@@ -72,7 +72,9 @@ full `-gXX` mask:
 The routine writes the heading `CAPTAIN BIBLE IN DOME OF DARKNESS`, iterates
 the available records/buildings, and uses Microsoft C `fread`/write and text
 stream helpers. This is implementation evidence for the manual's export
-feature rather than merely a string search.
+feature rather than merely a string search. The text-format chapter documents
+the extensionless verse indexes, companion `DDL*` streams, loader, inspector,
+and complete QEMU export validation.
 
 ## Save files
 
@@ -236,7 +238,11 @@ documents both formats and their reproducible tools.
 | `0x417F` | `play_sound_effect_resource` |
 | `0x4235` | `stop_sound_effect` |
 | `0x451B` | `execute_bin_commands` |
+| `0x5AD6` | `find_text_record_by_selector` |
+| `0x5CE2` | `copy_text_record_component` |
+| `0x5EE7` | `write_wrapped_export_text` |
 | `0x5F92` | `export_game_text` |
+| `0x629C` | `load_text_bank` |
 | `0x6631` | `initialize_scene` |
 | `0x7997` | `update_scene_threads` |
 | `0x7BED` | `poll_input_event` |

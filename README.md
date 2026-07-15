@@ -205,6 +205,23 @@ summarize their containers, timbres, and event streams with:
 tools/inspect_xmi.py build/dd1/all/267_MUS001.XMI
 ```
 
+## Inspecting game text
+
+The extensionless resources in `DD1.DAT` contain translation-specific verse
+indexes. They pair with the `DDLA` through `DDLR` files containing lies,
+paraphrases, questions, explanations, and conversations. Inspect a combined
+record with:
+
+```sh
+tools/inspect_text_resources.py \
+  CB/DD1.DAT --data-dir CB \
+  --translation N --bank A --record 0
+```
+
+Translations are `K`, `N`, `R`, and `T`; banks are `A` through `G` and `R`.
+The mdBook text-format chapter documents both binary layouts and their
+validation against the game's built-in study-file exporter.
+
 Both tools reject structural inconsistencies and consume their inputs exactly.
 The mdBook audio chapter documents the formats, executable decoder, and a
 byte-for-byte comparison between host-decoded `D003.ABT` and its live QEMU
