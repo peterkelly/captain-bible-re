@@ -5,8 +5,8 @@ reverse-engineering *Captain Bible in the Dome of Darkness*, a DOS game from
 the 1990s. The original game files are expected in `CB/` and are intentionally
 ignored by Git.
 
-Work is currently paused at the end of Phase 1 so the user can test the
-FreeDOS/QEMU game environment. See `PLAN.md` for the live task list and
+The FreeDOS/QEMU environment is complete and executable analysis is in
+progress. See `PLAN.md` for the live task list and
 `docs/src/progress-log.md` for the complete activity log.
 
 ## Requirements
@@ -17,6 +17,7 @@ FreeDOS/QEMU game environment. See `PLAN.md` for the live task list and
 - Python 3
 - A POSIX shell
 - mdBook (for the research book)
+- Rizin (for the supplied symbol script and further disassembly)
 
 The setup is being developed and tested with QEMU 11.0.2 and mdBook 0.5.3 on
 macOS/Apple Silicon.
@@ -85,6 +86,29 @@ Run its focused unit tests with:
 ```sh
 python3 -m unittest discover -s tests -v
 ```
+
+## Executable analysis
+
+`CB.EXE` is a 16-bit MZ executable compressed with Microsoft EXEPACK. Generate
+the independently verified unpacked executable and, when the recorded QEMU
+dump is present, compare it with the relocated process image:
+
+```sh
+tools/analyze_cb_exe.py CB/CB.EXE \
+  --output build/analysis/CB_UNPACKED.EXE \
+  --memory-dump build/dumps/title-physical-1m.bin \
+  --load-segment 0x627
+```
+
+Load the current high-confidence names into Rizin with:
+
+```sh
+rizin -b 16 -i analysis/cb.rz build/analysis/CB_UNPACKED.EXE
+```
+
+The generated executable and memory dumps remain under ignored `build/`.
+Research results, address conventions, function names, command-line behavior,
+and the recovered save layout are in the mdBook source.
 
 ## Documentation
 

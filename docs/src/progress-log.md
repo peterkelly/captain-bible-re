@@ -512,3 +512,321 @@ and confirmed the changes contain the canonical directory fix, reproducible
 image behavior, verification evidence, and updated plan and usage guidance.
 Prepared to commit these tracked changes while leaving the corrected generated
 disk images and launch-check screenshot ignored.
+
+### Static-analysis scope and initial fingerprint
+
+After the user asked for static disassembly, reported that the pass would
+fingerprint the executable, identify packing or overlays before trusting an
+entry-point disassembly, and keep generated binaries under ignored `build/`.
+The user then explicitly asked that QEMU be used for memory dumps and other
+debugging facilities. Adopted that request as permission to use runtime state
+to recover and verify the executable, while continuing to derive game logic
+from static analysis.
+
+Checked repository state, tracked history, current plans and documentation,
+and the installed analysis toolchain with commands including:
+
+```sh
+git status --short
+git log -3 --oneline
+find . -maxdepth 3 -type f | sort
+command -v cargo
+command -v rizin
+command -v qemu-system-i386
+sed -n '1,260p' PLAN.md
+sed -n '1,260p' docs/src/progress-log.md
+```
+
+The tree was clean before this pass. The current history showed commits
+`833a81d`, `9ade46a`, and `3a1d2ec`. The earlier log's Phase 1 commit ID was a
+transient prior ID; no history-changing command was run during this pass.
+
+Inspected the packed file with `stat`, `file`, `shasum`, `xxd`, `strings`,
+`rz-bin`, Rizin, and short read-only standard-library Python decoders. Important
+results were:
+
+- `CB.EXE` is 64,299 bytes with SHA-256
+  `2b7726ae9cf56e0067533e4bd1c5c76685f1d9855a7d90835850388db7b07ee0`.
+- Its timestamp is 1996-12-24 23:32 in the host's `+0700` zone.
+- The file is a 16-bit MZ executable with a 512-byte header, no outer
+  relocations, and entry `0F79:0010` at file offset `0xF9A0`.
+- The packed load module has approximately 7.004 bits/byte of entropy.
+- Strings include the 1988 Microsoft run-time banner, game resources and UI
+  text, `R6000` run-time errors, and `Packed file is corrupt`.
+
+Decoded the 16-byte structure at file offset `0xF990` and disassembled the
+following stub. The `RB` signature, reverse `B0` fill/`B2` copy loop, relocation
+restoration, and error string identify Microsoft EXEPACK. Recovered:
+
+```text
+real_ip       cb5c
+real_cs       0000
+exepack_size  019b
+real_sp       1388
+real_ss       1a40
+dest_len      1260 paragraphs
+signature     4252 ("RB")
+```
+
+Parsed the packed relocation table after the 277-byte stub. It occupies the
+final 118 file bytes and contains 43 relocations in the standard 16 grouped
+segments. The full offset list is preserved in `executable.md`.
+
+Consulted Microsoft's historical DOS documentation, served by PCjs, for the
+documented purpose of LINK `/EXEPACK`, and David Fifield's EXEPACK page and
+source for a current independent specification and implementation. Also read
+the relevant `exepack.rs` and `exe.rs` source in full around header parsing,
+backward decompression, relocation decoding, minimum-allocation adjustment,
+MZ serialization, and checksum handling.
+
+### Visible QEMU post-unpack capture
+
+Started the prepared game disk with the user-required visible Cocoa display,
+plus a monitor and GDB endpoint:
+
+```sh
+qemu-system-i386 \
+  -name 'Captain Bible memory capture' \
+  -machine pc,accel=tcg \
+  -cpu pentium \
+  -m 16 \
+  -boot c \
+  -drive file=build/captain-bible/captain-bible.img,format=raw,if=ide,index=0,media=disk \
+  -vga std \
+  -audiodev coreaudio,id=audio0 \
+  -device sb16,audiodev=audio0 \
+  -device adlib,audiodev=audio0 \
+  -display cocoa,zoom-to-fit=on \
+  -gdb tcp:127.0.0.1:1234 \
+  -monitor stdio
+```
+
+After the title screen appeared, used the QEMU monitor:
+
+```text
+stop
+info registers
+pmemsave 0 0x100000 build/dumps/title-physical-1m.bin
+screendump build/dumps/title-screen.ppm
+quit
+```
+
+The dump SHA-256 is
+`aca64f0013d052a2cd8b8ecb5869b1d71df7cd30f704361f57bfebacfa1d67d5`.
+The title-screen state had PSP `0617`, `CS=0627`, `IP=C614`, and
+`DS=ES=SS=14E1`. Thus the load module begins at physical `0x6270`, its
+relative data segment begins at load offset `0xEBA0` / physical `0x14E10`, and
+the current instruction was at physical `0x12884`.
+
+Searched the dump for known strings. The Microsoft run-time banner occurs at
+physical `0x14E18`, faith/status strings at `0x15068`, `DD1.DAT` at `0x15220`,
+the game title at `0x15456`, and the `R6000` strings near `0x18796`. The packed
+stub's corruption message is absent from the reconstructed module, as
+expected. Stopped QEMU before performing any disk or host-side file work.
+
+Reported to the user that this capture provides a bridge between the packed
+DOS file and static analysis and that the rebuilt module would be checked
+against the captured process rather than trusting packed-entry disassembly.
+
+### Independent EXEPACK reconstruction
+
+Built an external implementation under ignored `build/tools/` for an initial
+independent result:
+
+```sh
+mkdir -p build/tools build/analysis
+git clone https://www.bamsoftware.com/git/exepack.git \
+  build/tools/exepack-src
+git -C build/tools/exepack-src rev-parse HEAD
+cargo build --release \
+  --manifest-path build/tools/exepack-src/Cargo.toml
+build/tools/exepack-src/target/release/exepack -d \
+  CB/CB.EXE build/analysis/CB_UNPACKED.EXE
+```
+
+The source revision was `f715ed19285565d636e78182fc19df62c0fa64b9`.
+The output is a 75,776-byte MZ executable with 75,264 load bytes, 43 ordinary
+MZ relocations, entry `0000:CB5C`, and SHA-256
+`4875f83d6d2ba9c1cc4f058e351e453010c6a5976e1b15976b676689f9747643`.
+
+Applied the relocations with load segment `0x0627` in a read-only Python
+comparison and compared all 75,264 bytes with the QEMU dump. The first
+`0x905A` bytes are identical. There are 5,612 differing bytes overall, grouped
+primarily in initialized state and BSS; inspection showed strings and tables
+loaded by startup. Reported the real entry and this verification result to the
+user.
+
+Created `tools/analyze_cb_exe.py` using `apply_patch`. It is a dependency-free
+MZ/EXEPACK parser, decompressor, relocation decoder, MZ serializer, checksum
+writer, and optional QEMU-memory comparator. Created
+`tests/test_analyze_cb_exe.py` with size-field, known-output, and memory-dump
+regressions.
+
+The first test run exposed a Python 3.14 `dataclasses` import issue because the
+dynamically loaded test module had not been registered in `sys.modules`:
+
+```text
+AttributeError: 'NoneType' object has no attribute '__dict__'
+```
+
+Registered the test module before executing it, then ran:
+
+```sh
+chmod +x tools/analyze_cb_exe.py
+python3 -m unittest discover -s tests -v
+python3 -m py_compile \
+  tools/analyze_cb_exe.py tests/test_analyze_cb_exe.py
+tools/analyze_cb_exe.py CB/CB.EXE \
+  --output build/analysis/CB_UNPACKED_PY.EXE \
+  --memory-dump build/dumps/title-physical-1m.bin \
+  --load-segment 0x627
+cmp build/analysis/CB_UNPACKED.EXE \
+  build/analysis/CB_UNPACKED_PY.EXE
+```
+
+All 12 repository tests passed. `cmp` proved that the local Python
+implementation emits exactly the same bytes as the independent Rust tool.
+
+### Rizin first pass and segmented-address correction
+
+Ran Rizin recursively over the unpacked file. An initial attempt to set
+`asm.bits=16` through an evaluation variable failed with:
+
+```text
+ERROR: use -b argument for setting the arch bits
+```
+
+Reran with `-b 16`, saved exploratory output under ignored
+`build/analysis/`, and searched for DOS, BIOS video, BIOS keyboard, and mouse
+interrupt instructions. Rizin reported approximately 340 candidate functions,
+79 `int 21h` sites, 12 `int 10h` sites, three `int 16h` sites, and six
+`int 33h` sites. Large false function merges remain around tables and unusual
+control flow.
+
+The Microsoft startup at `0xCB5C` pushes three values and calls `0x8A82` before
+passing the return value to its exit path. The values are `envp`, `argv`, and
+`argc` in right-to-left order, identifying `0x8A82` as `main`.
+
+Corrected an important addressing issue during inspection: Rizin displays
+ordinary DS immediates as low linear addresses. Startup loads DS with
+load-segment plus `0x0EBA`; therefore `DS:08DA` is load offset `0xF47A`, not
+code address `0x08DA`. Used this translation when extracting and correlating
+strings.
+
+Inspected `main`, its startup callees, the manual's command-line section, the
+string run-time functions, DOS file routines, VGA detection, mouse routines,
+the event combiner, text export, and save functions. Commands included Rizin
+`pdf`, `pd`, `axt`, `afl`, and `/ad` queries, `ndisasm` around instructions
+that Rizin initially rendered as invalid, `xxd`, and read-only Python string
+and structure decoders.
+
+Confirmed from implementations that `0xE22C`, `0xE26C`, `0xE29E`, `0xE302`,
+`0xE31A`, `0xE772`, and `0xE993` are `strcat`, `strcpy`, `strcmp`, `tolower`,
+`toupper`, `puts`, and `chdir`; and that `0xD0C2`, `0xD1AE`, and `0xD1D6` are
+`fclose`, `fopen`, and `fread`.
+
+Created `analysis/cb.rz` with the high-confidence names. Its first form used
+unsupported evaluation-variable names and incorrect address syntax; the
+second form collided with Rizin's existing section flags; and another run
+revealed that the two tiny mouse cursor wrappers had not been recognized as
+functions. Removed the unsupported settings, used `@ address` syntax, stopped
+redefining section flags, and explicitly analyzed the two wrappers before
+renaming them. Verified the final script with:
+
+```sh
+rizin -q -b 16 -e scr.color=false \
+  -i analysis/cb.rz \
+  -c 'afl~game; afl~save; afl~libc; fl~str_; q' \
+  build/analysis/CB_UNPACKED.EXE
+```
+
+The final run completed without an error and listed all intended game, save,
+library, and string names.
+
+### Static game-system findings
+
+Reported during the pass that the startup analysis had identified these
+paths, then documented the evidence in dedicated book chapters:
+
+- `main` directly implements `-t`, `-bX`, `-c`, `-idirectory`, `-sXfilename`,
+  `-gXX`, and the non-option per-player save prefix.
+- `0x3363` checks VGA, reads `SOUND.5`, conditionally loads `SOUND.1` through
+  `SOUND.4`, opens `DD1.DAT`, and initializes hardware/data subsystems.
+- `0x5F92` is the ASCII export routine. Its bit tests match the six documented
+  `-gXX` categories.
+- `0x7BED` merges keyboard, mouse motion, mouse-button, and UI-hit events.
+- `0x8E0A` detects the mouse through `int 33h`; `0x8D79` updates buttons and
+  clamps coordinates to 320×200.
+- `0x7F58` reads a 243-byte `.SV0` index consisting of nine 27-byte labels.
+- `0x7FD7` and `0x81AC` write and read a fixed 2,752-byte state in 15 blocks.
+  Every supplied `.SV1` through `.SV9` file has that exact size.
+- The quick-save path changes the mutable suffix from `0` to `Q`, identifying
+  `.SVQ` as the quick-save state file.
+
+Ran `stat`, SHA-256, `xxd`, and a nine-record decoder on the supplied save
+files. The supplied `DDGAMES.SV0` is 243 bytes, each state file is 2,752 bytes,
+and the index's visible labels begin with `EMPTY`. The missing-index code uses
+the initialized string `(EMPTY)` instead.
+
+Updated `PLAN.md`, `README.md`, the mdBook summary and introduction, and added
+`executable.md` and `static-analysis.md`. The new chapters preserve the exact
+EXEPACK and QEMU evidence, address convention, command parser, export masks,
+save block layout, input path, function map, confidence limits, and commands
+for reproducing the analysis.
+
+### Static-pass verification
+
+Reported to the user that the repository now contains the reproducible
+EXEPACK/QEMU verifier, regression tests, Rizin symbol map, and mdBook findings,
+and that a final consistency pass was in progress.
+
+Ran:
+
+```sh
+python3 -m unittest discover -s tests -v
+python3 -m py_compile \
+  tools/analyze_cb_exe.py tests/test_analyze_cb_exe.py
+bash -n run.sh
+tools/analyze_cb_exe.py CB/CB.EXE \
+  --output build/analysis/CB_UNPACKED.EXE \
+  --memory-dump build/dumps/title-physical-1m.bin \
+  --load-segment 0x627 \
+  > build/analysis/analyzer-report.txt
+rizin -q -b 16 -e scr.color=false \
+  -i analysis/cb.rz \
+  -c 'afl~game; afl~save; afl~libc; q' \
+  build/analysis/CB_UNPACKED.EXE \
+  > build/analysis/symbol-check.txt
+mdbook build docs
+test -f build/docs-book/executable.html
+test -f build/docs-book/static-analysis.html
+git diff --check
+git status --short
+git diff --stat
+```
+
+Results:
+
+- All 12 tests passed.
+- Both analysis Python files compiled and `run.sh` still parsed as Bash.
+- The analyzer reproduced the expected executable and QEMU comparison report.
+- The Rizin script loaded and printed the intended renamed function groups.
+- mdBook 0.5.3 built both new chapters successfully.
+- The Git whitespace check passed.
+- Generated executable, dump, reports, external source, and book output remain
+  ignored under `build/`; only analysis source, tests, and documentation are
+  pending in the working tree.
+
+After adding the source link and making a formatting-only Python change,
+repeated the tests, compiler check, analyzer comparison, Rizin symbol query,
+mdBook build, whitespace check, executable-mode check, status, and source line
+counts. All checks passed again; `tools/analyze_cb_exe.py` is mode `755`, and
+the five new analysis/source files total 805 lines.
+
+### Static-analysis commit preparation
+
+At the user's request, reviewed the complete static-analysis change set
+before committing it. Confirmed that the new analyzer, regression tests,
+Rizin symbols, executable notes, static-analysis report, and project status
+updates belong to this phase of the investigation. The verification results
+above establish the commit as a reproducible analysis baseline.

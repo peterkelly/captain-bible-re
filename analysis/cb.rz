@@ -1,0 +1,48 @@
+aaa
+af @ 0x8d50
+af @ 0x8d5d
+
+afn runtime_startup @ 0xcb5c
+afn game_main @ 0x8a82
+afn set_cwd_from_executable_path @ 0x8a09
+afn parse_bible_translation_lock @ 0x89af
+afn initialize_hardware_and_data @ 0x3363
+afn initialize_new_session @ 0x7d2b
+afn main_menu_and_game_loop @ 0x875d
+afn poll_input_event @ 0x7bed
+afn export_game_text @ 0x5f92
+afn load_art_resource @ 0xb818
+
+afn copy_live_state_to_save_buffers @ 0x7d8e
+afn copy_save_buffers_to_live_state @ 0x7e41
+afn write_save_index @ 0x7f01
+afn read_save_index @ 0x7f58
+afn write_save_state @ 0x7fd7
+afn initialize_empty_save_slot @ 0x815a
+afn read_save_state @ 0x81ac
+
+afn show_mouse_cursor @ 0x8d50
+afn hide_mouse_cursor @ 0x8d5d
+afn update_mouse_state @ 0x8d79
+afn detect_mouse @ 0x8e0a
+afn detect_video_adapter @ 0x90d4
+
+afn libc_fclose @ 0xd0c2
+afn libc_fopen @ 0xd1ae
+afn libc_fread @ 0xd1d6
+afn libc_strcat @ 0xe22c
+afn libc_strcpy @ 0xe26c
+afn libc_strcmp @ 0xe29e
+afn libc_tolower @ 0xe302
+afn libc_toupper @ 0xe31a
+afn libc_puts @ 0xe772
+afn libc_chdir @ 0xe993
+
+f str_microsoft_runtime 0x38 @ 0xeba8
+f str_vga_not_detected 0x1e @ 0xef64
+f str_sound_configuration 8 @ 0xef83
+f str_main_data_file 8 @ 0xefb0
+f str_export_open_error 0xd @ 0xf156
+f str_export_title 0x27 @ 0xf1e6
+f str_save_index_suffix 5 @ 0xf39b
+f str_run_art 8 @ 0xf47a

@@ -11,6 +11,9 @@ inferences. Commands and their important results are preserved in the
 
 ## Current scope
 
-The current milestone is limited to making the game playable under QEMU. The
-user will test that environment before executable and data-format analysis
-begins.
+The playable QEMU environment is complete. The current milestone is static
+analysis of `CB.EXE`, assisted by QEMU memory snapshots where runtime evidence
+is needed to recover the original post-decompression image. The initial pass
+has identified the packer and run time, reconstructed the executable, mapped
+startup and major support routines, and recovered the command-line, export,
+input, and save paths.

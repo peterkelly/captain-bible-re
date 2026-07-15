@@ -24,14 +24,17 @@ This plan is a living checklist. Findings and commands are recorded in
 ## Phase 2: Static inventory and executable analysis
 
 - [ ] Record checksums, timestamps, formats, and sizes for every game file.
-- [ ] Identify the executable format, compiler/runtime, and memory model.
-- [ ] Map executable segments, entry points, strings, and imported services.
-- [ ] Analyze the command-line parser and documented hidden/export options.
+- [x] Identify the executable format, compiler/runtime, and memory model.
+- [x] Recover and independently verify the EXEPACK-compressed load module.
+- [x] Map the initial segments, entry points, strings, and DOS/BIOS services.
+- [x] Analyze the command-line parser and documented export options.
+- [x] Recover a first-pass function map for startup, input, saves, and export.
 - [ ] Determine the purpose and format of each `DD*`, `SOUND.*`, and save file.
 
 ## Phase 3: Dynamic analysis
 
-- [ ] Establish a repeatable debugging and tracing workflow.
+- [x] Establish a repeatable QEMU memory-capture and debugging workflow.
+- [x] Capture and correlate a title-screen physical-memory snapshot.
 - [ ] Trace startup, file access, graphics, input, sound, and save operations.
 - [ ] Correlate runtime behavior with static functions and data structures.
 - [ ] Exercise major screens and gameplay systems while recording evidence.
