@@ -227,6 +227,22 @@ The mdBook audio chapter documents the formats, executable decoder, and a
 byte-for-byte comparison between host-decoded `D003.ABT` and its live QEMU
 PCM buffer.
 
+## Inspecting saved games
+
+Each player prefix has a 243-byte `.SV0` label index, nine normal state files,
+and a separate `.SVQ` quick save. Inspect either fixed format with:
+
+```sh
+tools/inspect_save.py CB/DDGAMES.SV0
+tools/inspect_save.py CB/DDGAMES.SV3 --descriptors
+```
+
+The inspector validates exact sizes, decodes the nine fixed C-string label
+buffers, separates live and checkpoint state blocks, and exposes the saved
+settings and text descriptors. The mdBook save-format chapter documents the
+2,752-byte state layout, player-prefix behavior, quick-save suffix changes,
+snapshot copying, error behavior, and evidence from all supplied saves.
+
 ## QEMU DOS-call tracing
 
 Run the game with the QEMU TCG tracer and monitor socket enabled:

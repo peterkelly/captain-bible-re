@@ -38,10 +38,12 @@ afn load_file_into_far_memory @ 0xacda
 
 afn copy_live_state_to_save_buffers @ 0x7d8e
 afn copy_save_buffers_to_live_state @ 0x7e41
+afn choose_save_slot @ 0x2b6f
 afn write_save_index @ 0x7f01
 afn read_save_index @ 0x7f58
 afn write_save_state @ 0x7fd7
 afn initialize_empty_save_slot @ 0x815a
+afn save_selected_slot @ 0x81a5
 afn read_save_state @ 0x81ac
 
 afn show_mouse_cursor @ 0x8d50

@@ -78,39 +78,15 @@ and complete QEMU export validation.
 
 ## Save files
 
-The default prefix is `DDGAMES`; a player argument replaces the prefix.
-`0x7F58` appends `.SV0`, opens the file as `rb`, and reads `0xF3` (243) bytes.
-The buffer is nine consecutive 27-byte slot-label records. When the index does
-not exist, it initializes all nine labels from `(EMPTY)`. `0x7F01` writes the
-same 243-byte index.
-
-Normal game states use suffixes `.SV1` through `.SV9`. The quick-save path
-temporarily changes the suffix digit to `Q`, so its state file is `.SVQ`.
-Function `0x7FD7` writes a state and `0x81AC` reads the same fixed layout:
-
-| File offset | Size | In-memory DS offset | Current interpretation |
-|---:|---:|---:|---|
-| `0x000` | 200 | `7BF2` | Primary state block A |
-| `0x0C8` | 200 | `727A` | Primary state block B |
-| `0x190` | 66 | `3A66` | Compact per-item/entity values |
-| `0x1D2` | 660 | `B194` | 66 records of 10 bytes |
-| `0x466` | 20 | `6EA6` | String/state block |
-| `0x47A` | 20 | `B83E` | String/state block |
-| `0x48E` | 20 | `8938` | String/state block |
-| `0x4A2` | 20 | `AEFE` | String/state block |
-| `0x4B6` | 2 | `007C` | Scalar |
-| `0x4B8` | 2 | `0048` | Scalar |
-| `0x4BA` | 2 | `004A` | Scalar |
-| `0x4BC` | 2 | `9FB0` | Scalar |
-| `0x4BE` | 2 | `0080` | Scalar |
-| `0x4C0` | 768 | `5B16` | 16×16×3-byte table |
-| `0x7C0` | 768 | `76EC` | Second 16×16×3-byte table |
-| **Total** | **2,752** | | |
-
-All supplied `DDGAMES.SV1` through `DDGAMES.SV9` files are exactly 2,752
-bytes, and the supplied `DDGAMES.SV0` is exactly 243 bytes. The table names
-remain conservative until their gameplay meaning is correlated with data and
-runtime changes.
+The default player prefix is `DDGAMES`; a non-option argument replaces it.
+The `.SV0` index is nine 27-byte label buffers, normal states are `.SV1`
+through `.SV9`, and F10/F9 use the independent `.SVQ` state. Static copy
+direction separates checkpoint and live fields in each fixed 2,752-byte state.
+The scalar fields include translation, music, effects, and checkpoint/live
+text-bank values; the 66 ten-byte descriptors connect exactly to the recovered
+text resources. The [save-game format chapter](save-formats.md) gives the full
+15-block layout, filename logic, supplied-file comparison, error behavior, and
+reproducible inspector.
 
 ## Input and hardware support
 

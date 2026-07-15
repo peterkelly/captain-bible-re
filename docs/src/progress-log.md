@@ -2454,3 +2454,242 @@ files as one cohesive commit after the successful 50-test verification above.
 Staged all ten files, ran `git diff --cached --check`, and created the commit
 with subject `text: Recover study resource formats`. Verified that every
 commit-message line is at most 72 characters and that the worktree is clean.
+
+## 2026-07-15: save-game format and player prefixes
+
+The user asked to continue reverse engineering. Selected the next open file-
+format milestone: fully recover the supplied save formats and player-name
+behavior, turn the result into a strict inspector, and document it. Reported
+that the work would begin from the ten supplied save files and static
+comparisons, then trace filenames and scalar fields.
+
+### Corpus inventory and comparisons
+
+Ran `git status --short`, inspected the recent log, searched the plan, README,
+book, and ignored analysis outputs with `rg`, and used `stat`, SHA-256, and
+short Python scripts on `CB/DDGAMES.SV0` through `SV9`. The current starting
+commit was `3c42783 text: Recover study resource formats`, and the tracked
+worktree was clean. Confirmed again that `SV0` is 243 bytes and all nine state
+files are 2,752 bytes.
+
+Decoded `SV0` as nine 27-byte buffers. Every visible C string is `EMPTY`, but
+bytes after the first NUL include fragments such as `id II` and `rney SL`.
+These are stale buffer tails, not label text: the executable uses `strcpy`
+rather than clearing all 27 bytes. Noted that the executable's missing-index
+initializer is `(EMPTY)`, whereas the supplied file contains `EMPTY` without
+parentheses.
+
+Compared every state pair and each byte position across the corpus. Found
+that `SV6` and `SV8` are identical, 2,477 of 2,752 offsets are constant, and
+275 vary. The group containing `SV1`, `SV2`, `SV5`, `SV6`, `SV7`, and `SV8`
+often differs by only one byte; `SV3` and `SV4` also differ by one byte, while
+`SV9` differs more substantially.
+
+Dumped every known block and compared the paired regions. Each 200-byte
+primary pair differs at byte 56; `SV9` additionally differs at byte 54. The
+two 768-byte blocks are identical inside each save. They are zero in most
+files, while `SV3` and `SV4` each contain 112 nonzero bytes. The four 20-byte
+buffers decode as `LOGO`, `LOGO`, `seg`, and `seg`; some files retain stale
+bytes after those C strings' NUL terminators.
+
+All supplied states contain translation index 1, music flag 1, effects flag
+1, checkpoint bank word 67, and live bank word 67. The latter two are ASCII
+`C`. All compact descriptor-state bytes are zero. Descriptor pointers in
+`SV9` use a different segment from the other supplied files, an early sign
+that those pointer words are process-dependent.
+
+### Static save-path tracing
+
+Generated these ignored evidence files with scripted Rizin sessions over
+`build/analysis/CB_UNPACKED.EXE`:
+
+- `build/analysis/save-pass-functions.txt`
+- `build/analysis/game-main-save-pass.txt`
+- `build/analysis/save-field-xrefs.txt`
+- `build/analysis/save-name-control-flow.txt`
+- `build/analysis/save-menu-flow.txt`
+- `build/analysis/save-main-loop.txt`
+- `build/analysis/save-snapshot-callers.txt`
+- `build/analysis/save-snapshot-exact.txt`
+
+The sessions ran `aaa` and `analysis/cb.rz`, then used `pdf`, `pd`, `axt`,
+`px`, and `ps` around the save functions, `game_main`, the options menu, the
+main event loop, and DS references `0042`, `0045`, `0048`, `004A`, `007C`,
+`0080`, and `4A02`. One command requested `pdf @ main`, which failed because
+the configured name is `game_main`; reran it with the correct symbol. Another
+attempt used the unavailable `pdc` command; retained ordinary function and
+recursive disassembly instead.
+
+Recovered the exact checkpoint-copy behavior at load offsets `0x7D8E` and
+`0x7E41`. The forward routine copies 200 bytes from DS `727A` to `7BF2`, byte
+`+4` from each of 66 ten-byte descriptors at `B194` into `3A66`, all
+16×16×3 bytes from `5B16` to `76EC`, the C strings at `B83E`/`AEFE` to
+`6EA6`/`8938`, and word `0080` to `9FB0`. The inverse routine reverses those
+copies and reloads the selected text bank. Forward-copy callers are new-
+session initialization and a scene command, not the state writer itself.
+This explains the manual's warning that saves in conversations can resume at
+the beginning of a scene: the file contains both checkpoint and live state.
+
+Recovered the ten-byte runtime descriptor layout as far pointer offset,
+far pointer segment, persistent state byte, selector, companion offset, and
+companion span. The loader reconstructs all structural and pointer fields
+while preserving byte `+4`; the separate 66-byte block is its checkpoint
+copy. Loaded NIV bank C through `tools/inspect_text_resources.py` and compared
+it with `SV1`. All 46 active descriptors match exactly in selector, companion
+offset, and span, and the remaining 20 structural records are zero.
+
+The first ad-hoc comparison script failed with `ModuleNotFoundError` because
+`inspect_text_resources.py` imports `extract_dd1` as a tool-directory module.
+Added `tools` to that script's temporary `sys.path` and reran successfully.
+This was an inspection-only correction; no source was changed to accommodate
+the one-off command.
+
+Traced the scalar cross-references. DS `0048` is the music-enabled flag:
+music playback tests it and the options menu toggles it. DS `004A` is the
+sound-effects flag and is likewise tested and toggled. DS `007C` is the
+translation index established in the text pass. DS `0080` is the current
+text-bank character, copied to checkpoint word `9FB0`.
+
+Traced `game_main` and the suffix data. Startup copies the literal `DDGAMES`
+to DS `4A02`. A non-option command-line argument replaces it verbatim via
+unbounded `strcpy`; the executable does not enforce the manual's DOS filename,
+path, or eight-character rules. The static suffix at DS `0042` is `.SV0`.
+Both index and state routines create names by copying the player prefix and
+appending this mutable suffix.
+
+Disassembled slot selection at `0x2B6F` and the main loop around `0x891B`.
+The menu changes the suffix's last byte to ASCII `1` through `9`. F10 changes
+it to `Q`, updates live rendering/state, calls `write_save_state`, and restores
+`0`. F9 makes the same temporary change around `read_save_state`. Reported to
+the user that this proves `.SVQ` is the independent tenth state. The
+empty-slot helper uses the selected digit to address one 27-byte label and,
+when empty or equal to `(EMPTY)`, copies a generated `Game 1` through `Game 9`
+default into it.
+
+Confirmed the write routine emits the exact 15 blocks in the documented
+order and rewrites `SV0` first. The read routine mirrors the layout. It
+returns failure if `fopen` fails, but does not test the 15 individual `fread`
+counts before refreshing sound/text state and reporting success. This is why
+the host inspector rejects damaged sizes even though the original game does
+not reliably do so.
+
+### Reproducible save inspector
+
+Added executable `tools/inspect_save.py`. It detects an index or state by the
+two exact sizes, decodes CP437 C-string buffers, preserves and reports stale
+label tails, parses all 66 text descriptors, names the recovered settings,
+separates live/checkpoint regions, counts snapshot differences, and optionally
+lists nonempty descriptors.
+
+Added `tests/test_inspect_save.py` with seven tests. They cover all ten
+supplied files, nine visible `EMPTY` labels and stale tails, exact parser size
+selection, damaged-size rejection, scalar and C-string regressions, compact
+state bytes versus descriptor byte `+4`, live/checkpoint table equality, the
+known `SV6`/`SV8` duplicate, and the complete NIV bank C descriptor match.
+
+Ran:
+
+```sh
+chmod +x tools/inspect_save.py
+python3 -m unittest tests.test_inspect_save -v
+tools/inspect_save.py CB/DDGAMES.SV0
+tools/inspect_save.py CB/DDGAMES.SV3 --descriptors
+```
+
+All seven focused tests passed. The index CLI displayed nine labels and stale-
+tail counts; the state CLI reported translation 1, both audio flags enabled,
+bank C, four expected resource strings, 46 active descriptors, no active
+state bytes, one primary checkpoint difference, and no three-byte-table
+difference. Renamed an initially proposed `world_table` field to the
+conservative `three_byte_table` because gameplay meaning is not yet proven.
+
+### Documentation and symbols
+
+Added `docs/src/save-formats.md` and linked it from `SUMMARY.md`. The chapter
+documents player-prefix handling, all ten filenames, fixed label records,
+stale bytes, every state block, checkpoint direction, descriptor structure,
+supplied-file statistics, original error handling, inspector usage, open
+questions, and relevant functions. Replaced the older preliminary save table
+in `static-analysis.md` with a concise verified summary and chapter link;
+updated the save inventory link and added inspector usage to `README.md`.
+
+Marked save-format/player-prefix recovery and the inspector complete in
+`PLAN.md`. Added `choose_save_slot` and `save_selected_slot` to
+`analysis/cb.rz`. Reported during the pass that the major save blocks were
+pinned down, that the snapshot relationship was established by copy direction,
+and that filename and scalar tracing was in progress; later reported the exact
+`.SV0`/slot/`.SVQ` mutation and the 46-record NIV bank C match.
+
+### Save-pass verification
+
+Reported that the inspector and focused tests were complete, that the book now
+distinguishes checkpoint and live state from executable evidence, and that a
+full repository verification was starting. Ran:
+
+```sh
+python3 -m unittest discover -s tests -v
+python3 -m py_compile tools/*.py tests/*.py
+bash -n run.sh tools/build_qemu_dos_trace.sh
+tools/inspect_save.py CB/DDGAMES.SV0 \
+  > build/analysis/save-index-inspection.txt
+tools/inspect_save.py CB/DDGAMES.SV3 --descriptors \
+  > build/analysis/save-state-inspection.txt
+rizin -q -b 16 -e scr.color=false \
+  -i analysis/cb.rz \
+  -c 'afl~save_; afl~choose_save_slot; q' \
+  build/analysis/CB_UNPACKED.EXE \
+  > build/analysis/save-symbols.txt
+mdbook build docs
+test -f build/docs-book/save-formats.html
+git diff --check
+rg -n '[[:blank:]]+$' \
+  PLAN.md README.md analysis/cb.rz \
+  docs/src/SUMMARY.md docs/src/file-inventory.md \
+  docs/src/static-analysis.md docs/src/save-formats.md \
+  docs/src/progress-log.md tests/test_inspect_save.py \
+  tools/inspect_save.py
+git status --short
+```
+
+All 57 tests passed in 2.114 seconds. Every Python source compiled and both
+shell scripts parsed. Both save-inspector modes ran successfully, Rizin loaded
+the expanded symbol file, and mdBook built the new chapter at
+`build/docs-book/save-formats.html`. The diff and whitespace checks were clean.
+The save-format work remains uncommitted pending an explicit checkpoint
+request.
+
+Performed a final status/diff review and displayed the inspector's `--help`
+output. An initial chained command stopped after the whitespace `rg` returned
+status 1 for the expected “no matches” result, so it did not reach the status
+commands that followed. Reran `git diff --check`, `git diff --stat`,
+`git diff --numstat`, `git status --short`, and the help command independently.
+The diff check remained clean, the CLI showed its positional save path and
+optional `--descriptors` switch, and only the ten intended save-pass paths are
+modified or new.
+
+### Save-format commit preparation
+
+At the user's request, prepared the completed save-format pass for a commit.
+Ran `git status --short`, `git diff --check`, `git diff --stat`, and reviewed
+the tracked plan, README, Rizin, summary, inventory, and static-analysis diff.
+Confirmed that the ten modified or new paths form one cohesive change: save
+format recovery, its reproducible inspector and tests, the dedicated mdBook
+chapter, symbol additions, and project/log updates. The whitespace check was
+clean, and the full 57-test verification immediately above remains current;
+the only subsequent content change is this commit-preparation log entry.
+
+Staged the ten intended paths and ran `git diff --cached --check`. Git found
+one extra blank line at the end of `docs/src/save-formats.md`, so the chained
+status/stat commands correctly stopped before commit. Inspected the final
+bytes with `tail` and `xxd`, removed the redundant newline with `apply_patch`,
+and prepared to restage both that correction and this log entry before running
+the staged checks again.
+
+Restaged the correction and log. The second staged whitespace check passed;
+the staged summary contained exactly ten paths, with 801 insertions and 36
+deletions. Created the requested checkpoint with subject
+`save: Recover game-state formats` and a detailed five-paragraph body covering
+the filename logic, state layout, text-resource correlation, inspector, tests,
+and rationale. Verified the initial commit message with `awk`; every line is
+at most 72 characters, and `git status --short` was empty. Added this final
+commit action to the activity log and folded it into the same checkpoint.

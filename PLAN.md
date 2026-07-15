@@ -54,7 +54,8 @@ This plan is a living checklist. Findings and commands are recorded in
 - [x] Recover the extensionless verse indexes and companion `DDL*` text streams.
 - [x] Implement and verify a reproducible text-resource inspector.
 - [x] Document data containers, compression, graphics, audio, and text formats.
-- [ ] Document save-game structures and player-name behavior.
+- [x] Recover and document save-game structures and player-name behavior.
+- [x] Implement and verify a reproducible save-game inspector.
 - [ ] Reconstruct maps, entities, conversations, combat, and progression logic.
 - [ ] Build small extraction or inspection tools where they improve confidence.
 

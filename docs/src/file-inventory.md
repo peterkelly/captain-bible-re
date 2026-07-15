@@ -45,5 +45,5 @@ is excluded. `file(1)` descriptions are heuristic; in particular, its
 | `DDGAMES.SV9` | 2,752 | `6139575d1cf94a76d64a730d7bf06dd9da7c2f1b5a66e5f386ef05afff04a0f3` |
 
 `SV6` and `SV8` are byte-identical. `SV0` is the nine-record slot index;
-`SV1` through `SV9` use the fixed state layout documented in the static
-analysis chapter.
+`SV1` through `SV9` use the fixed state layout documented in the
+[save-game format chapter](save-formats.md).
