@@ -7,6 +7,7 @@ BASE_IMAGE="$ROOT_DIR/build/freedos/freedos.img"
 PLAY_DIR="$ROOT_DIR/build/captain-bible"
 PLAY_IMAGE="$PLAY_DIR/captain-bible.img"
 GAME_DIR="$ROOT_DIR/CB"
+GAME_DOS_DIR="CBDOME"
 AUTOEXEC="$ROOT_DIR/tools/captain-bible-autoexec.bat"
 PARTITION_OFFSET=1048576
 
@@ -73,7 +74,7 @@ if [[ ! -f "$BASE_IMAGE" ]]; then
 fi
 
 if [[ ! -f "$PLAY_IMAGE" || "$rebuild" == true ]]; then
-    for command in mcopy mmd unzip; do
+    for command in mcopy mdir mmd unzip; do
         require_command "$command"
     done
 
@@ -88,8 +89,10 @@ if [[ ! -f "$PLAY_IMAGE" || "$rebuild" == true ]]; then
     clone_sparse "$BASE_IMAGE" "$temporary_image"
     image_spec="$temporary_image@@$PARTITION_OFFSET"
 
-    mmd -i "$image_spec" ::/CB
-    mcopy -s -o -i "$image_spec" "$GAME_DIR"/* ::/CB/
+    if ! mdir -i "$image_spec" "::/$GAME_DOS_DIR" >/dev/null 2>&1; then
+        mmd -i "$image_spec" "::/$GAME_DOS_DIR"
+    fi
+    mcopy -s -o -i "$image_spec" "$GAME_DIR"/* "::/$GAME_DOS_DIR/"
 
     mkdir -p "$package_dir"
     mcopy -i "$image_spec" ::/packages/base/ctmouse.zip "$package_dir/ctmouse.zip"
@@ -110,6 +113,9 @@ if [[ "$setup_only" == true ]]; then
 fi
 
 require_command qemu-system-i386
+
+printf 'QEMU disk: %s\n' "$PLAY_IMAGE"
+printf 'Game inside FreeDOS: C:\\%s\\CB.EXE\n' "$GAME_DOS_DIR"
 
 qemu_args=(
     -name "Captain Bible"

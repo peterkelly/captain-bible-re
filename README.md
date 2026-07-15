@@ -33,7 +33,8 @@ The script opens QEMU and starts Captain Bible automatically. On its first
 run, it creates a persistent play image at
 `build/captain-bible/captain-bible.img`. Saved games are written to that image
 and remain available on later runs. On macOS, the game uses QEMU's visible
-Cocoa display with `zoom-to-fit=on`.
+Cocoa display with `zoom-to-fit=on`. Before QEMU opens, the script prints both
+the host image filename and the guest path `C:\CBDOME\CB.EXE`.
 
 The game supports both mouse and keyboard input. If QEMU captures the pointer,
 use Control-Option-G to release it on macOS. Exit through the game's Escape
@@ -67,6 +68,17 @@ The result is `build/freedos/freedos.img`. The builder verifies the published
 SHA-256, preserves the source boot code, constructs a new FAT16 partition, and
 copies the FreeDOS filesystem with mtools. It does not run or automate the
 FreeDOS installer.
+
+The current workspace image also contains the complete game at `C:\CBDOME`, added
+after the base image was built. If you boot that image directly, run:
+
+```bat
+CD \CBDOME
+CB
+```
+
+Rebuilding the base image removes that manual game copy. Running `./run.sh`
+will still create or use the separate game-bearing play image automatically.
 
 Run its focused unit tests with:
 

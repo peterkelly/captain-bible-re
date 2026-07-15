@@ -36,10 +36,12 @@ It has a 1 MiB partition offset (LBA 2048), so its mtools path is:
 build/freedos/freedos.img@@1048576
 ```
 
-The base disk remains a clean FreeDOS image. `run.sh` clones it to a separate
-persistent play image, copies `CB/` to `C:\CB`, installs CuteMouse from the
-LiteUSB package set, and replaces the clone's boot scripts so the game starts
-automatically.
+The builder initially produces a clean FreeDOS base image. `run.sh` clones it
+to a separate persistent play image, copies `CB/` to `C:\CBDOME`, installs
+CuteMouse from the LiteUSB package set, and replaces the clone's boot scripts
+so the game starts automatically. At the user's request, the complete game was
+also copied into the current base image at `C:\CBDOME`; rebuilding the base image
+will remove that additional copy.
 
 ## Run the game
 
@@ -53,6 +55,10 @@ The persistent play disk is
 `build/captain-bible/captain-bible.img`. Use `./run.sh --setup-only` to prepare
 the disk without opening QEMU or `./run.sh --rebuild` to replace it from the
 current `CB/` tree. Rebuilding discards saves stored only in the old play disk.
+
+When booting the current base image directly instead, enter `CD \CBDOME` followed
+by `CB`. The normal `./run.sh` path needs no DOS commands because its derived
+play image starts the game automatically.
 
 The QEMU machine provides:
 

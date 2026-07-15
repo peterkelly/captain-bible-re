@@ -407,3 +407,108 @@ documentation set while leaving all ignored downloads, raw disks, screenshots,
 book output, game files, and Python caches out of version control. The commit
 uses the repository's required imperative subject and a detailed, wrapped body
 that explains the reproducibility and documentation rationale.
+
+Committed Phase 1 as `30b34c8` with subject
+`chore: Add FreeDOS game environment`. Verified afterward that the working tree
+was clean and every stored commit-message line was at most 72 characters.
+
+### Copy game into the base disk
+
+The user requested that the game be copied into the disk image. First confirmed
+that no QEMU process was running, because mtools must not access an image while
+the VM is using it. Inspected both 1 GiB images. The persistent play image
+already contained `CB.EXE`, `DD1.DAT`, and the sound-driver tree at `C:\CB`, but
+the base `build/freedos/freedos.img` did not.
+
+Copied the complete non-hidden host game tree into the base image and performed
+a content-level verification:
+
+```sh
+mmd -i 'build/freedos/freedos.img@@1048576' ::/CB
+mcopy -s -o -i 'build/freedos/freedos.img@@1048576' CB/* ::/CB/
+rm -rf build/copy-verification
+mkdir -p build/copy-verification
+mcopy -s -i 'build/freedos/freedos.img@@1048576' \
+  ::/CB build/copy-verification/
+find CB -type f ! -name '.DS_Store' -exec shasum -a 256 {} + \
+  | awk '{print $1}' | sort > build/copy-verification/host.sha256
+find build/copy-verification/CB -type f -exec shasum -a 256 {} + \
+  | awk '{print $1}' | sort > build/copy-verification/image.sha256
+cmp build/copy-verification/host.sha256 \
+  build/copy-verification/image.sha256
+```
+
+Both manifests contained 96 files, and `cmp` found no content differences.
+Used `mdir` to confirm `C:\CB\CB.EXE`, `C:\CB\DD1.DAT`, and
+`C:\CB\DRIVERS\SBLASTER.COM`, then removed the temporary extracted tree and
+manifests. The user can run the base image copy with `CD \CB` and `CB`; the
+normal `./run.sh` path still starts the already-populated play image
+automatically.
+
+The user then reported that after running `run.sh` they could not see the game
+on the hard disk. Confirmed QEMU was stopped and inspected the exact play image
+selected by `run.sh`. Its root directory contained `CB`, the directory listing
+contained all expected top-level game files, and an extracted `CB.EXE` matched
+the host executable's SHA-256
+`2b7726ae9cf56e0067533e4bd1c5c76685f1d9855a7d90835850388db7b07ee0`.
+
+Identified a likely path-expectation mismatch: the game manual names the normal
+installation directory `C:\CBDOME`, while the initial play image used
+`C:\CB`. Updated `run.sh` and its auto-start batch file to use the canonical
+`C:\CBDOME` path. Also made image preparation tolerate an already-present
+directory and print both the host disk path and guest executable path before
+QEMU opens. Planned to rebuild the play disk, copy the canonical directory into
+the current base disk, remove the old ambiguous `C:\CB` copies, and verify both
+images before the user retries.
+
+Confirmed the host `mdeltree` tool was available and no QEMU process was
+running. Created `C:\CBDOME` in the base image, copied the game tree into it,
+removed the previous `C:\CB` directory, and rebuilt the play image with:
+
+```sh
+mmd -i 'build/freedos/freedos.img@@1048576' ::/CBDOME
+mcopy -s -o -i 'build/freedos/freedos.img@@1048576' \
+  CB/* ::/CBDOME/
+mdeltree -i 'build/freedos/freedos.img@@1048576' ::/CB
+./run.sh --rebuild --setup-only
+```
+
+Extracted `C:\CBDOME` from each stopped image into temporary host directories.
+Compared the sorted SHA-256 content hashes from each image with the host `CB/`
+tree using `cmp` and process substitution. All three trees contained 96 files,
+and both comparisons succeeded with no differences. `mdir` showed `CBDOME` in
+the root and `CBDOME\CB.EXE` in both images. Explicit checks confirmed the old
+`C:\CB` directory was absent from both. `mtype` confirmed that the play image's
+`FDAUTO.BAT` changes to `C:\CBDOME` and invokes `CB`.
+
+Performed a bounded, visible launch check using the required Cocoa display:
+
+```sh
+qemu-system-i386 \
+  -name 'Captain Bible corrected path check' \
+  -machine pc,accel=tcg \
+  -cpu pentium \
+  -m 16 \
+  -boot c \
+  -drive file=build/captain-bible/captain-bible.img,format=raw,if=ide,index=0,media=disk \
+  -vga std \
+  -audiodev coreaudio,id=audio0 \
+  -device sb16,audiodev=audio0 \
+  -device adlib,audiodev=audio0 \
+  -display cocoa,zoom-to-fit=on \
+  -monitor stdio
+```
+
+The visible QEMU window reached the Captain Bible title screen from the new
+canonical path. Captured one screen dump as evidence, then stopped QEMU cleanly
+through its monitor with `quit`. Updated the user documentation to say that
+`run.sh` prints the host image and `C:\CBDOME\CB.EXE` guest path before opening
+QEMU.
+
+### Canonical game-path commit
+
+At the user's request, reviewed the six modified source and documentation files
+and confirmed the changes contain the canonical directory fix, reproducible
+image behavior, verification evidence, and updated plan and usage guidance.
+Prepared to commit these tracked changes while leaving the corrected generated
+disk images and launch-check screenshot ignored.

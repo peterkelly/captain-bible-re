@@ -17,6 +17,7 @@ This plan is a living checklist. Findings and commands are recorded in
 - [x] Verify the filesystem, boot scripts, MBR, and QEMU boot marker.
 - [x] Add `run.sh` with VGA, mouse, Sound Blaster 16, and AdLib support.
 - [x] Create a persistent play image containing the supplied `CB` directory.
+- [x] Copy the game into both current images at `C:\CBDOME`.
 - [x] Verify that FreeDOS boots and the game reaches its title screen.
 - [ ] Have the user confirm interactive input, audio, and normal game exit.
 
