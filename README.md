@@ -243,6 +243,28 @@ settings and text descriptors. The mdBook save-format chapter documents the
 2,752-byte state layout, player-prefix behavior, quick-save suffix changes,
 snapshot copying, error behavior, and evidence from all supplied saves.
 
+## Inspecting world maps
+
+The archive contains 21 world maps: levels A through G at Easy, Normal, and
+Difficult settings. Each is a row-major 16×16 grid of three-byte mutable
+cells. Display the location-kind grid and optionally list its nonzero cells:
+
+```sh
+tools/inspect_map.py CB/DD1.DAT --map CE
+tools/inspect_map.py CB/DD1.DAT --map CE --cells
+```
+
+Compare an original map with the live grid serialized in a save:
+
+```sh
+tools/inspect_map.py \
+  CB/DD1.DAT --map CE --compare-save CB/DDGAMES.SV3
+```
+
+The mdBook world-map chapter documents resource naming, cell addressing,
+packed fields, scene commands, exploration bits, map-screen behavior, and the
+byte-level identification of supplied save grids.
+
 ## QEMU DOS-call tracing
 
 Run the game with the QEMU TCG tracer and monitor socket enabled:

@@ -35,6 +35,10 @@ af @ 0x629c
 afn load_text_bank @ 0x629c
 afn load_art_resource @ 0xb818
 afn load_file_into_far_memory @ 0xacda
+afn load_map_resource @ 0x34f
+afn normalize_map_cells @ 0x457
+afn show_map_screen @ 0x75f
+afn process_current_map_cell @ 0xc6c
 
 afn copy_live_state_to_save_buffers @ 0x7d8e
 afn copy_save_buffers_to_live_state @ 0x7e41

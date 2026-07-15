@@ -92,6 +92,14 @@ control-flow behavior:
 | `0x58` | none | `stop_sound_effect` | Stops active digital playback and releases its PCM buffer. |
 | `0x6D` | `z` | `load_palette` | Uses the same palette-loading path as `0x4D`. |
 | `0x70` | none | `unload_last_art` | Releases the most recently loaded art slot. |
+| `0x77` | none | `process_current_map_cell` | Calls the current-cell handler, which consults the cell and its neighbors. |
+| `0x78` | `B` | `load_map` | Combines a level letter with the current `E`/`N`/`D` difficulty code and loads a `.MAP` member. |
+| `0x7B` | `H` | `set_current_map_cell_kind` | Replaces the low nibble of the current cell from a script variable. |
+| `0x7C` | `H` | `set_current_map_cell_parameter_a` | Writes the current cell's second byte from a script variable. |
+| `0x7F` | `H` | `set_current_map_cell_parameter_b` | Writes the current cell's third byte from a script variable. |
+| `0x87` | none | `normalize_map_cells` | Applies recovered location-kind and parameter transitions across the grid. |
+| `0x88` | none | `clear_text_record_states` | Clears persistent byte `+4` in all 66 text descriptors. |
+| `0x89` | none | `mark_current_map_cell_explored` | Sets the current X bit in the current Y exploration row. |
 
 The suffix strings are present in the executable data segment and were also
 checked in the QEMU process image: `.PAL` at `DS:0434`, `.ART` at `DS:0490`,
@@ -174,6 +182,10 @@ semantics.
 
 | Load offset | Current name |
 |---:|---|
+| `0x034F` | `load_map_resource` |
+| `0x0457` | `normalize_map_cells` |
+| `0x075F` | `show_map_screen` |
+| `0x0C6C` | `process_current_map_cell` |
 | `0x3A1E` | `bin_read_u8` |
 | `0x3A30` | `bin_read_u16` |
 | `0x3A64` | `bin_read_cstring_offset` |

@@ -182,6 +182,21 @@ variables, and implement absolute jumps, calls, and returns. The dedicated
 scene-bytecode chapter documents the complete structural schema, startup
 sequence, mixed code/data regions, inspection tool, and QEMU memory check.
 
+## World-map state
+
+The archive contains 21 exact 768-byte map resources: levels A through G for
+Easy, Normal, and Difficult modes. Opcode `0x78` constructs their names and
+loads one into a mutable row-major 16×16×3-byte grid. Address calculations in
+the executable use `48*y + 3*x`; the first cell byte contains independently
+used connection and location-kind nibbles, followed by two parameters.
+
+The map screen also consults a 16-word exploration bitmap. Scene commands can
+process the current cell, mutate each cell field, normalize location kinds,
+and mark coordinates explored. The supplied `SV3` and `SV4` grids match
+`CE.MAP` except for four explained field changes. The dedicated world-map
+chapter gives the format, opcodes, save correlation, inspection tool, and
+remaining semantic questions.
+
 ## Digital effects and XMIDI music
 
 Opcode `0x57` passes an effect number and rate to `0x417F`. That routine
@@ -205,6 +220,10 @@ documents both formats and their reproducible tools.
 
 | Load offset | Name |
 |---:|---|
+| `0x034F` | `load_map_resource` |
+| `0x0457` | `normalize_map_cells` |
+| `0x075F` | `show_map_screen` |
+| `0x0C6C` | `process_current_map_cell` |
 | `0x3363` | `initialize_hardware_and_data` |
 | `0x3A1E` / `0x3A30` | Read byte/word BIN operands |
 | `0x3A64` | `bin_read_cstring_offset` |

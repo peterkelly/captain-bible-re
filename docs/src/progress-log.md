@@ -2693,3 +2693,197 @@ the filename logic, state layout, text-resource correlation, inspector, tests,
 and rationale. Verified the initial commit message with `awk`; every line is
 at most 72 characters, and `git status --short` was empty. Added this final
 commit action to the activity log and folded it into the same checkpoint.
+
+### World-map resource and runtime-state recovery
+
+After the user's next `continue`, checked the worktree, the three most recent
+commits, the live plan, the scene-bytecode and save chapters, the BIN
+inspector, and existing analysis notes. The tree was clean at commit
+`3afe96f` (`save: Recover game-state formats`). Selected the unknown saved
+16×16×3-byte table as the next bounded target and reported that the pass would
+correlate BIN handlers, archive resources, and saved state, then add a tool
+where the evidence supported one.
+
+Used Rizin cross-references for the live table at `DS:5B16`, its checkpoint at
+`DS:76EC`, script variables at `DS:727A`, and text descriptors at `DS:3A66`:
+
+```text
+axt @ 0x5b16
+axt @ 0x76ec
+axt @ 0x727a
+axt @ 0x3a66
+```
+
+Saved the inspection output under the ignored `build/analysis/` directory as
+`world-table-xrefs.txt`, `world-table-functions.txt`,
+`world-grid-control.txt`, `world-map-ui-and-opcodes.txt`, and
+`map-screen.txt`. Several Rizin `pdf` requests warned that the linear size
+differed too much from the basic-block sum. Used `pdr` and direct bounded
+`pd` listings instead. Rizin's inferred split around the map display is
+imperfect, but direct callers and control flow establish `0x075F` as the
+actual `show_map_screen` entry.
+
+The references repeatedly calculate `48*y + 3*x` and access neighbors at
+offsets ±3 and ±48. This proves a row-major 16×16 grid of three-byte cells.
+Identified current coordinate words at `DS:7290` and `DS:7292`. Reported that
+the saved table is live world-grid state, with `cell[y][x]` addressing, and
+that the next step was tracing the opcode handlers and map UI.
+
+Disassembled the handlers around load offsets `0x034F`, `0x0457`, `0x075F`,
+and `0x0C6C`, plus the opcode dispatch region. The loader takes its level
+letter from opcode `0x78`, indexes the executable literal `END` with script
+variable zero, appends the literal `.MAP`, and loads 768 raw bytes into
+`DS:5B16`. Checked the archive and found the complete 21-member product of
+levels A through G and suffixes E, N, and D, all exactly 768 expanded bytes.
+The manual names the corresponding modes Easy, Normal, and Difficult.
+Reported this resource-name construction and the 21-member result to the
+user.
+
+An initial ad-hoc archive query failed with `AttributeError` because it used a
+nonexistent `DD1Entry.full_name` property. Repeated it with the actual
+`filename` property. Enumerated opcode `0x78` in every recovered BIN code
+region and found all level letters: C in `FIRST` and `OUTC`, F in `OUTF`, E
+in `OUTE`, D in `OUTD`, B in `OUTB`, A in `OUTA`, and G in `OUTGL`.
+Also found broad use of current-cell processing and mutation commands in
+power, room, combat, and hall programs.
+
+Recovered these map-related opcode effects from direct handler behavior:
+
+- `0x77` processes the current map cell and consults adjacent cells.
+- `0x78 B` loads the selected level and current difficulty map.
+- `0x7B H` replaces the current cell's low kind nibble while preserving its
+  high nibble.
+- `0x7C H` and `0x7F H` write the cell's second and third bytes.
+- `0x87` normalizes loaded or changed map cells.
+- `0x88` clears persistent byte `+4` in all 66 text descriptors.
+- `0x89` sets `explored_rows[y] |= 1 << x` in the 16-word array at
+  `DS:72C4`.
+
+The F2 map display uses the exploration words to distinguish cells and splits
+the first cell byte into high and low nibbles. The high nibble selects one of
+16 map connection/shape frames, while the low nibble selects a location kind.
+The screen uses the remaining bytes as text selectors for at least kinds
+`0x6` and `0xA`. The manual independently says explored cells are gold,
+unexplored cells gray, stations and communication locations show verse
+references, and room markers use P, J, T, C, and V. Kept the field names
+conservative because individual connection-bit directions, the complete kind
+enumeration, and the general meanings of parameters A and B remain open.
+
+Queried `MAP.ART` with the artwork renderer. It is archive index 12, expands
+to 38,490 bytes, and contains 63 frames: a 189×167 background, small map
+glyphs, and later UI assets. An attempted one-off import of `parse_art` from
+`render_art` failed because that is not the module's public parser name; the
+supported command below succeeded and supplied the needed frame inventory:
+
+```sh
+tools/render_art.py build/dd1/all/012_MAP.ART --list
+```
+
+Compared each supplied save's live grid at file offsets `0x4C0..0x7C0` with
+all 21 archive maps. `SV3` and `SV4` are closest to—and exactly identify as—
+`CE.MAP`, with only four changed fields: `(2,0)` parameter B changes
+`38->00`, `(0,1)` parameter A changes `37->00`, `(1,1)` packed byte changes
+`A2->AB`, and `(2,1)` packed byte changes `E5->EB`. The last two retain their
+connection nibbles and change their location kind to B. The normalizer at
+`0x0457` performs those kind changes; it also includes a transition from kind
+6 to A that moves parameter B to A and clears B. Other supplied saves have
+zeroed grids and cannot be identified from this field. Reported this closed
+loop between the archive map and saved mutable state.
+
+### World-map inspector and documentation
+
+Added executable `tools/inspect_map.py`. It validates a level/difficulty
+identifier, extracts the selected member directly from `DD1.DAT`, requires
+the exact 768-byte size, exposes row-major coordinates and the packed nibbles,
+prints a compact kind grid, optionally lists nonzero cells, and compares a
+resource against the live world map in a state save.
+
+Added `tests/test_inspect_map.py` with five tests. They prove the complete
+21-map level/difficulty cross product and exact sizes, a row-major `CE.MAP`
+coordinate regression, the four `SV3` field mutations, all seven level
+letters supplied to opcode `0x78`, and rejection of bad sizes, names, and
+coordinates. Added semantic names for opcodes `0x77`, `0x78`, `0x7B`,
+`0x7C`, `0x7F`, `0x87`, `0x88`, and `0x89` to `inspect_bin.py`, and added
+the four recovered map-function names to `analysis/cb.rz`.
+
+The first focused run was:
+
+```sh
+git status --short
+python3 -m unittest tests.test_inspect_map tests.test_inspect_bin -v
+tools/inspect_map.py \
+  CB/DD1.DAT --map CE --compare-save CB/DDGAMES.SV3
+```
+
+All 14 focused tests passed, but the inspector invocation failed with
+`Permission denied` because its executable bit had not yet been set. Reported
+that the format tests passed and that only the missing executable bit failed,
+then ran:
+
+```sh
+chmod +x tools/inspect_map.py
+tools/inspect_map.py \
+  CB/DD1.DAT --map CE --compare-save CB/DDGAMES.SV3
+```
+
+The command printed the 16×16 low-nibble grid and the four expected save
+differences.
+
+Added `docs/src/world-maps.md` and linked it from the book summary. The chapter
+documents resource naming, cell addressing, known fields, mutable runtime
+state, exploration bits, map-screen behavior, save correlation, tool usage,
+relevant functions, and explicitly open semantics. Updated the scene-bytecode
+command table, save-format chapter, static-analysis summary and function map,
+README inspector instructions, and `PLAN.md`. Marked world-map recovery and
+its inspector complete while leaving entities, conversations, combat, and
+progression open. Reported that documentation would distinguish proved
+layout and lifecycle from still-unknown parameter meanings and bit
+directions.
+
+Ran the full verification:
+
+```sh
+git diff --check
+git diff --stat
+python3 -m unittest discover -s tests -v
+python3 -m py_compile tools/*.py tests/*.py
+mdbook build docs
+test -f build/docs-book/world-maps.html
+rizin -q -b 16 -e scr.color=false \
+  -i analysis/cb.rz \
+  -c 'afl~map_; afl~show_map_screen; q' \
+  build/analysis/CB_UNPACKED.EXE
+```
+
+All 62 tests passed in 2.226 seconds, all Python sources compiled, mdBook
+built the new world-map page, the diff check was clean, and Rizin loaded and
+listed all four added symbols at their expected offsets. This world-map pass
+is not committed because the user has not requested a checkpoint yet.
+
+Performed a final review that included untracked files, which are omitted by
+ordinary `git diff --stat` output. Rebuilt the book, reran all 62 tests (all
+passed in 2.201 seconds), checked every changed path for trailing whitespace,
+listed line counts for the three new files, and displayed the inspector's
+`--help` output. The final status contains nine modified tracked files and the
+three intended new files: the world-map chapter, inspector, and focused test
+module. No whitespace errors were found.
+
+### World-map commit preparation
+
+At the user's request, prepared the completed world-map pass for a commit.
+Ran `git status --short`, `git diff --check`, and `git diff --stat`, then
+reviewed the tracked plan, README, Rizin symbols, book links and chapters,
+opcode-name additions, and all three new files. Confirmed that the 12 paths
+form one cohesive change covering the recovered map format, runtime behavior,
+save correlation, reproducible inspector, tests, symbols, and documentation.
+The whitespace check was clean, and the most recent full verification remains
+62 passing tests plus a successful mdBook build.
+
+Staged the 12 intended paths and ran `git diff --cached --check`; it passed.
+The staged summary contained 716 insertions and 8 deletions. Created the
+requested checkpoint with subject `map: Recover world-state format` and a
+detailed five-paragraph body covering the resource set, runtime evidence,
+conservative inspector model, save correlation, tests, and documentation.
+Verified the initial message with `awk`; every line is at most 72 characters.
+Added this final commit action to the log and amended it into the same
+checkpoint.

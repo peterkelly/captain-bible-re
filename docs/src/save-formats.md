@@ -74,8 +74,8 @@ nine supplied state files have this size.
 | `0x4BA` | 2 | `004A` | Sound-effects enabled flag |
 | `0x4BC` | 2 | `9FB0` | Checkpoint text-bank character |
 | `0x4BE` | 2 | `0080` | Live text-bank character |
-| `0x4C0` | 768 | `5B16` | Live 16×16×3-byte table |
-| `0x7C0` | 768 | `76EC` | Checkpoint copy of that table |
+| `0x4C0` | 768 | `5B16` | Live 16×16×3-byte world map |
+| `0x7C0` | 768 | `76EC` | Checkpoint copy of the world map |
 | **Total** | **2,752** | | |
 
 “Checkpoint” is based on executable copy direction, not just similarity. At
@@ -87,8 +87,10 @@ routine restores those fields and reloads the selected text bank. The normal
 and quick save paths serialize both versions; they do not take a fresh
 checkpoint immediately before writing.
 
-The detailed semantics of the primary state and 16×16 table cells remain open.
-The names above deliberately describe their storage and lifecycle only.
+The [world-map chapter](world-maps.md) documents the table's row-major cell
+layout, packed connection/location byte, scene commands, exploration state,
+and archive-resource correlation. The detailed semantics of the primary state
+and several map kinds and parameters remain open.
 
 ## Runtime text descriptors
 
@@ -120,8 +122,10 @@ Static comparison of `DDGAMES.SV1` through `DDGAMES.SV9` found:
 
 - `SV6` and `SV8` are byte-for-byte identical.
 - 2,477 of the 2,752 offsets are constant across all nine files.
-- The live and checkpoint 16×16 tables match within every file. They are all
-  zero except in `SV3` and `SV4`, which each have 112 nonzero bytes.
+- The live and checkpoint 16×16 maps match within every file. They are all
+  zero except in `SV3` and `SV4`, which each have 112 nonzero bytes. Those two
+  grids match `CE.MAP` except for four field mutations, including two kind
+  changes that exactly follow the executable's map-normalization rule.
 - The checkpoint/live resource strings decode as `LOGO`, `LOGO`, `seg`, and
   `seg`. Bytes after their first NUL can be stale and are not semantic.
 - Translation is 1, music and effects are enabled, and both bank values are

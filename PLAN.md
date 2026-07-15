@@ -56,8 +56,10 @@ This plan is a living checklist. Findings and commands are recorded in
 - [x] Document data containers, compression, graphics, audio, and text formats.
 - [x] Recover and document save-game structures and player-name behavior.
 - [x] Implement and verify a reproducible save-game inspector.
-- [ ] Reconstruct maps, entities, conversations, combat, and progression logic.
-- [ ] Build small extraction or inspection tools where they improve confidence.
+- [x] Recover world-map resources, runtime grid, and exploration state.
+- [x] Implement and verify a reproducible world-map inspector.
+- [ ] Reconstruct entities, conversations, combat, and progression logic.
+- [x] Build small extraction or inspection tools where they improve confidence.
 
 ## Phase 5: Consolidation
 

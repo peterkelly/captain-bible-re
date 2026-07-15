@@ -90,6 +90,14 @@ OPCODE_NAMES = {
     0x58: "stop_sound_effect",
     0x6D: "load_palette",
     0x70: "unload_last_art",
+    0x77: "process_current_map_cell",
+    0x78: "load_map",
+    0x7B: "set_current_map_cell_kind",
+    0x7C: "set_current_map_cell_parameter_a",
+    0x7F: "set_current_map_cell_parameter_b",
+    0x87: "normalize_map_cells",
+    0x88: "clear_text_record_states",
+    0x89: "mark_current_map_cell_explored",
 }
 
 
