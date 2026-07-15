@@ -10,6 +10,7 @@
 - [Palette and Artwork Formats](graphics-formats.md)
 - [Scene Bytecode](scene-bytecode.md)
 - [Scene Display Objects](scene-objects.md)
+- [Combat Runtime](combat-runtime.md)
 - [Conversation Flow](conversation-flow.md)
 - [Script State and Progression](game-state.md)
 - [World Maps](world-maps.md)

@@ -55,6 +55,34 @@ class DialogueChoiceDefinition:
     text: str | int
 
 
+@dataclass(frozen=True)
+class AnimationSequenceDefinition:
+    """One animation header and its contiguous nine-byte steps."""
+
+    offset: int
+    interval: int
+    steps: tuple[bytes, ...]
+
+
+@dataclass(frozen=True)
+class ActionTargetDefinition:
+    """One selectable screen action defined by a BIN command."""
+
+    offset: int
+    target: int
+    x: int
+    y: int
+    selector: str | int
+
+
+COMBAT_ACTION_LABELS = {
+    ".11": "ATTACK",
+    ".12": "DEFEND",
+    ".13": "RETREAT",
+    ".14": "COMBAT",
+}
+
+
 # Operand layout recovered from execute_bin_commands at load-module offset
 # 0x451b. B is an unsigned byte, H is a little-endian 16-bit word, z is a
 # NUL-terminated CP437 string, 9 is a nine-byte opaque animation record, and
@@ -104,6 +132,8 @@ OPCODE_NAMES = {
     0x05: "return_minus_one",
     0x06: "begin_animation_sequence",
     0x07: "animation_step",
+    0x08: "start_animation",
+    0x09: "stop_animation",
     0x0D: "change_scene",
     0x0F: "adjust_thread_delay",
     0x13: "remove_dialogue_choice",
@@ -136,7 +166,14 @@ OPCODE_NAMES = {
     0x37: "clear_text_record_state",
     0x38: "jump_if_text_record_set",
     0x39: "jump_if_text_record_clear",
+    0x3A: "add_action_target",
+    0x3B: "enable_action_target",
+    0x3C: "disable_action_target",
     0x3D: "jump",
+    0x3E: "start_scene_thread_at",
+    0x3F: "wait_for_animation",
+    0x41: "enable_action_selection",
+    0x42: "disable_action_selection",
     0x43: "add_scaled_display_object",
     0x44: "add_dialogue_choice",
     0x45: "clear_dialogue_choices",
@@ -149,6 +186,10 @@ OPCODE_NAMES = {
     0x55: "snapshot_state",
     0x57: "play_sound_effect",
     0x58: "stop_sound_effect",
+    0x59: "wait_for_sound_effect",
+    0x5F: "start_linked_animation",
+    0x60: "nop",
+    0x61: "stop_scene_thread",
     0x65: "clear_display_object_frames",
     0x66: "advance_display_object_frames",
     0x6D: "load_palette",
@@ -164,7 +205,9 @@ OPCODE_NAMES = {
     0x7C: "set_current_map_cell_parameter_a",
     0x7D: "configure_study_prompt",
     0x7F: "set_current_map_cell_parameter_b",
+    0x80: "jump_if_animation_active",
     0x81: "reduce_faith",
+    0x82: "set_variable_random_modulo",
     0x85: "hide_display_object",
     0x86: "show_display_object",
     0x87: "normalize_map_cells",
@@ -202,7 +245,9 @@ SCRIPT_VARIABLE_OPERANDS = {
     0x33: (0,),
     0x7B: (0,),
     0x7C: (0,),
+    0x7D: (1,),
     0x7F: (0,),
+    0x82: (1,),
     0x8F: (0, 1),
     0x90: (1,),
 }
@@ -380,6 +425,54 @@ def dialogue_choice_definitions(
     return tuple(definitions)
 
 
+def animation_sequence_definitions(
+    commands: tuple[BinCommand, ...],
+) -> tuple[AnimationSequenceDefinition, ...]:
+    """Return animation headers with immediately following step records."""
+
+    definitions: list[AnimationSequenceDefinition] = []
+    for index, command in enumerate(commands):
+        if command.opcode != 0x06:
+            continue
+        steps: list[bytes] = []
+        position = index + 1
+        while position < len(commands) and commands[position].opcode == 0x07:
+            steps.append(bytes(commands[position].operands[0].value))
+            position += 1
+        definitions.append(
+            AnimationSequenceDefinition(
+                command.offset,
+                int(command.operands[0].value),
+                tuple(steps),
+            )
+        )
+    return tuple(definitions)
+
+
+def action_target_definitions(
+    commands: tuple[BinCommand, ...],
+) -> tuple[ActionTargetDefinition, ...]:
+    """Return selectable action records from a linear command sequence."""
+
+    definitions: list[ActionTargetDefinition] = []
+    for command in commands:
+        if command.opcode != 0x3A:
+            continue
+        selector = command.operands[3].value
+        if not isinstance(selector, (str, int)):
+            raise AssertionError("action target has an invalid selector operand")
+        definitions.append(
+            ActionTargetDefinition(
+                command.offset,
+                int(command.operands[0].value),
+                int(command.operands[1].value),
+                int(command.operands[2].value),
+                selector,
+            )
+        )
+    return tuple(definitions)
+
+
 def _format_operand(operand: Operand, is_script_variable: bool = False) -> str:
     if is_script_variable:
         value = int(operand.value)
@@ -429,6 +522,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--choices",
         action="store_true",
         help="summarize dialogue-choice definitions after the command listing",
+    )
+    parser.add_argument(
+        "--animations",
+        action="store_true",
+        help="summarize animation sequences after the command listing",
+    )
+    parser.add_argument(
+        "--actions",
+        action="store_true",
+        help="summarize selectable action targets after the command listing",
     )
     return parser
 
@@ -500,6 +603,46 @@ def main(argv: list[str] | None = None) -> int:
                 f"choice[{index:02d}] source={definition.offset:#06x} "
                 f"target={definition.target:#06x} text={text}"
             )
+    if args.animations:
+        definitions = animation_sequence_definitions(commands)
+        print(
+            "# animation sequences in linear definition order; "
+            "branches may skip them"
+        )
+        for index, definition in enumerate(definitions):
+            fields = [
+                f"animation[{index:02d}]",
+                f"source={definition.offset:#06x}",
+                f"interval={definition.interval}",
+                f"steps={len(definition.steps)}",
+            ]
+            if definition.steps:
+                fields.append(f"first={definition.steps[0].hex()}")
+            print(" ".join(fields))
+    if args.actions:
+        definitions = action_target_definitions(commands)
+        print(
+            "# selectable actions in linear definition order; "
+            "branches may change active targets"
+        )
+        for index, definition in enumerate(definitions):
+            selector = (
+                repr(definition.selector)
+                if isinstance(definition.selector, str)
+                else f"@{definition.selector:#06x}"
+            )
+            fields = [
+                f"action[{index:02d}]",
+                f"source={definition.offset:#06x}",
+                f"target={definition.target:#06x}",
+                f"x={definition.x}",
+                f"y={definition.y}",
+                f"selector={selector}",
+            ]
+            label = COMBAT_ACTION_LABELS.get(definition.selector)
+            if label is not None:
+                fields.append(f"label={label}")
+            print(" ".join(fields))
     return 0
 
 

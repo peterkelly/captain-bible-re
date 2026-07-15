@@ -3594,3 +3594,214 @@ had not wrapped their contents, so the message violated the repository's
 72-character rule. The commit content itself was correct. Added this audit to
 the log and amended the same checkpoint with explicitly wrapped body lines,
 then repeated the message, status, and cleanliness checks.
+
+## 2026-07-15: Combat and gameplay entities
+
+The user asked to continue after checkpoint `953f414`. Confirmed that the
+worktree was clean and reviewed the living plan, the scene-bytecode command
+table, the display-object boundary, and earlier opcode-clustering notes. The
+next open slice is the combat-heavy BIN command cluster and any executable
+runtime structures that connect it to display records, collision, faith
+damage, and encounter completion. The investigation begins with static corpus
+and handler analysis; visible, silent QEMU will be used only where live state
+is needed to distinguish competing interpretations.
+
+### Combat-program corpus
+
+Listed and decoded `COMBAT1.BIN` through `COMBAT7.BIN`, then counted their
+commands, opcode-`0x06` animation headers, contiguous opcode-`0x07` steps, and
+opcode-`0x3A` definitions. The seven programs contain 5,443 commands in
+35,449 bytes, 214 animation sequences, 2,596 steps, and 27 selectable-action
+definitions. Six programs define four actions and `COMBAT6.BIN` defines
+three. Selector counts are seven `.11`, six `.12`, seven `.13`, and seven
+`.14` strings.
+
+Compared each program's resource loads. All seven load `COMBTAGS` first and
+`COMBAT` second, followed by encounter-specific artwork: `BIG*`, `HELMET`,
+`MANTIS*`, `SNAKE*`, `CRAB`, `GUARD*`, or `ZAP*`/`SPRK`. Attempted to render
+`162_COMBTAGS.ART` with a guessed `054_ZAP.PAL`; that command failed because
+the guessed path does not exist. Located the real `019_ZAP.PAL` member and
+rendered all four frames under the ignored
+`build/graphics/combat-tags/` directory. Visual inspection identified the
+frames as `ATTACK`, `DEFEND`, `RETREAT`, and `COMBAT`, establishing the
+`.11` through `.14` mapping independently of action control flow.
+
+Decoded the exact `COMBAT7.BIN` action definitions:
+
+```text
+0x0C06 -> 0x0EC8  (151,  61)  .11 ATTACK
+0x0C11 -> 0x0EAB  (136, 153)  .12 DEFEND
+0x0C1C -> 0x1053  ( 15, 167)  .13 RETREAT
+0x0C27 -> 0x0FA7  (157,  62)  .14 COMBAT
+```
+
+### Executable tables and handlers
+
+Used Rizin disassembly and cross-references around the interpreter handlers,
+then followed their callees into the scene update and input paths. Opcode
+`0x3A` appends ten-byte records at `DS:480E`, counted at `DS:6EA4`. The fields
+are an absolute BIN target, X, Y, current-BIN selector offset, active byte,
+and one padding byte. Opcodes `0x3B` and `0x3C` set and clear the active byte.
+The routine at `0x6A23` searches active records near the pointer and draws the
+selected label; the keyboard search is at `0x8558`. Selection dispatches the
+record's target through `0x7A5C`.
+
+Animation definitions create 12-byte slots at `DS:6EBA`, counted at
+`DS:B114`. Recovered first-step and current-step BIN offsets, the sequence
+interval, linked/parent index, mode/state, and render/display slot. The final
+two timing bytes remain only partly understood. The nine-byte step following
+an opcode-`0x07` is frame, ART slot, signed X, signed Y, 8.8 scale, and flags.
+Followed the linked-transform resolver at `0x3B9B`, single-slot renderer at
+`0x3D08`, all-slot updater at `0x3DA8`, start routine at `0x3F59`, and stop
+routine at `0x3FDF`. The updater implements modes 1 through 10 and advances
+the cursor by the ten-byte opcode-plus-payload step size.
+
+Recovered additional interpreter operations from their handlers:
+
+- `0x08`, `0x5F`, and `0x09` start, start-linked, and stop animations;
+- `0x3F` waits for an active animation and `0x80` branches on its state;
+- `0x41` and `0x42` enable and disable selectable-action input;
+- `0x3E` starts a true BIN scheduler slot at an absolute target and `0x61`
+  stops a slot;
+- `0x59` waits for digital playback, using a simulated timer without a
+  digital driver;
+- `0x60` is a no-op which shares the main interpreter continuation;
+- `0x82` stores the runtime pseudorandom value modulo an immediate in a
+  selected script variable.
+
+The true BIN scheduler uses 16-byte records beginning at `DS:8D44`, with the
+current index at `DS:7DB4`. Proven fields are cursor `+0`, delay/timer
+`+0x0C`, active byte `+0x0E`, and status `+0x0F`. This is distinct from the
+other 16-byte record family created by opcode `0x02` and connected to a
+type-`0x02` display record. The evidence therefore supports a script-driven
+combat system composed of actions, animations, random branches, progression
+flags, and faith loss. It does not support labeling a display record or
+action record as an enemy-health object.
+
+### Inspector and regression tests
+
+Extended `tools/inspect_bin.py` with conservative names for the recovered
+combat/runtime opcodes, typed animation and action definitions, and two new
+views. `--animations` groups every opcode-`0x06` header with its immediately
+following steps; `--actions` lists source, target, coordinates, selector, and
+the four rendered label names. Added variable annotation for the destination
+of opcode `0x82` and for the already identified variable operand of opcode
+`0x7D`.
+
+Added focused tests for all new semantic names, the exact four
+`COMBAT7.BIN` actions, its first animation sequence, and the complete
+seven-program corpus totals. The first focused test run failed with three
+`NameError` exceptions: an ambiguous patch had accidentally inserted the new
+imports below the file's `unittest.main()` call. Inspected the file tail,
+moved those imports into the existing import block, removed the stray lines,
+and wrapped the affected assertions. Repeated:
+
+```sh
+python3 -m unittest tests.test_inspect_bin -v
+tools/inspect_bin.py \
+  build/dd1/all/337_COMBAT7.BIN --animations --actions
+```
+
+All 21 focused tests passed in 0.130 seconds, and the inspector printed 35
+animation sequences, 293 steps, and the four expected labeled targets.
+
+### Visible QEMU attempt
+
+Started the game with the required visible Cocoa window and silent audio:
+
+```sh
+./run.sh --trace-dos
+```
+
+The trace process used session 98634. Advanced from the intro, opened the
+Escape menu, checked Load Game, and found all nine labels `EMPTY`. Returned
+through TITLE and BOSS dialogue, selected the fifth response (`OK! I'd better
+go do it!`), and advanced the following prayer/transition. Automated input
+then left a black framebuffer. Repeated register checks remained at
+`CS=0D66`, `DS=0000`, `EIP=3E04` in a loaded sound-driver segment rather than
+the game's code/data segments. Waiting more than eight seconds did not change
+the screen; the most recent DOS trace also ended in that transition.
+
+Captured the ignored transition frames under `build/qemu-trace/`, then sent
+`quit` through the monitor and confirmed QEMU exited with status zero. This
+run did not reach a verifiable encounter, so no animation, action, or thread
+table claim relies on it. A live combat capture remains open.
+
+### Documentation, symbols, and validation
+
+Added the `Combat Runtime` chapter and linked it from the book. It documents
+the seven-resource corpus, animation steps and slots, selectable-action
+records and labels, true BIN scheduler, synchronization operations, inspector
+commands, QEMU boundary, and remaining questions. Updated the scene-bytecode,
+scene-display-object, static-analysis, README, and plan material. The plan now
+marks the action/animation/thread slice complete while leaving exact combat
+outcomes and remaining gameplay entities open.
+
+The first combined `analysis/cb.rz` patch failed because it assumed
+`initialize_scene` and `update_scene_threads` were adjacent. Inspected the
+numbered file and reapplied the additions against their actual locations. A
+later combined scene-bytecode patch also failed because it expected separate
+`0x38` and `0x39` rows where the table has one combined row. Reapplied smaller
+patches against the exact context. Neither failed patch changed a file.
+
+Named the five animation routines, action overlay, action-key search, and
+BIN-thread starter in `analysis/cb.rz`, and renamed the 14 existing switch
+case flags for the recovered handlers. Audited the script with:
+
+```sh
+rizin -q -b 16 -e scr.color=false -i analysis/cb.rz \
+  -c 'afl; fl; q' build/analysis/CB_UNPACKED.EXE \
+  > build/analysis/combat-symbol-audit.txt \
+  2> build/analysis/combat-symbol-audit.err
+```
+
+All requested function and handler names appeared at the expected offsets.
+The five-byte standard-error file contains only a terminal progress escape,
+not a Rizin analysis or name-collision error.
+
+Generated `build/analysis/combat7-runtime.txt`, checked its four action rows,
+and ran the complete validation set:
+
+```sh
+python3 -m unittest discover -s tests -v
+python3 -m py_compile tools/*.py tests/*.py
+bash -n run.sh
+mdbook build docs
+test -f build/docs-book/combat-runtime.html
+git diff --check
+```
+
+All 77 tests passed in 2.319 seconds. Python compilation and shell syntax
+checking passed, mdBook generated `combat-runtime.html`, the COMBAT7 inspector
+output matched the recovered records, the Rizin symbol audit succeeded, and
+the whitespace check passed.
+
+Performed one final consistency pass after completing the progress log:
+rebuilt mdBook, reran the 21 focused BIN tests (all passed in 0.134 seconds),
+recompiled the two changed Python files, reviewed status and the documentation,
+plan, README, and symbol-script diffs, and repeated `git diff --check`. The
+book and focused checks remained clean. Left the work uncommitted for review.
+
+### Preparing the combat-runtime checkpoint
+
+The user requested a commit. Rechecked `git status --short` and
+`git diff --check`, confirmed that the only changed paths belong to this
+combat-runtime investigation, and retained the successful validation results:
+all 77 tests pass, the changed Python files compile, `run.sh` passes shell
+syntax checking, mdBook builds the new chapter, the COMBAT7 inventory matches
+the recovered action records, and the Rizin symbol audit contains every new
+name without collision errors. Prepared one checkpoint with the inspector,
+tests, symbol map, combat chapter, related documentation, plan, README, and
+this append-only activity record.
+
+The first staged `git diff --cached --check` reported one extra blank line at
+the end of `combat-runtime.md`. Removed that blank line, recorded the finding
+here, and restaged the chapter and progress log before repeating the complete
+staged audit.
+
+Created the checkpoint as `a83072d` with subject
+`combat: Recover scripted encounter runtime`. The immediate 72-column audit
+found three commit-body lines of 73 characters. The subject and committed
+content were correct, but the message missed the repository limit by one
+column on those lines. Recorded the correction here and amended the same
+checkpoint with shorter wrapping.

@@ -79,6 +79,9 @@ retains a BIN-stream location and consumes the records later. This explains
 why the command decoder originally could establish the nine-byte boundary
 before the animation lifecycle was understood.
 
+The animation slot and step layouts, lifecycle commands, and linked-transform
+path are now documented in the [combat-runtime chapter](combat-runtime.md).
+
 Victim scenes use `0x85` and `0x86` on groups of display indices when their
 visual state changes. For example, `NAGE.BIN` hides a set of crystal-related
 objects in a subroutine selected by progression flags. This is evidence for
@@ -143,12 +146,12 @@ not guaranteed live indices.
 
 ## Remaining questions
 
-- The complete 16-byte command-thread record and animation-sequence record
-  layouts still need names for each field.
-- The relationship between display objects and combat collision, targeting,
-  or enemy health is not yet recovered.
-- Several mutation and motion opcodes operate on related thread/animation
-  structures and remain unnamed.
+- The opcode-`0x02` 16-byte interactive/display record still needs names for
+  every field and a clearer distinction from the true BIN scheduler table.
+- Combat targeting uses a separate ten-byte screen-action table. No evidence
+  yet connects direct display objects to collision or enemy health.
+- The last two bytes of each 12-byte animation slot and several detailed mode
+  transitions remain unnamed.
 - A display record can visually represent a character, but no identity or
   gameplay-stat field exists in this ten-byte structure.
 

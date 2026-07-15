@@ -9,9 +9,12 @@ sys.path.insert(0, str(ROOT / "tools"))
 from extract_dd1 import DD1Archive  # noqa: E402
 from inspect_bin import (  # noqa: E402
     BinFormatError,
+    COMBAT_ACTION_LABELS,
     OPCODE_NAMES,
     OPCODE_SCHEMAS,
     SCRIPT_VARIABLE_OPERANDS,
+    action_target_definitions,
+    animation_sequence_definitions,
     decode_command,
     decode_stream,
     dialogue_choice_definitions,
@@ -63,6 +66,82 @@ class BinBytecodeTests(unittest.TestCase):
         self.assertEqual(OPCODE_NAMES[0x49], "request_study_bible")
         self.assertEqual(OPCODE_NAMES[0x4E], "show_captain_bible_dialogue")
         self.assertEqual(OPCODE_NAMES[0x7D], "configure_study_prompt")
+
+    def test_recovered_combat_runtime_opcode_names(self):
+        expected = {
+            0x08: "start_animation",
+            0x09: "stop_animation",
+            0x3A: "add_action_target",
+            0x3B: "enable_action_target",
+            0x3C: "disable_action_target",
+            0x3E: "start_scene_thread_at",
+            0x3F: "wait_for_animation",
+            0x41: "enable_action_selection",
+            0x42: "disable_action_selection",
+            0x59: "wait_for_sound_effect",
+            0x5F: "start_linked_animation",
+            0x60: "nop",
+            0x61: "stop_scene_thread",
+            0x80: "jump_if_animation_active",
+            0x82: "set_variable_random_modulo",
+        }
+        for opcode, name in expected.items():
+            self.assertEqual(OPCODE_NAMES[opcode], name)
+
+    def test_combat7_action_targets_match_art_labels(self):
+        commands = decode_stream(self.member("COMBAT7.BIN"))
+        definitions = action_target_definitions(commands)
+        self.assertEqual(
+            [
+                (
+                    definition.offset,
+                    definition.target,
+                    definition.x,
+                    definition.y,
+                    definition.selector,
+                    COMBAT_ACTION_LABELS[definition.selector],
+                )
+                for definition in definitions
+            ],
+            [
+                (0x0C06, 0x0EC8, 151, 61, ".11", "ATTACK"),
+                (0x0C11, 0x0EAB, 136, 153, ".12", "DEFEND"),
+                (0x0C1C, 0x1053, 15, 167, ".13", "RETREAT"),
+                (0x0C27, 0x0FA7, 157, 62, ".14", "COMBAT"),
+            ],
+        )
+
+    def test_combat_animation_and_action_corpus_counts(self):
+        sequence_count = 0
+        step_count = 0
+        action_count = 0
+        selectors = []
+        for number in range(1, 8):
+            commands = decode_stream(self.member(f"COMBAT{number}.BIN"))
+            sequences = animation_sequence_definitions(commands)
+            actions = action_target_definitions(commands)
+            sequence_count += len(sequences)
+            step_count += sum(len(sequence.steps) for sequence in sequences)
+            action_count += len(actions)
+            selectors.extend(action.selector for action in actions)
+        self.assertEqual(
+            (sequence_count, step_count, action_count), (214, 2596, 27)
+        )
+        self.assertEqual(selectors.count(".11"), 7)
+        self.assertEqual(selectors.count(".12"), 6)
+        self.assertEqual(selectors.count(".13"), 7)
+        self.assertEqual(selectors.count(".14"), 7)
+
+    def test_combat7_first_animation_sequence(self):
+        commands = decode_stream(self.member("COMBAT7.BIN"))
+        sequences = animation_sequence_definitions(commands)
+        self.assertEqual(
+            (len(sequences), sum(len(x.steps) for x in sequences)), (35, 293)
+        )
+        self.assertEqual(
+            (sequences[0].offset, sequences[0].interval, sequences[0].steps),
+            (0x002B, 50, (bytes.fromhex("01 04 92 00 35 00 00 01 02"),)),
+        )
 
     def test_boss_dialogue_choices_match_qemu_live_table(self):
         commands = decode_stream(self.member("BOSS.BIN"))

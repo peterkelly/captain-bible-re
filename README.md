@@ -179,6 +179,8 @@ tools/inspect_bin.py build/dd1/all/005_INTRO.BIN
 tools/inspect_bin.py build/dd1/all/001_LOGO.BIN --objects
 tools/inspect_bin.py build/dd1/all/327_BOSS.BIN --choices
 tools/inspect_bin.py \
+  build/dd1/all/337_COMBAT7.BIN --animations --actions
+tools/inspect_bin.py \
   build/dd1/all/334_ROOM3.BIN --start 0x0c96 --limit 0x1754
 ```
 
@@ -193,7 +195,10 @@ scale, flags, frame, and ART slot. See the scene-display-object chapter for
 the live ten-byte layout and control-flow caveat. The `--choices` view lists
 dialogue-choice source offsets, absolute branch targets, and inline text. See
 the conversation-flow chapter for its six-byte runtime table, study-Bible
-integration, and live QEMU correlation.
+integration, and live QEMU correlation. The `--animations` view groups each
+animation header with its contiguous nine-byte steps; `--actions` lists
+screen coordinates, absolute targets, selectors, and recovered combat labels.
+The combat-runtime chapter documents their runtime tables and BIN scheduler.
 
 ## Inspecting audio resources
 

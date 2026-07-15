@@ -28,14 +28,22 @@ af @ 0x3ad2
 afn reset_scene_display_records @ 0x3ad2
 af @ 0x3aff
 afn render_scene_display_records @ 0x3aff
+afn resolve_animation_transform @ 0x3b9b
+afn render_animation_slot @ 0x3d08
+afn update_animation_slots @ 0x3da8
+afn start_animation_slot @ 0x3f59
+afn stop_animation_slot @ 0x3fdf
 afn execute_bin_commands @ 0x451b
 afn initialize_scene @ 0x6631
+afn update_action_selector_overlay @ 0x6a23
 afn update_scene_threads @ 0x7997
+afn start_scene_thread @ 0x7a5c
 afn initialize_new_session @ 0x7d2b
 afn main_menu_and_game_loop @ 0x875d
 afn poll_input_event @ 0x7bed
 af @ 0x834e
 afn handle_study_bible_request @ 0x834e
+afn find_action_target_by_key @ 0x8558
 af @ 0x5ad6
 afn find_text_record_by_selector @ 0x5ad6
 af @ 0x5ce2
@@ -144,3 +152,17 @@ fr case.0x4552.70 bin_handler_present_dialogue_choices
 fr case.0x4552.20 bin_handler_show_dialogue
 fr case.0x4552.73 bin_handler_request_study_bible
 fr case.0x4552.114 bin_handler_suspend_scene_thread
+fr case.0x4552.8 bin_handler_start_animation
+fr case.0x4552.9 bin_handler_stop_animation
+fr case.0x4552.58 bin_handler_add_action_target
+fr case.0x4552.59 bin_handler_enable_action_target
+fr case.0x4552.60 bin_handler_disable_action_target
+fr case.0x4552.62 bin_handler_start_scene_thread_at
+fr case.0x4552.63 bin_handler_wait_for_animation
+fr case.0x4552.65 bin_handler_enable_action_selection
+fr case.0x4552.66 bin_handler_disable_action_selection
+fr case.0x4552.89 bin_handler_wait_for_sound_effect
+fr case.0x4552.95 bin_handler_start_linked_animation
+fr case.0x4552.97 bin_handler_stop_scene_thread
+fr case.0x4552.128 bin_handler_jump_if_animation_active
+fr case.0x4552.130 bin_handler_set_variable_random_modulo

@@ -79,6 +79,8 @@ control-flow behavior:
 | `0x04` / `0x43` | `BBHHHB` | `add_scaled_display_object` | Appends a directly rendered object with frame, ART slot, X, Y, scale, and flags. |
 | `0x06` | `H` | `begin_animation_sequence` | Creates animation state and appends a type-`0x06` display record. |
 | `0x07` | `9` | `animation_step` | Advances over a fixed nine-byte step retained for later animation updates. |
+| `0x08` / `0x5F` | `BB` / `BBB` | start animation | Starts an animation without / with an explicit linked slot. |
+| `0x09` | `B` | `stop_animation` | Stops an animation and releases its render slot. |
 | `0x0D` | `zz` | `change_scene` | Selects a new scene and secondary segment name. |
 | `0x0F` | `H` | `adjust_thread_delay` | Updates the current command thread's wait value. |
 | `0x13` | `H` | `remove_dialogue_choice` | Removes the first six-byte choice record with the matching target. |
@@ -95,7 +97,12 @@ control-flow behavior:
 | `0x35` | none | `return` | Resumes the saved bytecode return offset. |
 | `0x36` / `0x37` | `B` | set/clear text-record state | Mutates persistent descriptor byte `+4` selected by record identifier. |
 | `0x38` / `0x39` | `BH` | branch on text-record state | Selects a target when a record state is set / clear. |
+| `0x3A` | `HHHz` | `add_action_target` | Appends a selectable screen coordinate, BIN target, and label selector. |
+| `0x3B` / `0x3C` | `B` | enable/disable action target | Changes one action record's active byte. |
 | `0x3D` | `H` | `jump` | Replaces the cursor with an absolute file offset. |
+| `0x3E` | `BH` | `start_scene_thread_at` | Activates a BIN scheduler slot at an absolute target. |
+| `0x3F` | `B` | `wait_for_animation` | Suspends the current thread while an animation is active. |
+| `0x41` / `0x42` | none | enable/disable action selection | Controls screen-action input globally. |
 | `0x44` | `Hz` | `add_dialogue_choice` | Appends an absolute target and far text pointer to the choice table. |
 | `0x45` | none | `clear_dialogue_choices` | Clears the choice count and dialogue state. |
 | `0x46` | none | `present_dialogue_choices` | Suspends the thread until the selected choice supplies a new BIN target. |
@@ -107,6 +114,9 @@ control-flow behavior:
 | `0x55` | none | `snapshot_state` | Copies the live state into a retained buffer. |
 | `0x57` | `BH` | `play_sound_effect` | Builds `D###.ABT`, decodes it, and starts playback at the supplied rate. |
 | `0x58` | none | `stop_sound_effect` | Stops active digital playback and releases its PCM buffer. |
+| `0x59` | none | `wait_for_sound_effect` | Suspends until digital playback or its simulated timer completes. |
+| `0x60` | none | `nop` | Continues directly to the next command. |
+| `0x61` | `B` | `stop_scene_thread` | Clears one BIN scheduler slot's active byte. |
 | `0x65` | `BB` | `clear_display_object_frames` | Sets the frame byte to zero across a consecutive display-record range. |
 | `0x66` | `BBBB` | `advance_display_object_frames` | Increments and range-wraps frame bytes across consecutive records. |
 | `0x6D` | `z` | `load_palette` | Uses the same palette-loading path as `0x4D`. |
@@ -120,7 +130,9 @@ control-flow behavior:
 | `0x7C` | `H` | `set_current_map_cell_parameter_a` | Writes the current cell's second byte from a script variable. |
 | `0x7D` | `BH` | `configure_study_prompt` | Selects a companion-text component and record selector for the next study screen. |
 | `0x7F` | `H` | `set_current_map_cell_parameter_b` | Writes the current cell's third byte from a script variable. |
+| `0x80` | `BH` | `jump_if_animation_active` | Selects a target when an animation state byte is nonzero. |
 | `0x81` | `H` | `reduce_faith` | Subtracts a difficulty-scaled immediate from faith unless no-combat mode is active. |
+| `0x82` | `HH` | `set_variable_random_modulo` | Stores a pseudorandom remainder in a script variable. |
 | `0x85` / `0x86` | `B` | hide/show display object | Sets / clears the high hidden bit in a display record's ART-slot byte. |
 | `0x87` | none | `normalize_map_cells` | Applies recovered location-kind and parameter transitions across the grid. |
 | `0x88` | none | `clear_text_record_states` | Clears persistent byte `+4` in all 66 text descriptors. |
@@ -206,11 +218,15 @@ decimal forms. Unidentified handlers retain names such as `opcode_3a`,
 preserving useful structure without assigning speculative semantics.
 
 Add `--objects` to append a linear summary of commands which define display
-records, or `--choices` to inventory dialogue target/text pairs. The
+records, `--choices` to inventory dialogue target/text pairs, or
+`--animations --actions` to inventory animation sequences and selectable
+screen targets. The
 [scene-display-object chapter](scene-objects.md) documents the ten-byte
 runtime record, while the [conversation-flow chapter](conversation-flow.md)
-documents the six-byte choice table. Both summaries warn that branches can
-change which definitions execute.
+documents the six-byte choice table. The
+[combat-runtime chapter](combat-runtime.md) documents animation slots, action
+targets, and the BIN scheduler. These summaries warn that branches can change
+which definitions execute.
 
 ## Executable routines
 
@@ -225,6 +241,11 @@ change which definitions execute.
 | `0x2933` | `show_dialogue_message` |
 | `0x3AD2` | `reset_scene_display_records` |
 | `0x3AFF` | `render_scene_display_records` |
+| `0x3B9B` | `resolve_animation_transform` |
+| `0x3D08` | `render_animation_slot` |
+| `0x3DA8` | `update_animation_slots` |
+| `0x3F59` | `start_animation_slot` |
+| `0x3FDF` | `stop_animation_slot` |
 | `0x3A1E` | `bin_read_u8` |
 | `0x3A30` | `bin_read_u16` |
 | `0x3A64` | `bin_read_cstring_offset` |
@@ -233,8 +254,11 @@ change which definitions execute.
 | `0x446F` | `render_study_prompt` |
 | `0x451B` | `execute_bin_commands` |
 | `0x6631` | `initialize_scene` |
+| `0x6A23` | `update_action_selector_overlay` |
 | `0x7997` | `update_scene_threads` |
+| `0x7A5C` | `start_scene_thread` |
 | `0x834E` | `handle_study_bible_request` |
+| `0x8558` | `find_action_target_by_key` |
 | `0xB948` | `release_render_slot` |
 | `0xBCAC` | `render_scene_display_object` |
 

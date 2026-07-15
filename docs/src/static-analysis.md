@@ -198,7 +198,29 @@ silent QEMU capture of `LOGO.BIN` contained 13 records whose type order and
 direct fields exactly match all 13 linear display definitions in the script.
 The dedicated scene-display-object chapter documents the layout, commands,
 QEMU addresses, inspector output, and boundary between display state and
-still-unrecovered gameplay entity/combat state.
+scripted gameplay state.
+
+## Combat animation and actions
+
+The seven `COMBAT*.BIN` programs contain 214 animation definitions with 2,596
+nine-byte steps and 27 selectable action targets. Animation runtime records
+begin at `DS:6EBA` with a 12-byte stride; they retain the first/current BIN
+step offsets, timing, linked slot, mode, and render slot. Dedicated opcodes
+start, link, stop, wait for, and branch on those animations.
+
+Selectable actions use a separate ten-byte table at `DS:480E`. Each record
+contains an absolute BIN target, screen coordinates, a selector-string
+offset, and an active byte. The first ART resource in every combat is
+`COMBTAGS`; rendering its four frames identifies selectors `.11` through
+`.14` as `ATTACK`, `DEFEND`, `RETREAT`, and `COMBAT`. Pointer and keyboard
+paths search active targets and start a BIN scheduler slot at the selected
+target.
+
+Random branches, the Sword and Shield flags, opcode-`0x81` faith loss, and
+map/progression changes remain in script state. No enemy-health field exists
+in the display or action-target records. The combat-runtime chapter documents
+the tables, commands, corpus counts, inspector, and remaining dynamic
+validation boundary.
 
 ## Conversation and choice flow
 
@@ -295,6 +317,11 @@ documents both formats and their reproducible tools.
 | `0x3A64` | `bin_read_cstring_offset` |
 | `0x3AD2` | `reset_scene_display_records` |
 | `0x3AFF` | `render_scene_display_records` |
+| `0x3B9B` | `resolve_animation_transform` |
+| `0x3D08` | `render_animation_slot` |
+| `0x3DA8` | `update_animation_slots` |
+| `0x3F59` | `start_animation_slot` |
+| `0x3FDF` | `stop_animation_slot` |
 | `0x4001` | `load_palette_resource` |
 | `0x4091` | `play_music_resource` |
 | `0x4155` | `release_sound_effect_buffer` |
@@ -310,13 +337,16 @@ documents both formats and their reproducible tools.
 | `0x5F92` | `export_game_text` |
 | `0x629C` | `load_text_bank` |
 | `0x6631` | `initialize_scene` |
+| `0x6A23` | `update_action_selector_overlay` |
 | `0x7997` | `update_scene_threads` |
+| `0x7A5C` | `start_scene_thread` |
 | `0x7BED` | `poll_input_event` |
 | `0x7D2B` | `initialize_new_session` |
 | `0x7D8E` / `0x7E41` | Copy live state to/from save buffers |
 | `0x7F01` / `0x7F58` | Write/read the 243-byte save index |
 | `0x7FD7` / `0x81AC` | Write/read the 2,752-byte save state |
 | `0x834E` | `handle_study_bible_request` |
+| `0x8558` | `find_action_target_by_key` |
 | `0x875D` | `main_menu_and_game_loop` |
 | `0x89AF` | `parse_bible_translation_lock` |
 | `0x8A09` | `set_cwd_from_executable_path` |
