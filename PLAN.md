@@ -45,6 +45,9 @@ This plan is a living checklist. Findings and commands are recorded in
 
 - [x] Recover the `DD1.DAT` directory and named-resource layout.
 - [x] Implement and verify a reproducible `DD1.DAT` extractor.
+- [x] Recover the `PAL`, `ART`, and related sprite metadata formats.
+- [x] Implement and verify reproducible artwork rendering tools.
+- [x] Recover the `BIN` scene-command stream and startup sequencing.
 - [ ] Document data containers, compression, graphics, audio, and text formats.
 - [ ] Document save-game structures and player-name behavior.
 - [ ] Reconstruct maps, entities, conversations, combat, and progression logic.

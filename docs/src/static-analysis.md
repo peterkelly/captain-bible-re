@@ -173,12 +173,50 @@ chains through `0x9D98`. Static reconstruction plus extraction of every
 declared member establishes the full directory and compression format; see
 the dedicated `DD1.DAT` chapter.
 
+## Palette and artwork rendering
+
+All `PAL` resources are raw 256-entry VGA DAC tables. The BIOS palette path at
+`0xA017` uses video function `1012h`; the retrace-synchronized path at `0xA032`
+writes the same six-bit RGB triplets through ports `03C8h` and `03C9h`.
+
+Every `ART` frame has a 12-byte descriptor containing signed X/Y origins,
+unsigned width/height, and a 32-bit pixel offset. The direct frame routine at
+`0xB99C` multiplies the requested index by 12, reads width at offset 4, height
+at 6, and the far pixel displacement at 8. The pixel body is row-major and
+eight bits per pixel. Low-level blitters provide both opaque copying and an
+index-0 transparent path. The graphics-format chapter records validation of
+all 143 resources and the exact QEMU framebuffer comparison.
+
+## Scene bytecode interpreter
+
+The 62 `BIN` members contain scene programs interpreted by `0x451B`. The
+routine reads opcodes `0x01` through `0x91` and dispatches through a 145-entry
+handler table at `0x59AB`. Shared readers at `0x3A1E`, `0x3A30`, and `0x3A64`
+consume bytes, little-endian words, and NUL-terminated strings from a far
+resource cursor. Static handler analysis recovers the operand layout for all
+145 commands; 122 opcodes occur across 25,837 decoded commands.
+
+`initialize_scene` at `0x6631` appends `.BIN`, loads the resource, and starts
+the interpreter at file offset zero. `update_scene_threads` at `0x7997`
+resumes stored file offsets. Directly identified handlers load `.ART` and
+`.PAL` members, select XMI music, change scenes, manage timing, manipulate
+variables, and implement absolute jumps, calls, and returns. The dedicated
+scene-bytecode chapter documents the complete structural schema, startup
+sequence, mixed code/data regions, inspection tool, and QEMU memory check.
+
 ## High-confidence function map
 
 | Load offset | Name |
 |---:|---|
 | `0x3363` | `initialize_hardware_and_data` |
+| `0x3A1E` / `0x3A30` | Read byte/word BIN operands |
+| `0x3A64` | `bin_read_cstring_offset` |
+| `0x4001` | `load_palette_resource` |
+| `0x4091` | `play_music_resource` |
+| `0x451B` | `execute_bin_commands` |
 | `0x5F92` | `export_game_text` |
+| `0x6631` | `initialize_scene` |
+| `0x7997` | `update_scene_threads` |
 | `0x7BED` | `poll_input_event` |
 | `0x7D2B` | `initialize_new_session` |
 | `0x7D8E` / `0x7E41` | Copy live state to/from save buffers |
@@ -197,8 +235,16 @@ the dedicated `DD1.DAT` chapter.
 | `0x9C5F` | `archive_refill_input` |
 | `0x9CA4` | `archive_decode_member` |
 | `0x9D98` | `archive_expand_code` |
+| `0x9FF7` | `vga_set_dac_entry` |
+| `0xA017` | `vga_load_palette_bios` |
+| `0xA032` | `vga_write_palette_range` |
+| `0xA0C9` | `blit_rect_to_vga` |
+| `0xA106` | `blit_rect_transparent_zero` |
+| `0xA136` | `blit_rect_opaque` |
 | `0xACDA` | `load_file_into_far_memory` |
+| `0xB620` | `update_palette_effect` |
 | `0xB818` | `load_art_resource` |
+| `0xB99C` | `draw_art_frame_opaque` |
 | `0xCB5C` | `runtime_startup` |
 
 The Rizin script additionally names verified Microsoft C library routines such

@@ -1306,3 +1306,529 @@ verified executable and memory comparison, Rizin loaded all archive and
 low-level I/O names, mdBook rendered the three new chapters, and the Git
 whitespace check passed. Prepared one commit with an imperative subject and a
 detailed, 72-column-wrapped explanation of the tracing and extraction work.
+
+## 2026-07-15: Palette and artwork format analysis
+
+After commit `7354291`, the user asked to continue. Reported that the next
+Phase 4 milestone would recover the palette and artwork formats, correlate
+their extracted bytes with rendering code and the captured QEMU screen, and
+add a reproducible decoder when supported by the evidence. Added explicit
+palette/artwork recovery and rendering-tool tasks to `PLAN.md`.
+
+Confirmed the worktree was clean, reviewed the current plan and latest log,
+and verified that the ignored `build/dd1/all/` extraction still contains all
+369 members. No source files were changed before the two new plan tasks and
+this log entry.
+
+### Resource population and descriptor inference
+
+Used a read-only Python inventory over the extracted resources to group files
+by extension, count sizes, print leading bytes, and interpret initial words.
+All 37 `PAL` members are exactly 768 bytes. All their values are at most 63,
+which is the six-bit VGA DAC component range. `ART` sizes range from 201 to
+64,041 bytes and their leading words form plausible positions and dimensions.
+
+The first `ART` hypothesis came from `BOSS2.ART`: its first six values are X
+180, Y 44, width 31, height 4, and 32-bit offset 60. The next pixel offset is
+184, exactly `60 + 31 * 4`. `LOGO.ART` begins with offset 72, indicating six
+12-byte records. Wrote a temporary parser treating each record as signed X/Y,
+unsigned width/height, and a 32-bit offset, then checked all 143 members:
+
+```sh
+python3 - <<'PY'
+# Parse every *_*.ART as repeated struct '<hhHHI'.
+# Require first_offset % 12 == 0, contiguous width*height pixel bodies,
+# and final offset == file size.
+PY
+```
+
+Every resource passed with no exceptions. The population contains 1,178
+frames and 4,850,699 pixel bytes. Frame counts range from one to 63; the
+63-frame file is `MAP.ART`. Eleven files contain a full `(0, 0, 320, 200)`
+frame. Negative signed origins occur frequently, including `RUN.ART` frame 0
+at `(-28, -5)` with dimensions 46×61, showing that they are relative sprite
+anchors rather than always screen coordinates.
+
+Counted content identities with SHA-256. The 37 palettes represent 35 unique
+payloads: the two `GANTRY.PAL` entries match, and `RICH.PAL` matches `1.PAL`.
+The 143 artwork members represent 142 unique payloads because the two
+`HOLEA.ART` entries match.
+
+Inspected `LOGO.BIN`, `INTRO.BIN`, `TITLE.BIN`, `MENU.BIN`, and `DOME.BIN`
+with `strings -a -t x` to see how scripts refer to artwork and other assets.
+The first guessed numeric paths for `MENU.BIN` and `DOME.BIN` did not exist;
+used `find` to obtain their actual indices 326 and 330, then repeated the
+inspection. Strings such as `MTITLE` are command plus music names, not an
+embedded palette declaration, so palette pairing required program and runtime
+evidence.
+
+### Graphics disassembly
+
+Saved focused Rizin listings for the art loader, descriptor users, low-level
+blitters, palette functions, and palette-effect loop:
+
+```sh
+rizin -q -b 16 -a x86 -e scr.color=false -e asm.bytes=false \
+  -i analysis/cb.rz \
+  -c 's 0xb818; pdf; axt; s 0xb7ea; pdf; \
+s 0xb8f0; pd 260; q' \
+  build/analysis/CB_UNPACKED.EXE \
+  > build/analysis/art-functions.txt
+
+rizin -q -b 16 -a x86 -e scr.color=false -e asm.bytes=false \
+  -i analysis/cb.rz \
+  -c 's 0xa0c9; pdf; s 0xb99c; af; pdf; /ad/ out; q' \
+  build/analysis/CB_UNPACKED.EXE \
+  > build/analysis/graphics-functions.txt
+
+rizin -q -b 16 -a x86 -e scr.color=false -e asm.bytes=false \
+  -i analysis/cb.rz \
+  -c 's 0x9f80; pd 240; q' \
+  build/analysis/CB_UNPACKED.EXE
+
+rizin -q -b 16 -a x86 -e scr.color=false -e asm.bytes=false \
+  -i analysis/cb.rz \
+  -c 's 0xc000; pdf; s 0xbf88; pdf; s 0xb620; pdf; q' \
+  build/analysis/CB_UNPACKED.EXE \
+  > build/analysis/art-rendering.txt
+```
+
+At `0xB99C`, the requested frame index is multiplied by 12. The routine reads
+width from descriptor offset 4, height from 6, and the 32-bit pixel offset
+from 8 before copying rows to VGA memory. `0xA0C9` uses destination stride 320
+and segment `A000h`. `0xA106` explicitly skips source byte 0, while `0xA136`
+copies every pixel, proving that transparency is a draw-call choice rather
+than a descriptor bit.
+
+Palette code provides a similarly direct match. `0xA017` invokes BIOS video
+function `1012h` for all 256 entries. `0xA032` synchronizes through status port
+`03DAh`, writes the starting index to `03C8h`, and sends raw RGB triplets to
+`03C9h`. `0xB620` computes bounded component changes and submits a palette
+range, accounting for fades and palette cycling.
+
+### Prototype rendering and captured-screen checks
+
+Confirmed Pillow 12.3.0 is installed. Wrote an ignored, inline prototype to
+parse the descriptors, expand six-bit components, and render `LOGO`, `INTRO`,
+`TITLE`, `DOME`, `BOSS`, and `MENU` under `build/graphics/`. The first version
+created a mask with `P`-mode `Image.point`; Pillow remapped palette indices
+while producing that mask, so its colors were visibly wrong. Checked source
+and saved pixels, found that source index 33 had become index 21, and replaced
+the mask with an explicit `L` image containing byte 255 for nonzero pixels.
+The corrected renders show the Bridgestone logo, opening story, title screen,
+dome landscape, boss screen, and menu artwork with the expected geometry and
+colors.
+
+Used the QEMU startup screenshot and `INTRO.ART` pixels to derive the dominant
+runtime RGB value for each of the 39 indices used on that screen. Static
+entries match `TITLE.PAL` closely; indices 243 through 254 differ because the
+text range is being color-cycled. This also explained why a base-palette
+preview need not match the exact text shade at the capture instant.
+
+Performed a stronger comparison that does not depend on RGB conversion:
+
+```sh
+python3 - <<'PY'
+# Compare INTRO.ART's 64,000-byte frame with dump[0xA0000:0xAFA00].
+PY
+xxd -l 64 -s 0xa0000 build/qemu-trace/startup-physical-1m.bin
+xxd -l 64 -s 12 build/dd1/all/006_INTRO.ART
+```
+
+The frame and live VGA memory share 63,648 of 64,000 bytes. All 352
+differences are explained by two visible runtime overlays: 333 pixels in the
+floppy/save icon bounding box X 297–316, Y 1–17, and 19 pixels in the centered
+mouse cursor bounding box X 154–166, Y 94–106. Outside those rectangles the
+resource and framebuffer are byte-for-byte identical. The extracted frame
+pixel SHA-256 is
+`9f0926921d2a5ca01586a1f644d1eee24e734b4f6cbc3b0399e9883f97d2a014`.
+
+Also checked the older and current one-MiB dumps. They are different overall,
+but their VGA ranges contain the same opening scene; the older filename refers
+to the executable-analysis milestone rather than a distinct title-frame VGA
+capture. Did not use it as independent title-art evidence.
+
+### Reproducible artwork tool
+
+Added executable `tools/render_art.py` and `tests/test_render_art.py`. The tool
+validates descriptor alignment, positive dimensions, contiguous pixel blocks,
+exact resource length, 768-byte palette size, and six-bit palette components.
+It can list descriptors, render a single transparent frame, render every frame
+with index-preserving filenames, or composite signed origins on a configurable
+canvas. It implements clipping itself so index values remain stable and uses
+nearest-neighbor integer scaling.
+
+The first focused run was:
+
+```sh
+chmod +x tools/render_art.py
+python3 -m py_compile tools/render_art.py tests/test_render_art.py
+python3 -m unittest -v tests.test_render_art
+```
+
+Seven structural tests passed; one guessed LOGO canvas checksum failed. As
+reported to the user, computed a second composite independently with a simple
+pixel loop. It exactly matched the tool output and established SHA-256
+`e3234c620a873a2f91bb68e8e631d0a645b7958a24b3b07e5890f9bc7b5d62bc`.
+Corrected the stale fixture and all eight focused tests passed.
+
+Changed the tests to extract their ART/PAL inputs directly from `CB/DD1.DAT`
+through `DD1Archive`, rather than depend on ignored pre-extracted files. This
+makes the test suite reproducible from the supplied game directory alone. A
+fresh `--extract-all` run separately produced all 369 files.
+
+Exercised each command-line rendering path with:
+
+```sh
+tools/render_art.py build/dd1/all/003_LOGO.ART --list \
+  > build/graphics/tool-check/logo-frames.txt
+tools/render_art.py build/dd1/all/003_LOGO.ART \
+  --palette build/dd1/all/002_LOGO.PAL \
+  --canvas --scale 2 \
+  --output build/graphics/tool-check/logo.png
+tools/render_art.py build/dd1/all/006_INTRO.ART \
+  --palette build/dd1/all/025_TITLE.PAL \
+  --canvas --scale 2 \
+  --output build/graphics/tool-check/intro.png
+tools/render_art.py build/dd1/all/082_RUN.ART \
+  --palette build/dd1/all/025_TITLE.PAL \
+  --all-frames build/graphics/tool-check/run-frames \
+  --scale 2
+```
+
+The list reports all six LOGO descriptors, the two composites are valid
+640×400 indexed PNGs, and all 21 RUN frames were written. Visually inspected
+the final logo, opening scene, and first running frame; their pixels,
+transparency, orientation, and palette are correct.
+
+Added the palette/artwork book chapter, renderer instructions and Pillow
+requirement to `README.md`, format findings to the static-analysis chapter,
+and eight high-confidence graphics names to `analysis/cb.rz`. Marked the two
+graphics tasks complete in `PLAN.md`.
+
+### Graphics-pass verification
+
+Ran:
+
+```sh
+python3 -m unittest discover -s tests -v
+python3 -m py_compile tools/*.py tests/*.py
+bash -n run.sh tools/build_qemu_dos_trace.sh
+tools/render_art.py --help > build/graphics/tool-check/help.txt
+tools/render_art.py build/dd1/all/003_LOGO.ART \
+  --palette build/dd1/all/002_LOGO.PAL \
+  --canvas --scale 2 \
+  --output build/graphics/tool-check/final-logo.png
+rizin -q -b 16 -a x86 -e scr.color=false \
+  -i analysis/cb.rz \
+  -c 'afl~vga_; afl~blit_; afl~palette_effect; afl~draw_art; q' \
+  build/analysis/CB_UNPACKED.EXE \
+  > build/graphics/tool-check/symbols.txt
+mdbook build docs
+test -f build/docs-book/graphics-formats.html
+git diff --check
+git status --short
+git diff --stat
+```
+
+All 25 tests passed, every Python source compiled, both existing shell scripts
+still parsed, and the renderer reproduced its checked 640×400 logo PNG. Rizin
+loaded all eight graphics names at their intended offsets. mdBook rendered the
+new graphics chapter, and the tracked-source whitespace check passed. Source
+changes remain uncommitted pending the next requested checkpoint.
+
+### Beginning scene-command analysis
+
+Continued directly into the `BIN` resources because they contain artwork,
+music, text, timing, and effect references that connect the recovered graphics
+to startup behavior. Added explicit `BIN` command-stream recovery to
+`PLAN.md`.
+
+Correlated the archive seeks in the existing QEMU DOS-call trace with the
+decoded `DD1.DAT` directory. The startup path reads these resources in order:
+
+```text
+LOGO.BIN -> LOGO.PAL -> LOGO.ART -> D003.ABT
+TITLE.BIN -> TITLE.PAL -> TITLE.ART -> TITLE2.ART -> MUS001.XMI
+INTRO.BIN -> INTRO.ART
+```
+
+The trace's archive offsets, entry numbers, stored sizes, and expanded sizes
+all agree with the extractor: `LOGO.BIN` is entry 1 at `0x24da`, `TITLE.BIN`
+is entry 332 at `0x1b8665`, and `INTRO.BIN` is entry 5 at `0xaad0`. The later
+scene reuses `TITLE.PAL`; no second palette read occurs before `INTRO.ART`.
+The destination segments in the DOS reads also show a reusable resource
+buffer: both `TITLE.BIN` and `INTRO.BIN` occupy segment `4c13` at their
+respective points in startup.
+
+### Live BIN resource and interpreter state
+
+Reported that work would continue by finishing the BIN bytecode chapter and
+guides, recording both the evidence trail and corrections, and running the
+complete verification suite.
+
+Searched the startup physical-memory dump for the fully expanded
+`INTRO.BIN`, its far pointer, and nearby interpreter state. Repeated the check
+in a self-contained form with:
+
+```sh
+python3 - <<'PY'
+from pathlib import Path
+import sys
+sys.path.insert(0, 'tools')
+from extract_dd1 import DD1Archive
+
+archive = DD1Archive.from_path(Path('CB/DD1.DAT'))
+intro = archive.extract(archive.matching('INTRO.BIN')[0])
+dump = Path('build/qemu-trace/startup-physical-1m.bin').read_bytes()
+pointer = bytes.fromhex('00 00 13 4c')
+print([hex(i) for i in range(len(dump)) if dump.startswith(intro, i)])
+print([hex(i) for i in range(0x14000, 0x16000)
+       if dump.startswith(pointer, i)])
+print(dump[0x14f06:0x14f0e].hex(' '))
+print(hex(intro[0x4b]))
+PY
+```
+
+Results:
+
+- The only complete live copy of the 184-byte `INTRO.BIN` begins at physical
+  address `0x4C130`, the linear address of `4C13:0000`.
+- The base pointer bytes `00 00 13 4C` occur at physical `0x14F0A`, which is
+  the data-segment state at `DS:00FA`.
+- Bytes at `DS:00F6..00FD` are `4B 00 13 4C 00 00 13 4C`. They encode current
+  cursor `4C13:004B` and resource base `4C13:0000`.
+- `INTRO.BIN[0x4B]` is opcode `0x42`, at a valid command boundary immediately
+  after the `return_minus_one` command ending at file offset `0x4B`.
+
+This established that the interpreter stores a file-relative cursor in
+`DS:00F6`, its segment in `DS:00F8`, and the resource-base far pointer in
+`DS:00FA..00FD`. It also tied a statically decoded command boundary to QEMU
+runtime state rather than relying only on whole-file plausibility.
+
+### Interpreter and operand readers
+
+Followed references to `DS:00FA` and inspected the parser region and its
+callers in Rizin. Saved the focused output as ignored research artifacts:
+
+```text
+build/analysis/bin-parser-region.txt
+build/analysis/bin-core-functions.txt
+build/analysis/bin-callers.txt
+```
+
+The static pass identified:
+
+- `0x3A1E`, which reads a byte from the far cursor and increments its offset.
+- `0x3A30`, which reads two bytes and constructs a little-endian word.
+- `0x3A64`, which normally advances through a NUL-terminated string and
+  returns its resource-base-relative starting offset. An initial `0xFF`
+  instead introduces an explicit 16-bit offset.
+- `0x451B`, the main interpreter. It installs `base + argument` as the cursor,
+  reads an opcode, subtracts one, checks the range through `0x91`, and uses a
+  145-entry near-pointer table at `0x59AB`.
+- `0x6631`, which appends `.BIN`, loads a scene resource, installs the base and
+  cursor, initializes thread/object state, and executes file offset zero.
+- `0x7997`, which resumes active scene threads by passing their saved offsets
+  to `0x451B`.
+
+Out-of-range bytes are consumed by the game's fallback path. The host decoder
+rejects them instead because treating arbitrary embedded data as executable
+commands would conceal region boundaries.
+
+Recovered the operand layout of each handler by following calls to the three
+readers and direct cursor adjustments. The compact schema is:
+
+```text
+B  unsigned byte
+H  little-endian 16-bit word
+z  NUL-terminated CP437 string
+9  opaque nine-byte animation record
+s  optional extra word when the preceding H is signed-negative
+```
+
+During the iterative decoder work, corrected several prototype mistakes:
+
+- An early schema string used uppercase `Z`, which the prototype did not
+  recognize as a string marker. Standardized strings on lowercase `z`.
+- The conditional instruction layout was temporarily written as `Bhs`; the
+  lowercase `h` was not a valid word marker. Corrected opcodes `0x11`, `0x12`,
+  and `0x17` through `0x1A` to `BHs`.
+- The initial resource count was reported internally as 60 because a quick
+  scan omitted two members. The archive-backed test enumerated 62, and all
+  documentation and totals now use that value.
+- The first `ROOM3.BIN` region test assumed its second code block continued to
+  EOF. It stopped at another invalid zero block at `0x1754`; inspection found
+  a 20-byte reserved region followed by a third command entry point at
+  `0x1768`.
+
+Reported the resulting structural milestone: all 145 dispatched opcodes have
+operand layouts, and 62 archived BIN resources cross-check against them, with
+two deliberate mixed code/data cases exposed explicitly.
+
+### Opcode meanings and corrected resource interpretation
+
+Cross-referenced handler callees, suffix-building functions, and script
+control flow. High-confidence meanings include art and palette loading,
+music selection, scene changes, timing, variable assignment/increment/
+decrement, jumps, calls, returns, state snapshots, and art unloading.
+
+The most important correction concerned strings such as `MTITLE` seen during
+the earlier graphics pass. They were initially described as a command plus a
+music name. Static analysis of `0x4001` showed it appends the suffix at
+`DS:0434`, which is `.PAL`, while `0x4091` separately constructs `MUS###` or
+`IBM###` XMI names. Checked the suffixes directly in the QEMU memory dump:
+
+```text
+DS:0434  .PAL
+DS:0490  .ART
+DS:0721  .BIN
+```
+
+Thus bytes `4D 54 49 54 4C 45 00` are opcode `0x4D` followed by string
+`TITLE`, not an embedded `MTITLE` music identifier. Both opcodes `0x4D` and
+`0x6D` invoke palette loading; opcode `0x52` selects music by numeric index.
+
+Decoded the startup streams completely. Their sizes and command counts are:
+
+```text
+LOGO.BIN    640 bytes    114 commands
+TITLE.BIN   436 bytes     80 commands
+INTRO.BIN   184 bytes     39 commands
+MENU.BIN  2,004 bytes     99 commands
+```
+
+`INTRO.BIN` begins with opcodes `6B 43`, `4C 0F`, palette command `4D
+"TITLE"`, and art command `01 "INTRO"`. It later issues music command `52
+01` and, at file offset `0x009A`, scene-change command `0D "dome" "seg"`.
+
+### Reproducible BIN inspection tool
+
+Added executable `tools/inspect_bin.py`. It contains the recovered schema for
+every opcode `0x01..0x91`, typed command/operand records, bounds checks,
+CP437-string decoding, conditional signed-word handling, and a command-line
+listing with file offsets. Known operations receive semantic names; other
+handlers deliberately remain `opcode_XX`.
+
+Added `tests/test_inspect_bin.py`. The tests read resources directly from
+`CB/DD1.DAT` and cover:
+
+- exactly 145 contiguous schema entries;
+- complete decoding and command counts for four startup programs;
+- the `INTRO.BIN` palette, art, and scene-change commands;
+- every known command region in all 62 BIN resources;
+- the signed-negative conditional extra word;
+- both zero-filled gaps and all three `ROOM3.BIN` code regions;
+- rejection of opcode-zero padding and unterminated strings.
+
+The first focused run was:
+
+```sh
+chmod +x tools/inspect_bin.py
+python3 -m py_compile tools/inspect_bin.py tests/test_inspect_bin.py
+python3 -m unittest -v tests.test_inspect_bin
+```
+
+All eight BIN tests passed. Whole-archive statistics from the validated
+regions are:
+
+```text
+62 BIN members
+179,200 expanded bytes
+64 command regions
+25,837 decoded commands
+122 distinct opcodes used
+```
+
+Sixty resources linearly decode through EOF. `CP2.BIN` has a command region
+through `0x1D5A` and a 251-byte structured trailer. `ROOM3.BIN` has command
+regions `0x0000..0x0336`, `0x0C96..0x1754`, and `0x1768..0x19DB`, separated
+by zero blocks of 2,400 and 20 bytes. Saved listings of the latter two regions
+as `build/analysis/room3-region2-bin.txt` and
+`build/analysis/room3-region3-bin.txt`.
+
+Exercised the user-facing decoder paths with:
+
+```sh
+tools/inspect_bin.py build/dd1/all/005_INTRO.BIN
+tools/inspect_bin.py \
+  build/dd1/all/334_ROOM3.BIN --start 0xc96 --limit 0x1754
+tools/inspect_bin.py \
+  build/dd1/all/334_ROOM3.BIN --start 0x1768
+```
+
+The first command reports all 39 commands and 184 bytes. The bounded ROOM3
+listings report 180 commands over 2,750 bytes and 122 commands over 627 bytes.
+Adjusted the summary line after this check so a nonzero `--start` reports the
+decoded byte count, plus its absolute range, rather than mislabeling the final
+file offset as a byte count.
+
+Recomputed the archive totals and repeated the QEMU pointer check with the
+self-contained Python snippets above. Then verified the new Rizin symbols:
+
+```sh
+rizin -q -b 16 -a x86 -e scr.color=false \
+  -i analysis/cb.rz \
+  -c 'afl~bin_; afl~palette_resource; afl~music_resource; afl~scene; q' \
+  build/analysis/CB_UNPACKED.EXE
+```
+
+Rizin listed all eight intended names at `0x3A1E`, `0x3A30`, `0x3A64`,
+`0x4001`, `0x4091`, `0x451B`, `0x6631`, and `0x7997`.
+
+During final review, noticed that the documented `0xFF` string-offset escape
+in `0x3A64` was not yet implemented in the host decoder because none of the
+linearly decoded regions exercised it. Added `string_offset` operand handling,
+displayed such references as `@0xNNNN`, and added a focused regression using
+`01 FF 34 12`. Updated the chapter's `z` schema to describe both encodings.
+
+### Scene-bytecode documentation
+
+Added `docs/src/scene-bytecode.md` and linked it from `SUMMARY.md`. The chapter
+documents the interpreter model, live data-segment state, operand notation,
+identified commands, startup sequence, mixed-content resources, inspection
+tool, and executable routines. Added a concise interpreter section and the
+new names to `static-analysis.md`.
+
+Updated `README.md` with decoder examples and the two resources that require
+explicit command-region bounds. Marked BIN scene-command recovery complete in
+`PLAN.md`. Also corrected segment:offset notation in the chapter to show the
+resource base as `4C13:0000` and live cursor as `4C13:004B`; the memory words
+are stored offset first because x86 is little-endian.
+
+### BIN-pass verification
+
+Ran the complete repository verification rather than only the focused BIN
+tests:
+
+```sh
+python3 -m unittest discover -s tests -v
+python3 -m py_compile tools/*.py tests/*.py
+bash -n run.sh tools/build_qemu_dos_trace.sh
+tools/inspect_bin.py --help > build/analysis/inspect-bin-help.txt
+tools/inspect_bin.py build/dd1/all/005_INTRO.BIN \
+  > build/analysis/intro-bin.txt
+rizin -q -b 16 -a x86 -e scr.color=false \
+  -i analysis/cb.rz \
+  -c 'afl~bin_; afl~palette_resource; afl~music_resource; afl~scene; q' \
+  build/analysis/CB_UNPACKED.EXE > build/analysis/bin-symbols.txt
+mdbook build docs
+test -f build/docs-book/scene-bytecode.html
+git diff --check
+git status --short
+git diff --stat
+```
+
+All 33 unit tests passed in 1.261 seconds before the explicit string-offset
+regression was added. Every Python source compiled and
+both shell scripts parsed. The decoder's help and full INTRO listing were
+written successfully, Rizin loaded all requested symbols, and mdBook produced
+`build/docs-book/scene-bytecode.html`. The tracked-source whitespace check
+passed. The graphics and BIN source changes remain uncommitted at this
+checkpoint.
+
+After adding the string-offset case, repeated the full test, compile, shell,
+decoder, Rizin, mdBook, generated-page, and whitespace checks. All 34 tests
+passed in 1.267 seconds. The direct probe decoded `01 FF 34 12` as a
+`load_art` operand of kind `string_offset`, value `0x1234`, and displayed it as
+`@0x1234`. Confirmed both new command-line tools retain executable file modes.

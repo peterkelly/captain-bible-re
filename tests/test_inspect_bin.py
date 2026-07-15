@@ -1,0 +1,114 @@
+from pathlib import Path
+import sys
+import unittest
+
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tools"))
+
+from extract_dd1 import DD1Archive  # noqa: E402
+from inspect_bin import (  # noqa: E402
+    BinFormatError,
+    OPCODE_SCHEMAS,
+    decode_command,
+    decode_stream,
+)
+
+
+class BinBytecodeTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.archive = DD1Archive.from_path(ROOT / "CB" / "DD1.DAT")
+        cls.bin_members = {
+            entry.filename: cls.archive.extract(entry)
+            for entry in cls.archive.entries
+            if entry.extension == "BIN"
+        }
+
+    @classmethod
+    def member(cls, filename):
+        entry = cls.archive.matching(filename)[0]
+        return cls.archive.extract(entry)
+
+    def test_has_layout_for_every_dispatched_opcode(self):
+        self.assertEqual(set(OPCODE_SCHEMAS), set(range(1, 0x92)))
+
+    def test_decodes_complete_startup_scripts(self):
+        expected = {
+            "LOGO.BIN": 114,
+            "TITLE.BIN": 80,
+            "INTRO.BIN": 39,
+            "MENU.BIN": 99,
+        }
+        for filename, count in expected.items():
+            with self.subTest(filename=filename):
+                data = self.member(filename)
+                commands = decode_stream(data)
+                self.assertEqual(len(commands), count)
+                self.assertEqual(commands[-1].end, len(data))
+
+    def test_intro_resource_and_scene_change_commands(self):
+        commands = decode_stream(self.member("INTRO.BIN"))
+        self.assertEqual(
+            (commands[2].opcode, commands[2].operands[0].value),
+            (0x4D, "TITLE"),
+        )
+        self.assertEqual(
+            (commands[3].opcode, commands[3].operands[0].value),
+            (0x01, "INTRO"),
+        )
+        scene_change = next(command for command in commands if command.opcode == 0x0D)
+        self.assertEqual(
+            tuple(operand.value for operand in scene_change.operands),
+            ("dome", "seg"),
+        )
+
+    def test_all_bin_command_regions_follow_recovered_layouts(self):
+        self.assertEqual(len(self.bin_members), 62)
+        mixed_resources = {"CP2.BIN", "ROOM3.BIN"}
+        for filename, data in self.bin_members.items():
+            if filename in mixed_resources:
+                continue
+            with self.subTest(filename=filename):
+                commands = decode_stream(data)
+                self.assertEqual(commands[-1].end, len(data))
+
+        cp2 = self.bin_members["CP2.BIN"]
+        commands = decode_stream(cp2, 0, 0x1D5A)
+        self.assertEqual(commands[-1].end, 0x1D5A)
+
+    def test_conditional_extra_word_after_negative_operand(self):
+        command = decode_command(bytes.fromhex("11 01 f8 ff e6 01"), 0)
+        self.assertEqual(command.end, 6)
+        self.assertEqual(
+            tuple(operand.value for operand in command.operands),
+            (1, 0xFFF8, 0x01E6),
+        )
+
+    def test_room3_command_regions_surround_reserved_zero_blocks(self):
+        data = self.member("ROOM3.BIN")
+        regions = ((0, 0x0336), (0x0C96, 0x1754), (0x1768, len(data)))
+        for start, limit in regions:
+            with self.subTest(start=start, limit=limit):
+                commands = decode_stream(data, start, limit)
+                self.assertEqual(commands[-1].end, limit)
+        self.assertEqual(data[0x0336:0x0C96], bytes(0x0960))
+        self.assertEqual(data[0x1754:0x1768], bytes(0x14))
+
+    def test_rejects_zero_padding_as_an_opcode(self):
+        with self.assertRaisesRegex(BinFormatError, "invalid BIN opcode"):
+            decode_command(bytes(1), 0)
+
+    def test_rejects_unterminated_string(self):
+        with self.assertRaisesRegex(BinFormatError, "unterminated string"):
+            decode_command(b"\x01INTRO", 0)
+
+    def test_decodes_explicit_string_offset_escape(self):
+        command = decode_command(bytes.fromhex("01 ff 34 12"), 0)
+        self.assertEqual(command.end, 4)
+        self.assertEqual(command.operands[0].kind, "string_offset")
+        self.assertEqual(command.operands[0].value, 0x1234)
+
+
+if __name__ == "__main__":
+    unittest.main()

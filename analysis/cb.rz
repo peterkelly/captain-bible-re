@@ -7,6 +7,14 @@ afn game_main @ 0x8a82
 afn set_cwd_from_executable_path @ 0x8a09
 afn parse_bible_translation_lock @ 0x89af
 afn initialize_hardware_and_data @ 0x3363
+afn bin_read_u8 @ 0x3a1e
+afn bin_read_u16 @ 0x3a30
+afn bin_read_cstring_offset @ 0x3a64
+afn load_palette_resource @ 0x4001
+afn play_music_resource @ 0x4091
+afn execute_bin_commands @ 0x451b
+afn initialize_scene @ 0x6631
+afn update_scene_threads @ 0x7997
 afn initialize_new_session @ 0x7d2b
 afn main_menu_and_game_loop @ 0x875d
 afn poll_input_event @ 0x7bed
@@ -34,6 +42,18 @@ afn archive_read_raw_member @ 0x9bef
 afn archive_refill_input @ 0x9c5f
 afn archive_decode_member @ 0x9ca4
 afn archive_expand_code @ 0x9d98
+
+af @ 0x9ff7
+afn vga_set_dac_entry @ 0x9ff7
+af @ 0xa017
+afn vga_load_palette_bios @ 0xa017
+afn vga_write_palette_range @ 0xa032
+afn blit_rect_to_vga @ 0xa0c9
+afn blit_rect_transparent_zero @ 0xa106
+afn blit_rect_opaque @ 0xa136
+afn update_palette_effect @ 0xb620
+af @ 0xb99c
+afn draw_art_frame_opaque @ 0xb99c
 
 afn libc_fclose @ 0xd0c2
 afn libc_fopen @ 0xd1ae

@@ -15,6 +15,7 @@ progress. See `PLAN.md` for the live task list and
 - mtools (`mformat`, `mcopy`, `mmd`, `mdir`, and `mtype`)
 - `unzip`
 - Python 3
+- Pillow (for `ART`/`PAL` rendering)
 - A C compiler, `pkg-config`, and GLib development headers for DOS tracing
 - A POSIX shell
 - mdBook (for the research book)
@@ -134,6 +135,45 @@ names remain distinct. The extractor validates the directory, payload magic,
 compressed stream, expanded size, and exact input consumption. Format details
 and the corresponding executable routines are in the mdBook's `DD1.DAT`
 chapter.
+
+## Rendering artwork
+
+Extracted `ART` resources contain 12-byte frame descriptors followed by
+row-major eight-bit pixels. Their colors come from separate 768-byte VGA
+`PAL` resources. Inspect or render them with:
+
+```sh
+tools/render_art.py build/dd1/all/003_LOGO.ART --list
+tools/render_art.py \
+  build/dd1/all/003_LOGO.ART \
+  --palette build/dd1/all/002_LOGO.PAL \
+  --canvas --scale 2 \
+  --output build/graphics/logo.png
+```
+
+The renderer can also write one frame with `--frame` or every frame with
+`--all-frames`. Palette index 0 is transparent by default for sprite previews;
+use `--opaque-zero` when reproducing an opaque draw. The mdBook graphics
+chapter documents the format and its byte-for-byte correlation with QEMU VGA
+memory.
+
+## Inspecting scene bytecode
+
+The 62 extracted `BIN` resources contain scene programs. The recovered
+decoder knows the operand layout of all 145 dispatched opcodes and assigns
+semantic names where static evidence is strong:
+
+```sh
+tools/inspect_bin.py build/dd1/all/005_INTRO.BIN
+tools/inspect_bin.py \
+  build/dd1/all/334_ROOM3.BIN --start 0x0c96 --limit 0x1754
+```
+
+Most resources are code from beginning to end. `CP2.BIN` has a data trailer,
+and `ROOM3.BIN` has three command regions separated by zero-filled reserved
+blocks, so those regions require explicit `--start` and `--limit` values. The
+mdBook scene-bytecode chapter describes the interpreter, command schema,
+startup sequence, QEMU memory correlation, and currently identified opcodes.
 
 ## QEMU DOS-call tracing
 
