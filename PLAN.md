@@ -23,7 +23,7 @@ This plan is a living checklist. Findings and commands are recorded in
 
 ## Phase 2: Static inventory and executable analysis
 
-- [ ] Record checksums, timestamps, formats, and sizes for every game file.
+- [x] Record checksums, timestamps, formats, and sizes for every game file.
 - [x] Identify the executable format, compiler/runtime, and memory model.
 - [x] Recover and independently verify the EXEPACK-compressed load module.
 - [x] Map the initial segments, entry points, strings, and DOS/BIOS services.
@@ -35,12 +35,16 @@ This plan is a living checklist. Findings and commands are recorded in
 
 - [x] Establish a repeatable QEMU memory-capture and debugging workflow.
 - [x] Capture and correlate a title-screen physical-memory snapshot.
+- [x] Build a QEMU TCG plugin for game-originated DOS interrupt tracing.
+- [x] Capture and interpret a startup-to-story-introduction DOS API trace.
 - [ ] Trace startup, file access, graphics, input, sound, and save operations.
 - [ ] Correlate runtime behavior with static functions and data structures.
 - [ ] Exercise major screens and gameplay systems while recording evidence.
 
 ## Phase 4: File formats and game systems
 
+- [x] Recover the `DD1.DAT` directory and named-resource layout.
+- [x] Implement and verify a reproducible `DD1.DAT` extractor.
 - [ ] Document data containers, compression, graphics, audio, and text formats.
 - [ ] Document save-game structures and player-name behavior.
 - [ ] Reconstruct maps, entities, conversations, combat, and progression logic.

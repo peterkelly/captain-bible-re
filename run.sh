@@ -13,13 +13,15 @@ PARTITION_OFFSET=1048576
 
 rebuild=false
 setup_only=false
+trace_dos=false
 
 usage() {
     printf '%s\n' \
-        'Usage: ./run.sh [--rebuild] [--setup-only]' \
+        'Usage: ./run.sh [--rebuild] [--setup-only] [--trace-dos]' \
         '' \
         '  --rebuild     Recreate the play image from the current CB directory.' \
-        '  --setup-only  Prepare images without starting QEMU.'
+        '  --setup-only  Prepare images without starting QEMU.' \
+        '  --trace-dos   Trace game DOS calls and enable a monitor socket.'
 }
 
 while (($#)); do
@@ -29,6 +31,9 @@ while (($#)); do
             ;;
         --setup-only)
             setup_only=true
+            ;;
+        --trace-dos)
+            trace_dos=true
             ;;
         -h|--help)
             usage
@@ -117,9 +122,15 @@ require_command qemu-system-i386
 printf 'QEMU disk: %s\n' "$PLAY_IMAGE"
 printf 'Game inside FreeDOS: C:\\%s\\CB.EXE\n' "$GAME_DOS_DIR"
 
+tcg_options=tcg
+if [[ "$trace_dos" == true ]]; then
+    tcg_options=tcg,one-insn-per-tb=on
+fi
+
 qemu_args=(
     -name "Captain Bible"
-    -machine pc,accel=tcg
+    -machine pc
+    -accel "$tcg_options"
     -cpu pentium
     -m 16
     -boot c
@@ -127,9 +138,25 @@ qemu_args=(
     -vga std
 )
 
+if [[ "$trace_dos" == true ]]; then
+    trace_dir="$ROOT_DIR/build/qemu-trace"
+    trace_plugin="$trace_dir/qemu_dos_trace.so"
+    trace_log="$trace_dir/dos-calls.log"
+    trace_monitor="$trace_dir/monitor.sock"
+
+    "$ROOT_DIR/tools/build_qemu_dos_trace.sh" "$trace_plugin"
+    rm -f "$trace_monitor"
+    qemu_args+=(
+        -plugin "$trace_plugin,log=$trace_log,cs=0x627,start=0xCB5C"
+        -monitor "unix:$trace_monitor,server=on,wait=off"
+    )
+    printf 'DOS trace: %s\n' "$trace_log"
+    printf 'QEMU monitor: %s\n' "$trace_monitor"
+fi
+
 if [[ "$(uname -s)" == Darwin ]]; then
     qemu_args+=(
-        -audiodev coreaudio,id=audio0
+        -audiodev none,id=audio0
         -device sb16,audiodev=audio0
         -device adlib,audiodev=audio0
         -display cocoa,zoom-to-fit=on

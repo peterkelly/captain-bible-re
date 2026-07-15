@@ -15,6 +15,7 @@ progress. See `PLAN.md` for the live task list and
 - mtools (`mformat`, `mcopy`, `mmd`, `mdir`, and `mtype`)
 - `unzip`
 - Python 3
+- A C compiler, `pkg-config`, and GLib development headers for DOS tracing
 - A POSIX shell
 - mdBook (for the research book)
 - Rizin (for the supplied symbol script and further disassembly)
@@ -40,6 +41,10 @@ the host image filename and the guest path `C:\CBDOME\CB.EXE`.
 The game supports both mouse and keyboard input. If QEMU captures the pointer,
 use Control-Option-G to release it on macOS. Exit through the game's Escape
 menu before closing QEMU so pending save writes complete cleanly.
+
+QEMU still presents Sound Blaster 16 and AdLib hardware to the game, but uses
+the silent `none` audio backend. The Cocoa window remains visible while game
+audio is suppressed on the host.
 
 To prepare or check the images without opening QEMU:
 
@@ -109,6 +114,46 @@ rizin -b 16 -i analysis/cb.rz build/analysis/CB_UNPACKED.EXE
 The generated executable and memory dumps remain under ignored `build/`.
 Research results, address conventions, function names, command-line behavior,
 and the recovered save layout are in the mdBook source.
+
+## Extracting `DD1.DAT`
+
+The main resource archive has a recovered 24-byte directory format and custom
+LZW-family compression. List or extract its 369 members with:
+
+```sh
+tools/extract_dd1.py --list CB/DD1.DAT
+tools/extract_dd1.py \
+  --extract RUN.ART \
+  --output build/dd1/RUN.ART \
+  CB/DD1.DAT
+tools/extract_dd1.py --extract-all build/dd1/all CB/DD1.DAT
+```
+
+All-member output is prefixed with each directory index so repeated archive
+names remain distinct. The extractor validates the directory, payload magic,
+compressed stream, expanded size, and exact input consumption. Format details
+and the corresponding executable routines are in the mdBook's `DD1.DAT`
+chapter.
+
+## QEMU DOS-call tracing
+
+Run the game with the QEMU TCG tracer and monitor socket enabled:
+
+```sh
+./run.sh --trace-dos
+```
+
+The Cocoa window stays visible and host audio remains muted. Trace mode uses
+one guest instruction per TCG translation block so register values can be
+sampled at DOS interrupt boundaries; it is consequently slower than a normal
+run. The generated plugin, trace, monitor socket, screenshots, and memory
+dumps are kept under the ignored `build/qemu-trace/` directory.
+
+The trace activates at the reconstructed entry point `0627:CB5C` and records
+only `int 21h` calls from code segment `0627`. These addresses are stable for
+the current deterministic FreeDOS image. If the DOS environment or boot
+configuration changes, re-establish the load segment before relying on the
+filter.
 
 ## Documentation
 

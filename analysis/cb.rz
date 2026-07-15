@@ -12,6 +12,7 @@ afn main_menu_and_game_loop @ 0x875d
 afn poll_input_event @ 0x7bed
 afn export_game_text @ 0x5f92
 afn load_art_resource @ 0xb818
+afn load_file_into_far_memory @ 0xacda
 
 afn copy_live_state_to_save_buffers @ 0x7d8e
 afn copy_save_buffers_to_live_state @ 0x7e41
@@ -27,6 +28,13 @@ afn update_mouse_state @ 0x8d79
 afn detect_mouse @ 0x8e0a
 afn detect_video_adapter @ 0x90d4
 
+afn archive_load_member @ 0x97d0
+afn archive_lookup_member @ 0x99ab
+afn archive_read_raw_member @ 0x9bef
+afn archive_refill_input @ 0x9c5f
+afn archive_decode_member @ 0x9ca4
+afn archive_expand_code @ 0x9d98
+
 afn libc_fclose @ 0xd0c2
 afn libc_fopen @ 0xd1ae
 afn libc_fread @ 0xd1d6
@@ -37,6 +45,11 @@ afn libc_tolower @ 0xe302
 afn libc_toupper @ 0xe31a
 afn libc_puts @ 0xe772
 afn libc_chdir @ 0xe993
+afn libc_lowio_close @ 0xda82
+afn libc_lowio_seek @ 0xdaa2
+afn libc_lowio_open @ 0xdb1c
+afn libc_lowio_read @ 0xdcc0
+afn libc_lowio_write @ 0xdd9e
 
 f str_microsoft_runtime 0x38 @ 0xeba8
 f str_vga_not_detected 0x1e @ 0xef64

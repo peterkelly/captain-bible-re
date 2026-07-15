@@ -830,3 +830,479 @@ before committing it. Confirmed that the new analyzer, regression tests,
 Rizin symbols, executable notes, static-analysis report, and project status
 updates belong to this phase of the investigation. The verification results
 above establish the commit as a reproducible analysis baseline.
+
+## 2026-07-15: Dynamic DOS-call tracing
+
+The user asked to continue after commit `86bb979`. Reported that the next
+step would build on the verified EXEPACK/QEMU baseline by capturing a more
+useful runtime snapshot and correlating it with the static function map.
+
+Inspected `AGENTS.md`, `PLAN.md`, `README.md`, `run.sh`, the executable and
+static-analysis chapters, and the existing files under `build/analysis/` and
+`build/dumps/`. Confirmed that the worktree was clean, the current play path
+still uses the required visible `-display cocoa,zoom-to-fit=on`, and the title
+snapshot is present.
+
+Checked the installed dynamic-analysis interfaces with:
+
+```sh
+command -v qemu-system-i386 rizin rz-bin gdb lldb nc socat \
+  mtools mcopy mdir
+qemu-system-i386 --version
+qemu-system-i386 -plugin help
+find /opt/homebrew /usr/local -path '*qemu-plugin.h' \
+  -o -path '*libexeclog*'
+qemu-system-i386 -d help
+rg -n 'read_register|read_memory|vcpu_insn_exec' \
+  /opt/homebrew/include/qemu-plugin.h
+sed -n '1,1260p' /opt/homebrew/include/qemu-plugin.h
+```
+
+QEMU 11.0.2 includes plugin API version 6, an installed
+`qemu-plugin.h`, instruction callbacks, register access, and physical-memory
+reads. The host has LLDB but not GDB. Chose a TCG plugin as the next tracing
+method because it can observe each `int 21h` at its exact game address, read
+the DOS call registers and pathname from guest memory, and leave `CB.EXE`
+unchanged. Added the plugin and trace-capture steps to `PLAN.md`.
+
+The user asked that QEMU remain visible but stop playing audio. Changed the
+macOS QEMU audio backend in `run.sh` from `coreaudio` to `none`, while retaining
+the emulated Sound Blaster 16 and AdLib devices. This keeps the guest hardware
+paths available for analysis without producing host sound. Documented the
+behavior in `README.md`; it applies to normal and traced launches.
+
+### Building the TCG tracer
+
+Added `tools/qemu_dos_trace.c`, `tools/build_qemu_dos_trace.sh`, and the
+`--trace-dos` option to `run.sh`. The plugin recognizes executed `CD 21`
+instructions, reads the i386 register descriptors and guest physical memory,
+escapes DOS pathname strings, pairs calls with their returns, and writes an
+ignored log under `build/qemu-trace/`. Trace mode also creates a QEMU monitor
+socket so screen, memory, and register evidence can be captured while the
+Cocoa window remains visible.
+
+Ran:
+
+```sh
+chmod +x tools/build_qemu_dos_trace.sh
+bash -n run.sh tools/build_qemu_dos_trace.sh
+tools/build_qemu_dos_trace.sh
+file build/qemu-trace/qemu_dos_trace.so
+git diff --check
+```
+
+The plugin compiled without warnings as a native arm64 Mach-O bundle. Both
+shell scripts parsed successfully and the Git whitespace check passed.
+
+Launched the first visible trace with `./run.sh --trace-dos`. After allowing
+FreeDOS and the game to start, inspected `dos-calls.log`, connected to the
+monitor socket with `nc -U`, stopped the guest, recorded `info registers`,
+used `screendump`, saved the first MiB with `pmemsave`, and quit QEMU. The
+first screen capture showed the opening Captain Bible conversation. QEMU had
+captured hundreds of paired interrupt sites, but every apparent AH value was
+zero.
+
+Compared those sites with Rizin disassembly. For example, load offset
+`0x9908` is an `int 21h` immediately after `mov ah,49h`, proving that the
+initial zero was a tracing artifact rather than the executed function. Normal
+instruction callbacks exposed register state from the translation-block
+entry. Added `-accel tcg,one-insn-per-tb=on` for traced runs and moved register
+sampling to translation-block entry callbacks. Normal `./run.sh` execution
+remains unrestricted.
+
+The one-instruction mode fixed PC and the other argument registers, but QEMU
+11.0.2's plugin accessor continued to report only EAX as zero. Tested both
+the synchronous-exception callback and retaining the register-descriptor
+array for the entire VM lifetime; neither changed EAX. Removed the misleading
+AX values from output. The final implementation reads up to 48 preceding code
+bytes and derives the DOS function from the nearest `MOV AH,imm8` or
+`MOV AX,imm16`. It preserves the directly observed BX, CX, DX, SI, DI, DS,
+ES, and returned carry flag, and states the AX limitation in the trace header
+and dynamic-analysis chapter.
+
+An early trace also contained calls from a FreeDOS program that temporarily
+used segment `0627` before `CB.EXE` loaded. Added the `start=0xCB5C` plugin
+option and configured `run.sh` to keep tracing dormant until physical address
+`0627:CB5C` executes. The log now begins with the game's real startup calls:
+DOS version `30h`, memory resize `4Ah`, interrupt-vector setup, and handle
+IOCTL calls.
+
+### Startup trace and memory capture
+
+Repeated the visible, silent QEMU run after each timing/filter correction.
+For the final run, polled the log until call 195, then issued these monitor
+operations:
+
+```text
+stop
+info registers
+screendump build/qemu-trace/startup-screen.ppm
+pmemsave 0 1048576 build/qemu-trace/startup-physical-1m.bin
+quit
+```
+
+Converted the PPM to PNG with `sips` and visually inspected it. The screen is
+the first story narration, beginning “There once was a city far from us in
+place and time.” The stopped registers were `CS:IP=0627:C668`,
+`DS=ES=SS=14E1`, `FS=0617`, and `GS=04C7`. These segment values reproduce the
+earlier title-screen capture.
+
+The final trace has exactly 195 `CALL`/`RET` pairs, no unresolved `fn=FF`
+records, and no `CF=1` returns. Function counts include 78 reads, 27 seeks,
+16 allocations, 15 IOCTL calls, 11 opens, 10 attribute queries, nine closes,
+six resizes, and six frees. Its SHA-256 is
+`f8013fb529444c409a6309a5bbc57336d674382f4e20dcde9185a4d67658e3c9`.
+The memory dump SHA-256 is
+`7fee3fdda30db225711d0db84d1f292efb9b087c4a91deb2e035025cd31bf71e`;
+the PNG SHA-256 is
+`85a46bbf6345d5cd88393596706ded3daadbbe0ecb9853cdd0bcecf610077c79`.
+
+Ran the existing EXEPACK analyzer against the new memory dump:
+
+```sh
+tools/analyze_cb_exe.py CB/CB.EXE \
+  --output build/analysis/CB_UNPACKED.EXE \
+  --memory-dump build/qemu-trace/startup-physical-1m.bin \
+  --load-segment 0x627 \
+  > build/qemu-trace/memory-comparison.txt
+```
+
+It again found a `0x905A`-byte identical prefix and 5,612 differing runtime
+bytes across the full 75,264-byte load module. This exactly matches the first
+title-screen comparison and independently validates the new capture's process
+location.
+
+### Runtime file findings
+
+Extracted the path timeline with `rg '^CALL.*arg='`. The trace changes to
+`C:\CBDOME`, reads `SOUND.5`, loads `SOUND.1` through `SOUND.4`, probes and
+reopens `DD1.DAT`, reads `DDGAMES.SV0`, loads `DDLC` twice, and reads the save
+index again before the story introduction. Every recorded path operation has
+carry clear.
+
+Correlated the sound calls with `stat`, `xxd`, `file`, `strings`,
+`SETSOUND.BAT`, `MANUAL.TXT`, and the disassembly of
+`initialize_hardware_and_data`. `SOUND.1` is the configured DIGPAK Sound
+Blaster 16 `soundrv.com`; `SOUND.2` is Miles Design `midpak.adv`; `SOUND.3`
+is `tmidpak.com`; and `SOUND.4` is `midpak.ad` timbre data. The trace shows
+that the generic loader at `0xACDA` measures each file, requests its size
+rounded up to a DOS paragraph, reads it, and closes it. The observed
+allocations are `012Eh`, `03F9h`, `0340h`, and `00E3h`, exactly matching the
+four rounded file sizes.
+
+Disassembly shows that four-byte `SOUND.5` is the installation-lock record,
+not a driver selector. Its word at offset 0 controls the Bible translation;
+byte 2 forces no-mature mode unless it is `DBh`; byte 3 is ORed into the
+no-combat flag. The supplied `01 00 00 00` selects translation value 1,
+forces no-mature mode, and leaves combat unrestricted. This behavior also
+explains how the installation locks combine with `-b`, `-t`, and `-c`.
+
+The trace opens `DD1.DAT` as persistent DOS handle 5, then seeks and reads
+resources through that handle. It never opens the static `RUN.ART` name as a
+DOS path, establishing that names used by `load_art_resource` are members of
+the `DD1.DAT` container. `DDLC` is different: it is opened directly twice.
+
+### Inventory and documentation
+
+Ran `stat`, `shasum -a 256`, and `file` over every supplied file except host
+`.DS_Store`. All distributed files share timestamp
+`1996-12-24 23:32:00 +0700`. Recorded every size and SHA-256 in the new file
+inventory chapter. Noted that `file`'s “Arhangel archive” guess for `DDLE` is
+only a heuristic and that `DDGAMES.SV6` and `DDGAMES.SV8` are byte-identical.
+
+Added `dynamic-analysis.md` and `file-inventory.md`, updated the mdBook
+summary and introduction, expanded the static-analysis sound findings,
+documented `--trace-dos` in `README.md`, and marked the inventory and startup
+trace tasks complete in `PLAN.md`. Added high-confidence Rizin names for the
+far-memory file loader and Microsoft C low-level open, read, write, seek, and
+close routines.
+
+### Dynamic-pass verification
+
+Ran:
+
+```sh
+python3 -m unittest discover -s tests -v
+python3 -m py_compile \
+  tools/analyze_cb_exe.py tests/test_analyze_cb_exe.py
+bash -n run.sh tools/build_qemu_dos_trace.sh
+tools/build_qemu_dos_trace.sh
+./run.sh --help
+rizin -q -b 16 -a x86 -e scr.color=false \
+  -i analysis/cb.rz \
+  -c 'afl~lowio; afl~far_memory; q' \
+  build/analysis/CB_UNPACKED.EXE
+mdbook build docs
+test -f build/docs-book/dynamic-analysis.html
+test -f build/docs-book/file-inventory.html
+git diff --check
+git status --short
+git diff --stat
+```
+
+All 12 Python tests passed, both Python analysis files compiled, both shell
+scripts parsed, and the C plugin rebuilt without compiler warnings. The
+launcher help exposes `--trace-dos`; Rizin loaded all five low-level I/O names
+and `load_file_into_far_memory`; mdBook 0.5.3 built both new chapters; and the
+Git whitespace check passed. Generated plugins, traces, screenshots, memory
+dumps, reports, and book output remain ignored under `build/`.
+
+## 2026-07-15: `DD1.DAT` resource format
+
+After verifying the dynamic pass, reported that work would continue into the
+main resource container rather than stop at the trace. Chose `DD1.DAT` because
+QEMU established it as the persistent handle used for named resource seeks,
+while static analysis identified `load_art_resource` and the member name
+`RUN.ART`. Added explicit directory-recovery and extractor tasks to `PLAN.md`.
+
+### Directory reconstruction
+
+Inspected the beginning and end of the archive, searched its strings, compared
+QEMU's handle-5 seeks with archive offsets, and disassembled the code around
+the resource loader. The investigation used `xxd`, `strings`, `rg`, Rizin, and
+small read-only Python parsers. Representative commands were:
+
+```sh
+stat -f 'size=%z bytes' CB/DD1.DAT
+shasum -a 256 CB/DD1.DAT
+xxd -g 1 -l 512 CB/DD1.DAT
+xxd -g 1 -s -256 CB/DD1.DAT
+strings -a -t x CB/DD1.DAT | head
+rg 'RUN\.ART|LOGO\.BIN' build/qemu-trace/dos-calls.log
+rizin -q -b 16 -a x86 -e scr.color=false \
+  build/analysis/CB_UNPACKED.EXE
+```
+
+The first word is `0x0171`, or 369. Parsing the following bytes as 24-byte
+records produced printable names, markers 0 or 1, monotonic offsets, expanded
+sizes, and stored sizes. The implied directory length,
+`2 + 369 * 24 = 0x229A`, is exactly the first payload offset. A Python
+invariant pass confirmed that every payload begins at the preceding payload's
+end and that the last ends at file size `0x1C7954`. All 369 payloads begin
+with `GC`.
+
+Correlated individual records with runtime and static evidence. Directory
+index 1 is `LOGO.BIN`, offset `0x24DA`, stored size 431, and expanded size
+640. Those are the same seek and size values in the QEMU startup trace.
+Index 82 is `RUN.ART`, offset `0x6F69C`, stored size 16,138, and expanded size
+53,213. This establishes the static `RUN.ART` string as a container member,
+consistent with the absence of a DOS pathname open.
+
+Counted 38 marker-0 records and 331 marker-1 records. Marker 0 always has
+`stored_size = expanded_size + 2`, identifying it as an uncompressed body
+after `GC`. The extension counts are 143 `ART`, 62 `BIN`, 41 `ABT`, 37 `PAL`,
+33 without extensions, 32 `XMI`, and 21 `MAP`. The three duplicate names are
+`GANTRY.PAL`, `HOLEA.ART`, and `NG`.
+
+### Loader and compression disassembly
+
+Followed calls from the art loader and saved a focused disassembly with:
+
+```sh
+rizin -q -b 16 -a x86 -e scr.color=false -e asm.bytes=false \
+  -i analysis/cb.rz \
+  -c 's 0x97d0; pdf; s 0x99ab; pdf; s 0x9bef; pdf; \
+s 0x9ca4; pdf; s 0x9d98; pdf; q' \
+  build/analysis/CB_UNPACKED.EXE \
+  > build/analysis/dd1-functions.txt
+```
+
+The routine at `0x99AB` mutates the requested name to uppercase, splits it at
+the dot, scans the memory-resident directory in `0x18`-byte increments, seeks
+to the record's 32-bit offset, reads two bytes, and compares them with little-
+endian word `0x4347` (`GC`). The caller at `0x97D0` branches on the record
+marker: `0x9BEF` copies raw data and `0x9CA4` expands compressed data.
+`0x9C5F` refills the input buffer, while `0x9D98` recursively walks the
+decoder's prefix table and writes suffix bytes.
+
+Reconstructed the compressed code stream in a temporary Python decoder. The
+format uses literal roots 0 through 255 and grows through code `0x1000`. For
+each group of eight codes, it puts one to four bytes containing the high-bit
+planes before the eight low bytes. Each plane byte is consumed least-
+significant bit first across the group. When the counter reaches `0x1001`,
+the decoder begins a new dictionary pass with a literal; there is no clear
+code in the stream.
+
+The first temporary implementation expanded all 331 compressed members to
+their declared lengths and consumed every stored byte. That established the
+bit-plane boundaries but was not yet sufficient evidence that every output
+byte matched the executable's prefix/suffix update order.
+
+### Reproducible extractor
+
+Added executable `tools/extract_dd1.py` and
+`tests/test_extract_dd1.py`. The tool validates the complete directory and
+payload layout, lists members, extracts by unique name or numeric index, and
+extracts every member with an index prefix so duplicates cannot overwrite one
+another. It checks compressed stream bounds and exact consumption in addition
+to expanded size.
+
+The first tool check ran:
+
+```sh
+git status --short
+chmod +x tools/extract_dd1.py
+python3 -m py_compile tools/extract_dd1.py tests/test_extract_dd1.py
+python3 -m unittest -v tests.test_extract_dd1
+```
+
+Three structural tests and the all-members length test passed. The initial
+`RUN.ART` checksum fixture failed because it had not been independently tied
+to the newly written decoder. Extracted `RUN.ART` and `LOGO.BIN`, inspected
+their first 64 bytes, then exercised the all-members mode and computed archive
+statistics:
+
+```sh
+mkdir -p build/dd1
+tools/extract_dd1.py --extract RUN.ART \
+  --output build/dd1/RUN.ART CB/DD1.DAT
+tools/extract_dd1.py --extract LOGO.BIN \
+  --output build/dd1/LOGO.BIN CB/DD1.DAT
+shasum -a 256 build/dd1/RUN.ART build/dd1/LOGO.BIN
+wc -c build/dd1/RUN.ART build/dd1/LOGO.BIN
+xxd -l 64 build/dd1/RUN.ART
+xxd -l 64 build/dd1/LOGO.BIN
+rm -rf build/dd1/all
+tools/extract_dd1.py --extract-all build/dd1/all CB/DD1.DAT
+find build/dd1/all -type f | wc -l
+du -sh build/dd1/all
+```
+
+All 369 files were present. Raw entries contain 203,303 expanded bytes and
+203,379 stored bytes; compressed entries contain 5,340,520 expanded bytes and
+1,653,831 stored bytes. Total expanded content is 5,543,823 bytes. A separate
+checksum and `cmp` pass established that both instances of each of the three
+duplicate names have identical content.
+
+Re-read the decoder instructions one by one before accepting those bytes. At
+`0x9CF8`, the first literal becomes prefix entry `0x100`. Before each later
+expansion, `0x9D87` saves the current code at prefix index `BP`, while the leaf
+case at `0x9DDE` writes the phrase's first byte at suffix index `BP - 1`.
+This offset is essential to the usual LZW case where a code refers to the
+entry currently being completed. The temporary/tool implementation had put
+that suffix at `BP`; output lengths and stream consumption could not reveal
+the error.
+
+Reported this correction immediately, wrote a second inline decoder matching
+the assembly order, and compared it byte-for-byte with the first output. The
+first difference was byte 10 of `LOGO.BIN` and byte 24 of `RUN.ART`. The exact
+decoder still expanded all 369 records to the declared sizes and consumed all
+stored input. Corrected `decode_gc_dictionary`, added fixed checksums for both
+resources, and reran:
+
+```sh
+python3 -m py_compile tools/extract_dd1.py tests/test_extract_dd1.py
+python3 -m unittest -v tests.test_extract_dd1
+rm -rf build/dd1/all
+tools/extract_dd1.py --extract-all build/dd1/all CB/DD1.DAT
+tools/extract_dd1.py --extract RUN.ART \
+  --output build/dd1/RUN.ART CB/DD1.DAT
+tools/extract_dd1.py --extract LOGO.BIN \
+  --output build/dd1/LOGO.BIN CB/DD1.DAT
+shasum -a 256 build/dd1/RUN.ART build/dd1/LOGO.BIN
+wc -c build/dd1/RUN.ART build/dd1/LOGO.BIN
+xxd -l 64 build/dd1/RUN.ART
+xxd -l 64 build/dd1/LOGO.BIN
+find build/dd1/all -type f | wc -l
+```
+
+All five focused tests passed. The final `RUN.ART` output is 53,213 bytes with
+SHA-256
+`c4b00d2e31e9dec81cc419dc577086b143a546a4a0b618dbe5600df4e5fd4ac0`;
+`LOGO.BIN` is 640 bytes with SHA-256
+`8580d3ff93c6e775aa71334c50762ffde2b1f42a320ee362f5608bd8cbc51424`.
+
+Added the dedicated `DD1.DAT` book chapter, extractor usage to `README.md`,
+the six archive functions to `analysis/cb.rz` and the static function map, and
+marked directory recovery and extractor implementation complete in
+`PLAN.md`. Reported that the extractor had passed the full container and that
+the recovered format was being made reproducible in the documentation.
+
+### DD1 and dynamic-pass verification
+
+Ran the complete repository checks after the extractor and documentation
+changes:
+
+```sh
+python3 -m unittest discover -s tests -v
+python3 -m py_compile tools/*.py tests/*.py
+bash -n run.sh tools/build_qemu_dos_trace.sh
+tools/build_qemu_dos_trace.sh
+./run.sh --help
+tools/extract_dd1.py --list CB/DD1.DAT > build/dd1/list.txt
+test "$(wc -l < build/dd1/list.txt | tr -d ' ')" = 370
+tools/analyze_cb_exe.py CB/CB.EXE \
+  --output build/analysis/CB_UNPACKED.EXE \
+  --memory-dump build/qemu-trace/startup-physical-1m.bin \
+  --load-segment 0x627 \
+  > build/dd1/analyzer-check.txt
+rizin -q -b 16 -a x86 -e scr.color=false \
+  -i analysis/cb.rz \
+  -c 'afl~archive_; q' \
+  build/analysis/CB_UNPACKED.EXE \
+  > build/dd1/symbol-check.txt
+mdbook build docs
+test -f build/docs-book/dd1-container.html
+git diff --check
+git status --short
+git diff --stat
+```
+
+All 17 tests passed, all Python sources compiled, both shell scripts parsed,
+and the QEMU plugin rebuilt without warnings. The list has one heading plus
+369 records. The EXEPACK analyzer again reported the verified load module,
+`0x905A`-byte identical memory prefix, and 5,612 dynamic differences. Rizin
+loaded all six archive names at their intended offsets. mdBook generated the
+new chapter, and the Git whitespace check passed. All generated extraction,
+analysis, trace, and book artifacts remain under ignored `build/`; no commit
+was requested or made.
+
+After adding that verification record, rebuilt the book once more, checked
+tracked and untracked source files for whitespace errors, and confirmed that
+`run.sh`, `tools/build_qemu_dos_trace.sh`, and `tools/extract_dd1.py` all retain
+executable mode. The final checks passed.
+
+## 2026-07-15: Dynamic-analysis commit preparation
+
+The user requested a commit. Reviewed the complete tracked and untracked
+change set to ensure it contains only the visible/silent QEMU launcher, DOS
+tracer, startup evidence and inventory, `DD1.DAT` extractor and tests, symbol
+map additions, book chapters, and associated plan, README, and progress-log
+updates. Generated traces, dumps, extracted resources, plugin binaries, and
+rendered documentation remain ignored under `build/`.
+
+Repeated the pre-commit verification with:
+
+```sh
+python3 -m unittest discover -s tests -v
+python3 -m py_compile tools/*.py tests/*.py
+bash -n run.sh tools/build_qemu_dos_trace.sh
+tools/build_qemu_dos_trace.sh
+./run.sh --help
+rm -rf build/dd1/commit-check
+tools/extract_dd1.py --extract-all build/dd1/commit-check CB/DD1.DAT
+test "$(find build/dd1/commit-check -type f | wc -l | tr -d ' ')" = 369
+tools/analyze_cb_exe.py CB/CB.EXE \
+  --output build/analysis/CB_UNPACKED.EXE \
+  --memory-dump build/qemu-trace/startup-physical-1m.bin \
+  --load-segment 0x627 \
+  > build/dd1/commit-analyzer-check.txt
+rizin -q -b 16 -a x86 -e scr.color=false \
+  -i analysis/cb.rz \
+  -c 'afl~archive_; afl~lowio_; q' \
+  build/analysis/CB_UNPACKED.EXE \
+  > build/dd1/commit-symbol-check.txt
+mdbook build docs
+test -f build/docs-book/dynamic-analysis.html
+test -f build/docs-book/file-inventory.html
+test -f build/docs-book/dd1-container.html
+git diff --check
+```
+
+All 17 unit tests passed, all Python files compiled, both shell scripts parsed,
+the QEMU plugin rebuilt without warnings, and the launcher exposed trace mode.
+The extractor produced exactly 369 outputs. The analyzer reproduced the
+verified executable and memory comparison, Rizin loaded all archive and
+low-level I/O names, mdBook rendered the three new chapters, and the Git
+whitespace check passed. Prepared one commit with an imperative subject and a
+detailed, 72-column-wrapped explanation of the tracing and extraction work.

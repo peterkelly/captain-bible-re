@@ -11,9 +11,9 @@ inferences. Commands and their important results are preserved in the
 
 ## Current scope
 
-The playable QEMU environment is complete. The current milestone is static
-analysis of `CB.EXE`, assisted by QEMU memory snapshots where runtime evidence
-is needed to recover the original post-decompression image. The initial pass
-has identified the packer and run time, reconstructed the executable, mapped
-startup and major support routines, and recovered the command-line, export,
-input, and save paths.
+The playable QEMU environment is complete. Static analysis has identified the
+packer and run time, reconstructed the executable, mapped startup and major
+support routines, and recovered the command-line, export, input, and save
+paths. Dynamic analysis now uses a QEMU TCG plugin to trace game-originated
+DOS calls without modifying `CB.EXE`, correlating file activity and runtime
+addresses with the reconstructed program.

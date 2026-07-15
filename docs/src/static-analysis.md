@@ -129,6 +129,50 @@ interrupt `66h`. Sound data and XMI filenames indicate that the driver layer
 will require a separate focused pass before its entry points can be named with
 the same confidence.
 
+## Installation lock file and sound drivers
+
+Startup reads all four bytes of `SOUND.5` into a local structure. The fields
+are installation policy rather than sound-hardware selection:
+
+| Offset | Size | Use |
+|---:|---:|---|
+| `0` | 2 | Bible-translation lock, applied only when no command-line lock was supplied; `0070h` means unlocked. |
+| `2` | 1 | Mature-topic marker; only `DBh` permits mature topics, otherwise the no-mature flag is forced. |
+| `3` | 1 | Value ORed into the no-combat flag. |
+
+The supplied file is `01 00 00 00`: translation value 1, forced no-mature
+mode, and no installation-level combat restriction. This also explains why
+`-b`, `-t`, and `-c` cannot relax installation locks: startup preserves an
+already selected command-line translation and ORs the two restriction flags.
+
+The following four files are independent driver components loaded into far
+memory. `SETSOUND.BAT` records their original configured names:
+
+| Installed file | Original name | Identification |
+|---|---|---|
+| `SOUND.1` | `soundrv.com` | DIGPAK Sound Blaster 16 digital driver, Audio Solution 3.40 |
+| `SOUND.2` | `midpak.adv` | Miles Design Sound Blaster Pro FM music driver |
+| `SOUND.3` | `tmidpak.com` | MIDPAK resident music package, Audio Solution 3.0 |
+| `SOUND.4` | `midpak.ad` | MIDPAK timbre/instrument data |
+
+The dynamic trace confirms that `load_file_into_far_memory` at `0xACDA`
+opens each file, measures it with seek calls, allocates its paragraph-rounded
+size, reads it in chunks, and closes it.
+
+## Main resource archive
+
+The lookup routine at `0x99AB` uppercases the requested base name and
+extension, scans an in-memory table in 24-byte steps, seeks the persistent
+`DD1.DAT` handle to the record's 32-bit offset, and verifies the two-byte `GC`
+payload signature. The loader at `0x97D0` then selects either the raw far-copy
+path at `0x9BEF` or the dictionary decoder at `0x9CA4` from the record marker.
+
+The latter initializes 256 literal dictionary entries, reconstructs codes
+from groups of low bytes plus high-bit plane bytes, and expands prefix/suffix
+chains through `0x9D98`. Static reconstruction plus extraction of every
+declared member establishes the full directory and compression format; see
+the dedicated `DD1.DAT` chapter.
+
 ## High-confidence function map
 
 | Load offset | Name |
@@ -147,6 +191,13 @@ the same confidence.
 | `0x8D79` | `update_mouse_state` |
 | `0x8E0A` | `detect_mouse` |
 | `0x90D4` | `detect_video_adapter` |
+| `0x97D0` | `archive_load_member` |
+| `0x99AB` | `archive_lookup_member` |
+| `0x9BEF` | `archive_read_raw_member` |
+| `0x9C5F` | `archive_refill_input` |
+| `0x9CA4` | `archive_decode_member` |
+| `0x9D98` | `archive_expand_code` |
+| `0xACDA` | `load_file_into_far_memory` |
 | `0xB818` | `load_art_resource` |
 | `0xCB5C` | `runtime_startup` |
 
