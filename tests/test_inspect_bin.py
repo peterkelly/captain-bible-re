@@ -14,6 +14,7 @@ from inspect_bin import (  # noqa: E402
     SCRIPT_VARIABLE_OPERANDS,
     decode_command,
     decode_stream,
+    display_record_definitions,
 )
 
 
@@ -42,6 +43,43 @@ class BinBytecodeTests(unittest.TestCase):
         self.assertEqual(OPCODE_NAMES[0x36], "set_text_record_state")
         self.assertEqual(OPCODE_NAMES[0x73], "jump_if_state_flag_clear")
         self.assertEqual(OPCODE_NAMES[0x81], "reduce_faith")
+
+    def test_recovered_display_object_opcode_names(self):
+        self.assertEqual(OPCODE_NAMES[0x02], "create_scene_thread")
+        self.assertEqual(OPCODE_NAMES[0x03], "add_native_scale_display_object")
+        self.assertEqual(OPCODE_NAMES[0x43], "add_scaled_display_object")
+        self.assertEqual(OPCODE_NAMES[0x65], "clear_display_object_frames")
+        self.assertEqual(OPCODE_NAMES[0x66], "advance_display_object_frames")
+        self.assertEqual(OPCODE_NAMES[0x85], "hide_display_object")
+        self.assertEqual(OPCODE_NAMES[0x86], "show_display_object")
+
+    def test_logo_display_definitions_match_qemu_live_table(self):
+        commands = decode_stream(self.member("LOGO.BIN"))
+        definitions = display_record_definitions(commands)
+        self.assertEqual(
+            [definition.kind for definition in definitions],
+            [0x06] * 4 + [0x02] * 3 + [0x43] * 3 + [0x06] + [0x02] * 2,
+        )
+        self.assertEqual(len(definitions), 13)
+        self.assertEqual(
+            (
+                definitions[7].x,
+                definitions[7].y,
+                definitions[7].scale,
+                definitions[7].flags,
+                definitions[7].frame,
+                definitions[7].art_slot,
+            ),
+            (303, 0, 0x0100, 1, 4, 1),
+        )
+        self.assertEqual(
+            (
+                definitions[8].art_slot,
+                definitions[8].frame,
+                definitions[8].flags,
+            ),
+            (1, 4, 0),
+        )
 
     def test_script_variable_operands_are_even_offsets_in_primary_state(self):
         for filename, data in self.bin_members.items():

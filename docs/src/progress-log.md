@@ -3099,3 +3099,258 @@ and a four-paragraph body explaining the primary-state model, recovered
 opcode families, named progression fields, conservative inspectors, tests,
 and documentation. Added this final commit action to the progress log and
 amended it into the same checkpoint.
+
+## 2026-07-15: scene display objects
+
+### Selecting and inventorying the subsystem
+
+Continued with the open entity, conversation, and combat work. Chose to start
+with scene objects and encounter presentation because the complete BIN
+operand schema was already available. Checked the clean worktree, current
+plan, recent commits, existing symbols, scene-bytecode notes, and every prior
+mention of combat, encounters, entities, dialogue, victims, and powerups:
+
+```sh
+git status --short
+sed -n '45,80p' PLAN.md
+rg -n -i \
+  "combat|encounter|entity|enemy|robot|conversation|dialog|victim|attack" \
+  docs/src analysis/cb.rz README.md tools tests
+git log -4 --oneline
+```
+
+Reported that the intended path was to inventory scene opcodes and runtime
+structures, correlate them across the executable and BIN corpus, and use
+visible, silent QEMU debugging where static evidence needed confirmation.
+
+Dumped the 145-word dispatch table at `0x59AB` and the interpreter body:
+
+```sh
+rizin -q -b 16 -e scr.color=false -i analysis/cb.rz \
+  -c 'px 320 @ 0x59ab; q' build/analysis/CB_UNPACKED.EXE \
+  > build/analysis/bin-dispatch-table.txt
+rizin -q -b 16 -e scr.color=false -i analysis/cb.rz \
+  -c 'pdr @ execute_bin_commands; q' \
+  build/analysis/CB_UNPACKED.EXE
+```
+
+Parsed the little-endian handler words into an opcode-to-handler map. Then
+scanned all 64 known executable regions in the 62 BIN resources to count
+each still-unnamed opcode and collect resource, offset, and operand examples.
+The first Python attempt had a mismatched bracket in a formatted expression
+and failed with `SyntaxError`. The corrected attempt used the nonexistent
+`DD1Archive.members` attribute and failed with `AttributeError`; changed it
+to the documented `entries` collection and completed the scan.
+
+The corpus separated into dialogue-heavy and combat-heavy command clusters.
+Reported that dialogue was concentrated around `0x44..0x4F`, `0x59..0x5B`,
+and `0x85/0x86`, while the `COMBAT*.BIN` programs use another cluster. Began
+with the former because its strings and seven victim scripts supply stronger
+independent labels.
+
+### From dialogue handlers to the display table
+
+Saved direct disassemblies of the dialogue and record handlers:
+
+```sh
+rizin -q -b 16 -e scr.color=false -i analysis/cb.rz \
+  -c 'pD 1000 @ 0x50a2; q' build/analysis/CB_UNPACKED.EXE \
+  > build/analysis/dialogue-handler-disassembly.txt
+rizin -q -b 16 -e scr.color=false -i analysis/cb.rz \
+  -c 'pD 850 @ 0x54dc; q' build/analysis/CB_UNPACKED.EXE \
+  > build/analysis/dialogue-record-handlers.txt
+```
+
+Rendered complete listings for `NAGE.BIN` and the other victim programs.
+An early attempt guessed archive prefixes `004_TITLE.BIN` and
+`331_LOGO.BIN`; both failed with `FileNotFoundError`. Used `find` to obtain
+the actual extracted paths `332_TITLE.BIN` and `001_LOGO.BIN`, then repeated
+the listings successfully.
+
+Handlers `0x85` and `0x86` multiply their operand by ten and set or clear bit
+7 at `DS:A2B2 + index*10`. Neighboring commands use the same stride and
+change adjacent bytes. Initially described this as a likely entity/object
+table but explicitly withheld names until its renderer was traced; the high
+bit could have represented flipping rather than visibility.
+
+Searched the whole load-module disassembly for every indexed reference and
+disassembled the creation and update paths around `0x3AFF`, `0x4A5C`, and
+`0x55EC`. This established a record base of `DS:A2AC`, not `A2B2`:
+`A2B2` is record offset `+6`. The record count is at `DS:00E2`, the stride is
+ten bytes, and the updater rejects counts above 100.
+
+The creation handlers append these type values:
+
+- opcode `0x02` creates a command-thread record of type `0x02`;
+- opcode `0x03` creates a direct record of type `0x03` with scale `0x0100`;
+- opcodes `0x04` and `0x43` create direct records of type `0x43` with an
+  explicit scale;
+- opcode `0x06` starts animation state and creates a type-`0x06` record.
+
+Disassembled the direct renderer at `0xBCAC`. Its arguments prove that the
+three words are signed X, signed Y, and 8.8 scale; the four bytes are render
+flags, one-based frame, ART slot, and record type. Frame zero suppresses the
+render slot. Flags bit 7 suppresses drawing for values `0x80..0xEF`, while
+bits 1 and 2 flip the axes. This resolved `0x85` as hide and `0x86` as show.
+Opcodes `0x65` and `0x66` respectively clear consecutive frame bytes and
+increment them with an inclusive minimum/maximum range.
+
+Reported the key semantic boundary: the table is a scene display list shared
+by characters, props, animation groups, and command threads. It is not yet
+evidence for a distinct gameplay enemy/health model.
+
+### Visible QEMU memory validation
+
+Launched the existing trace mode:
+
+```sh
+./run.sh --trace-dos
+```
+
+This retained the Cocoa window requested by the user and used the existing
+`-audiodev none` configuration, so the diagnostic run was visible and
+silent. After the Bridgestone logo scene appeared, sent these commands to the
+monitor socket:
+
+```text
+info registers
+pmemsave 0 1048576 build/qemu-trace/entity-title-physical-1m.bin
+screendump build/qemu-trace/entity-title-screen.ppm
+```
+
+The filename says `title`, but the screenshot confirmed that the capture was
+the earlier Bridgestone `LOGO.BIN` scene. QEMU reported `DS=14E1`, placing
+`DS:00E2` at physical `0x14EF2` and `DS:A2AC` at physical `0x1F0BC`.
+Decoded the live table with `xxd` and Python. The count was 13. Records 7–9
+were:
+
+```text
+7: x=303 y=0 scale=0x0100 flags=1 frame=4 art=1 type=0x43
+8: x=3   y=0 scale=0x0100 flags=1 frame=4 art=0 type=0x43
+9: x=3   y=0 scale=0x0100 flags=1 frame=1 art=0 type=0x43
+```
+
+These are byte-for-byte matches for the three `LOGO.BIN` opcode-`0x43`
+definitions at `0x0122`, `0x012C`, and `0x0136`. The live type order also
+matches four animation records, three thread records, the three direct
+objects, another animation record, and two final thread records. Reported
+that all 13 definitions align, then stopped QEMU cleanly with `quit` and
+waited for the process to exit.
+
+### Inspector, tests, and documentation
+
+Extended `tools/inspect_bin.py` with conservative semantic names for the
+definition, frame-control, hide, and show opcodes. Added a typed static
+display-definition model and `--objects`, which appends source offsets,
+types, and known definition fields in linear order. The output warns that
+branches can skip or repeat definitions, so the summary is not presented as
+a general control-flow simulation.
+
+Added tests for the recovered opcode names and a QEMU-correlated LOGO
+regression. The regression requires exactly 13 definitions, checks the full
+type order, and checks all direct fields in record 7. Ran:
+
+```sh
+python3 -m unittest tests.test_inspect_bin -v
+tools/inspect_bin.py build/dd1/all/001_LOGO.BIN --objects
+```
+
+All 14 focused tests passed. The inspector printed the 13 expected records,
+including `display[07]` with the exact captured fields.
+
+Named the reset, update, render-slot release, and direct-object renderer in
+`analysis/cb.rz`. Added the `Scene Display Objects` chapter and linked it in
+the book. Updated the bytecode and static-analysis chapters, README, and
+living plan. Split the broad remaining task so the recovered display system
+is complete while gameplay entities, conversation flow, combat, and other
+progression remain open.
+
+Ran the complete verification set:
+
+```sh
+python3 -m unittest discover -s tests -v
+python3 -m py_compile tools/*.py tests/*.py
+bash -n run.sh
+mdbook build docs
+test -f build/docs-book/scene-objects.html
+tools/inspect_bin.py build/dd1/all/001_LOGO.BIN --objects \
+  > build/analysis/logo-display-records.txt
+rg '^display\[' build/analysis/logo-display-records.txt
+rizin -q -b 16 -e scr.color=false -i analysis/cb.rz \
+  -c 'afl~scene_display; afl~render_slot; q' \
+  build/analysis/CB_UNPACKED.EXE
+git diff --check
+```
+
+All 70 tests passed in 2.259 seconds, every Python source compiled, `run.sh`
+passed shell syntax checking, and mdBook built `scene-objects.html`. The
+inspector emitted all 13 expected LOGO definitions. Rizin loaded the reset,
+display update, direct-object render, and render-slot release symbols at
+`0x3AD2`, `0x3AFF`, `0xBCAC`, and `0xB948`. The whitespace check passed.
+Reported these results and that the completed slice remains uncommitted until
+the user requests a checkpoint.
+
+### Final display-field correction
+
+During final diff review, rechecked the renderer's stack arguments against
+the three distinct bytes in LOGO records 7–9. The first live record had value
+one in both byte `+6` and byte `+8`, which had hidden an ordering error in the
+initial interpretation. The renderer indexes the loaded-ART table with byte
+`+6`, reads the frame from byte `+7`, and derives flip flags from byte `+8`.
+Thus byte `+6` is the ART slot plus high hidden marker, while byte `+8` holds
+the separate render flags. Opcodes `0x85/0x86` still mean hide/show, but they
+set/clear the ART-slot byte's high bit rather than a flags-byte bit.
+
+Reported the correction before handoff. Corrected the inspector operand
+mapping, tests, scene-object chapter, bytecode table, and static summary.
+Added an assertion for LOGO record 8, whose distinct values (`art=1`,
+`flags=0`) prevent the two fields from being swapped again. The corrected
+QEMU interpretation is:
+
+```text
+7: x=303 y=0 scale=0x0100 flags=1 frame=4 art=1 type=0x43
+8: x=3   y=0 scale=0x0100 flags=0 frame=4 art=1 type=0x43
+9: x=3   y=0 scale=0x0100 flags=0 frame=1 art=1 type=0x43
+```
+
+An attempted consistency search put Markdown backticks inside a
+double-quoted shell pattern. Bash treated `` `+8` `` as command substitution
+and printed `/bin/bash: +8: command not found`. The search had `|| true`, did
+not mutate files, and the validation block that followed still ran. Reported
+the harmless command error and repeated the search with a single-quoted
+pattern.
+
+Reran all 70 tests after the field correction; they passed in 2.290 seconds.
+Python compilation, mdBook, the corrected inspector output, all four Rizin
+symbols, and `git diff --check` also passed. In particular, inspector records
+8 and 9 now show `art_slot=0x0001` and `flags=0x0000`, matching the raw QEMU
+bytes and their BIN operands.
+
+### Preparing the display-object checkpoint
+
+The user requested a commit. Inspected the worktree with `git status
+--short`, checked whitespace with `git diff --check`, reviewed the diff
+statistics and path list, and inspected the four most recent commits. The
+whitespace check passed. The intended checkpoint contains ten paths: the
+plan, README, Rizin symbol script, book summary, progress log, scene-bytecode
+and static-analysis chapters, new scene-object chapter, inspector, and its
+tests. The previously recorded verification remains current: all 70 tests
+pass, Python sources compile, mdBook builds, the four Rizin symbols load, and
+the corrected 13-record LOGO interpretation matches the QEMU dump.
+
+Staged those ten paths explicitly, then ran `git diff --cached --check`,
+`git status --short`, `git diff --cached --stat`, and `git diff --cached
+--name-only`. The staged check passed and confirmed that no unrelated path
+was included. Created the checkpoint with subject `scene: Recover
+display-object runtime`; its detailed message records the runtime model,
+inspector support, QEMU correlation, field-order regression coverage, and
+documentation rationale. Amended this final log entry into the same commit
+so the repository records the commit operation as part of the append-only
+investigation history.
+
+The first post-commit message audit used `git log -1 --pretty=%B` with an
+`awk` line-length check. It found seven body lines between 73 and 76
+characters, exceeding the repository's 72-character rule. The audit stopped
+the chained status and summary checks before they ran. Rewrapped the message
+without changing its meaning, staged this note, and amended the checkpoint
+again before repeating the complete verification.

@@ -30,6 +30,22 @@ class BinCommand:
     operands: tuple[Operand, ...]
 
 
+@dataclass(frozen=True)
+class DisplayRecordDefinition:
+    """One command which appends a record to the scene display list."""
+
+    offset: int
+    kind: int
+    delay: int | None = None
+    thread_slot: int | None = None
+    x: int | None = None
+    y: int | None = None
+    scale: int | None = None
+    flags: int | None = None
+    frame: int | None = None
+    art_slot: int | None = None
+
+
 # Operand layout recovered from execute_bin_commands at load-module offset
 # 0x451b. B is an unsigned byte, H is a little-endian 16-bit word, z is a
 # NUL-terminated CP437 string, 9 is a nine-byte opaque animation record, and
@@ -73,9 +89,12 @@ OPCODE_SCHEMAS = {
 
 OPCODE_NAMES = {
     0x01: "load_art",
+    0x02: "create_scene_thread",
+    0x03: "add_native_scale_display_object",
+    0x04: "add_scaled_display_object",
     0x05: "return_minus_one",
-    0x06: "set_animation_delay",
-    0x07: "skip_animation_record",
+    0x06: "begin_animation_sequence",
+    0x07: "animation_step",
     0x0D: "change_scene",
     0x0F: "adjust_thread_delay",
     0x1E: "copy_variable",
@@ -107,11 +126,14 @@ OPCODE_NAMES = {
     0x38: "jump_if_text_record_set",
     0x39: "jump_if_text_record_clear",
     0x3D: "jump",
+    0x43: "add_scaled_display_object",
     0x4D: "load_palette",
     0x52: "play_music",
     0x55: "snapshot_state",
     0x57: "play_sound_effect",
     0x58: "stop_sound_effect",
+    0x65: "clear_display_object_frames",
+    0x66: "advance_display_object_frames",
     0x6D: "load_palette",
     0x70: "unload_last_art",
     0x73: "jump_if_state_flag_clear",
@@ -124,6 +146,8 @@ OPCODE_NAMES = {
     0x7C: "set_current_map_cell_parameter_a",
     0x7F: "set_current_map_cell_parameter_b",
     0x81: "reduce_faith",
+    0x85: "hide_display_object",
+    0x86: "show_display_object",
     0x87: "normalize_map_cells",
     0x88: "clear_text_record_states",
     0x89: "mark_current_map_cell_explored",
@@ -254,6 +278,67 @@ def decode_stream(
     return tuple(commands)
 
 
+def display_record_definitions(
+    commands: tuple[BinCommand, ...],
+) -> tuple[DisplayRecordDefinition, ...]:
+    """Return display records appended by a linear command sequence.
+
+    Branches can skip definitions at runtime. The returned order is therefore
+    a static linear view, not a control-flow simulation.
+    """
+
+    definitions: list[DisplayRecordDefinition] = []
+    for command in commands:
+        if command.opcode == 0x06:
+            values = [int(operand.value) for operand in command.operands]
+            definitions.append(
+                DisplayRecordDefinition(
+                    command.offset, kind=0x06, delay=values[0]
+                )
+            )
+        elif command.opcode == 0x02:
+            values = [int(operand.value) for operand in command.operands]
+            definitions.append(
+                DisplayRecordDefinition(
+                    command.offset,
+                    kind=0x02,
+                    thread_slot=values[0],
+                    x=values[1],
+                    y=values[2],
+                    scale=values[3],
+                )
+            )
+        elif command.opcode == 0x03:
+            values = [int(operand.value) for operand in command.operands]
+            definitions.append(
+                DisplayRecordDefinition(
+                    command.offset,
+                    kind=0x03,
+                    frame=values[0],
+                    art_slot=values[1],
+                    x=values[2],
+                    y=values[3],
+                    scale=0x0100,
+                    flags=values[4],
+                )
+            )
+        elif command.opcode in (0x04, 0x43):
+            values = [int(operand.value) for operand in command.operands]
+            definitions.append(
+                DisplayRecordDefinition(
+                    command.offset,
+                    kind=0x43,
+                    frame=values[0],
+                    art_slot=values[1],
+                    x=values[2],
+                    y=values[3],
+                    scale=values[4],
+                    flags=values[5],
+                )
+            )
+    return tuple(definitions)
+
+
 def _format_operand(operand: Operand, is_script_variable: bool = False) -> str:
     if is_script_variable:
         value = int(operand.value)
@@ -294,6 +379,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--limit", type=parse_int, help="exclusive ending offset (default: EOF)"
     )
+    parser.add_argument(
+        "--objects",
+        action="store_true",
+        help="summarize display-record definitions after the command listing",
+    )
     return parser
 
 
@@ -322,6 +412,32 @@ def main(argv: list[str] | None = None) -> int:
         f"# {len(commands)} commands, {end - args.start} bytes "
         f"({args.start:#x}-{end:#x})"
     )
+    if args.objects:
+        definitions = display_record_definitions(commands)
+        print(
+            "# display records in linear definition order; "
+            "branches may skip them"
+        )
+        for index, definition in enumerate(definitions):
+            fields = [
+                f"display[{index:02d}]",
+                f"source={definition.offset:#06x}",
+                f"type={definition.kind:#04x}",
+            ]
+            for name in (
+                "delay",
+                "thread_slot",
+                "x",
+                "y",
+                "scale",
+                "flags",
+                "frame",
+                "art_slot",
+            ):
+                value = getattr(definition, name)
+                if value is not None:
+                    fields.append(f"{name}={value:#06x}")
+            print(" ".join(fields))
     return 0
 
 

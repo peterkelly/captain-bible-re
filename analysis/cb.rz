@@ -18,6 +18,10 @@ af @ 0x417f
 afn play_sound_effect_resource @ 0x417f
 af @ 0x4235
 afn stop_sound_effect @ 0x4235
+af @ 0x3ad2
+afn reset_scene_display_records @ 0x3ad2
+af @ 0x3aff
+afn render_scene_display_records @ 0x3aff
 afn execute_bin_commands @ 0x451b
 afn initialize_scene @ 0x6631
 afn update_scene_threads @ 0x7997
@@ -90,8 +94,12 @@ afn blit_rect_to_vga @ 0xa0c9
 afn blit_rect_transparent_zero @ 0xa106
 afn blit_rect_opaque @ 0xa136
 afn update_palette_effect @ 0xb620
+af @ 0xb948
+afn release_render_slot @ 0xb948
 af @ 0xb99c
 afn draw_art_frame_opaque @ 0xb99c
+af @ 0xbcac
+afn render_scene_display_object @ 0xbcac
 
 afn libc_fclose @ 0xd0c2
 afn libc_fopen @ 0xd1ae

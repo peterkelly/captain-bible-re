@@ -176,6 +176,7 @@ semantic names where static evidence is strong:
 
 ```sh
 tools/inspect_bin.py build/dd1/all/005_INTRO.BIN
+tools/inspect_bin.py build/dd1/all/001_LOGO.BIN --objects
 tools/inspect_bin.py \
   build/dd1/all/334_ROOM3.BIN --start 0x0c96 --limit 0x1754
 ```
@@ -185,6 +186,10 @@ and `ROOM3.BIN` has three command regions separated by zero-filled reserved
 blocks, so those regions require explicit `--start` and `--limit` values. The
 mdBook scene-bytecode chapter describes the interpreter, command schema,
 startup sequence, QEMU memory correlation, and currently identified opcodes.
+The `--objects` view summarizes the display records defined in linear command
+order, including thread/animation types and direct objects' coordinates,
+scale, flags, frame, and ART slot. See the scene-display-object chapter for
+the live ten-byte layout and control-flow caveat.
 
 ## Inspecting audio resources
 

@@ -59,7 +59,8 @@ This plan is a living checklist. Findings and commands are recorded in
 - [x] Recover world-map resources, runtime grid, and exploration state.
 - [x] Implement and verify a reproducible world-map inspector.
 - [x] Recover script variables, progression flags, faith, and text state.
-- [ ] Reconstruct entities, conversation flow, combat, and remaining progression.
+- [x] Recover scene display objects, render fields, and visibility/frame controls.
+- [ ] Reconstruct gameplay entities, conversation flow, combat, and remaining progression.
 - [x] Build small extraction or inspection tools where they improve confidence.
 
 ## Phase 5: Consolidation

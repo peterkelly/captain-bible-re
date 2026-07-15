@@ -182,6 +182,24 @@ variables, and implement absolute jumps, calls, and returns. The dedicated
 scene-bytecode chapter documents the complete structural schema, startup
 sequence, mixed code/data regions, inspection tool, and QEMU memory check.
 
+## Scene display objects
+
+Scene programs append up to 100 ten-byte display records at `DS:A2AC`, with
+the current count at `DS:00E2`. Direct object records contain signed X/Y,
+8.8 scale, an ART-slot/visibility byte, one-based ART frame, render flags,
+and a type byte. Other types connect animation sequences or command threads
+to the same update list. The ART-slot high bit hides an object; two low bits
+in the separate flags byte flip its axes.
+
+The reset function at `0x3AD2` releases every render slot and clears the count
+when changing scenes. The update function at `0x3AFF` dispatches records by
+type, and `0xBCAC` submits direct objects to the ART renderer. A visible,
+silent QEMU capture of `LOGO.BIN` contained 13 records whose type order and
+direct fields exactly match all 13 linear display definitions in the script.
+The dedicated scene-display-object chapter documents the layout, commands,
+QEMU addresses, inspector output, and boundary between display state and
+still-unrecovered gameplay entity/combat state.
+
 ## World-map state
 
 The archive contains 21 exact 768-byte map resources: levels A through G for
@@ -247,6 +265,8 @@ documents both formats and their reproducible tools.
 | `0x3979` | `reduce_faith` |
 | `0x3A1E` / `0x3A30` | Read byte/word BIN operands |
 | `0x3A64` | `bin_read_cstring_offset` |
+| `0x3AD2` | `reset_scene_display_records` |
+| `0x3AFF` | `render_scene_display_records` |
 | `0x4001` | `load_palette_resource` |
 | `0x4091` | `play_music_resource` |
 | `0x4155` | `release_sound_effect_buffer` |
@@ -292,7 +312,9 @@ documents both formats and their reproducible tools.
 | `0xACDA` | `load_file_into_far_memory` |
 | `0xB620` | `update_palette_effect` |
 | `0xB818` | `load_art_resource` |
+| `0xB948` | `release_render_slot` |
 | `0xB99C` | `draw_art_frame_opaque` |
+| `0xBCAC` | `render_scene_display_object` |
 | `0xCB5C` | `runtime_startup` |
 
 The Rizin script additionally names verified Microsoft C library routines such

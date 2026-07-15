@@ -9,6 +9,7 @@
 - [`DD1.DAT` Resource Container](dd1-container.md)
 - [Palette and Artwork Formats](graphics-formats.md)
 - [Scene Bytecode](scene-bytecode.md)
+- [Scene Display Objects](scene-objects.md)
 - [Script State and Progression](game-state.md)
 - [World Maps](world-maps.md)
 - [Audio Formats](audio-formats.md)

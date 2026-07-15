@@ -74,8 +74,11 @@ control-flow behavior:
 |---:|---|---|---|
 | `0x01` | `z` | `load_art` | Passes the name to `load_art_resource`, which appends `.ART`. |
 | `0x05` | none | `return_minus_one` | Terminates interpretation with return value -1. |
-| `0x06` | `H` | `set_animation_delay` | Writes the animation timing field. |
-| `0x07` | `9` | `skip_animation_record` | Advances over a fixed nine-byte record. |
+| `0x02` | `BHHH` | `create_scene_thread` | Initializes a thread slot and appends a type-`0x02` display record. |
+| `0x03` | `BBHHB` | `add_native_scale_display_object` | Appends a directly rendered object with implicit scale `0x0100`. |
+| `0x04` / `0x43` | `BBHHHB` | `add_scaled_display_object` | Appends a directly rendered object with frame, ART slot, X, Y, scale, and flags. |
+| `0x06` | `H` | `begin_animation_sequence` | Creates animation state and appends a type-`0x06` display record. |
+| `0x07` | `9` | `animation_step` | Advances over a fixed nine-byte step retained for later animation updates. |
 | `0x0D` | `zz` | `change_scene` | Selects a new scene and secondary segment name. |
 | `0x0F` | `H` | `adjust_thread_delay` | Updates the current command thread's wait value. |
 | `0x1E` | `HH` | `copy_variable` | Copies one signed script-variable word to another. |
@@ -96,6 +99,8 @@ control-flow behavior:
 | `0x55` | none | `snapshot_state` | Copies the live state into a retained buffer. |
 | `0x57` | `BH` | `play_sound_effect` | Builds `D###.ABT`, decodes it, and starts playback at the supplied rate. |
 | `0x58` | none | `stop_sound_effect` | Stops active digital playback and releases its PCM buffer. |
+| `0x65` | `BB` | `clear_display_object_frames` | Sets the frame byte to zero across a consecutive display-record range. |
+| `0x66` | `BBBB` | `advance_display_object_frames` | Increments and range-wraps frame bytes across consecutive records. |
 | `0x6D` | `z` | `load_palette` | Uses the same palette-loading path as `0x4D`. |
 | `0x70` | none | `unload_last_art` | Releases the most recently loaded art slot. |
 | `0x73` / `0x74` | `BH` | branch on state flag | Selects a target when a boolean state flag is clear / set. |
@@ -106,6 +111,7 @@ control-flow behavior:
 | `0x7C` | `H` | `set_current_map_cell_parameter_a` | Writes the current cell's second byte from a script variable. |
 | `0x7F` | `H` | `set_current_map_cell_parameter_b` | Writes the current cell's third byte from a script variable. |
 | `0x81` | `H` | `reduce_faith` | Subtracts a difficulty-scaled immediate from faith unless no-combat mode is active. |
+| `0x85` / `0x86` | `B` | hide/show display object | Sets / clears the high hidden bit in a display record's ART-slot byte. |
 | `0x87` | none | `normalize_map_cells` | Applies recovered location-kind and parameter transitions across the grid. |
 | `0x88` | none | `clear_text_record_states` | Clears persistent byte `+4` in all 66 text descriptors. |
 | `0x89` | none | `mark_current_map_cell_explored` | Sets the current X bit in the current Y exploration row. |
@@ -189,6 +195,11 @@ their high bit set are displayed in both unsigned hexadecimal and signed
 decimal forms. Unidentified handlers retain names such as `opcode_3a`,
 preserving useful structure without assigning speculative semantics.
 
+Add `--objects` to append a linear summary of commands which define display
+records. The [scene-display-object chapter](scene-objects.md) documents the
+ten-byte runtime record, renderer flags, QEMU validation, and the important
+caveat that branches can skip or repeat definitions.
+
 ## Executable routines
 
 | Load offset | Current name |
@@ -197,6 +208,8 @@ preserving useful structure without assigning speculative semantics.
 | `0x0457` | `normalize_map_cells` |
 | `0x075F` | `show_map_screen` |
 | `0x0C6C` | `process_current_map_cell` |
+| `0x3AD2` | `reset_scene_display_records` |
+| `0x3AFF` | `render_scene_display_records` |
 | `0x3A1E` | `bin_read_u8` |
 | `0x3A30` | `bin_read_u16` |
 | `0x3A64` | `bin_read_cstring_offset` |
@@ -205,6 +218,8 @@ preserving useful structure without assigning speculative semantics.
 | `0x451B` | `execute_bin_commands` |
 | `0x6631` | `initialize_scene` |
 | `0x7997` | `update_scene_threads` |
+| `0xB948` | `release_render_slot` |
+| `0xBCAC` | `render_scene_display_object` |
 
 Offsets use the unpacked load-module convention documented elsewhere in this
 book.
