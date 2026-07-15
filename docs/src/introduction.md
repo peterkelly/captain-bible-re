@@ -1,5 +1,7 @@
 # Introduction
 
+Project repository: [https://github.com/peterkelly/captain-bible-re](https://github.com/peterkelly/captain-bible-re)
+
 This book records the evidence, methods, and results of reverse-engineering
 *Captain Bible in the Dome of Darkness*. The supplied copy is a DOS program
 whose main executable is `CB.EXE`. The work begins with a reproducible FreeDOS

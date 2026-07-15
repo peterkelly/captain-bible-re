@@ -5499,3 +5499,116 @@ Created the requested checkpoint with subject `dynamic: Validate input saves
 and combat`. Git recorded 13 changed files, 965 insertions, and 50 deletions,
 including four new tested/executable support files. Appended this success
 record for the same checkpoint before its final amendment.
+
+### GitHub Pages publishing
+
+The user requested a GitHub workflow that publishes the mdBook to GitHub
+Pages. Inspected the repository files, `docs/book.toml`, README documentation
+instructions, PLAN, recent commits, origin URL, and existing working-tree
+changes. Found pre-existing uncommitted edits to `.gitignore`, README, and
+`docs/book.toml`, including the move of generated output from
+`build/docs-book/` to ignored `docs/book/`; preserved those edits.
+
+Checked GitHub's official Pages documentation and action repositories. The
+documented custom-workflow shape is checkout, static-site build, Pages artifact
+upload, and deployment through a `github-pages` environment with `pages: write`
+and `id-token: write`. Confirmed the current official major releases used here:
+`actions/checkout@v6`, `actions/upload-pages-artifact@v5`, and
+`actions/deploy-pages@v5`.
+
+Queried the official mdBook v0.5.3 GitHub release API for Linux assets. The
+first Python one-liner failed with a syntax error because escaped quotes were
+used inside an f-string expression. Replaced it with `str.format`, listed the
+assets successfully, and read the API-provided digest for the GNU x86-64
+archive:
+
+```text
+sha256:e2fd508a4fac06cbaa9f88b97d27bdc3b55a08946304ca845879fe26a3699e11
+```
+
+Added `.github/workflows/publish-docs.yml`. It triggers for relevant pushes to
+`main` and manual dispatches, downloads and verifies the tested mdBook binary,
+builds `docs/book/`, uploads that directory as the Pages artifact, and deploys
+it in a separate least-privilege job. Kept in-progress deployments from being
+cancelled. Corrected mdBook's project-site base URL from
+`/captain-bible-re/docs/` to `/captain-bible-re/`, documented the public URL
+and one-time Pages setting in README, and added a publication phase to PLAN.
+
+Validated the workflow and book with:
+
+```sh
+git diff --check
+ruby -e 'require "yaml"; YAML.parse_file(".github/workflows/publish-docs.yml")'
+curl --fail --location --silent --show-error \
+  --output "$archive" \
+  https://github.com/rust-lang/mdBook/releases/download/v0.5.3/mdbook-v0.5.3-x86_64-unknown-linux-gnu.tar.gz
+shasum -a 256 --check
+tar --list --gzip --file "$archive"
+python3 -m unittest discover -s tests -v
+python3 -m py_compile tools/*.py tests/*.py
+tools/check_documentation.py
+mdbook build docs
+test -f docs/book/index.html
+```
+
+Ruby parsed the workflow successfully. `actionlint` was not installed, so its
+optional semantic check was reported and skipped rather than implied to have
+run. The downloaded archive matched the pinned digest and contained `mdbook`.
+All 110 tests passed in 4.222 seconds, every Python file compiled, the
+documentation checker reported 23 chapters plus README, and the local book
+build completed at `docs/book/`. Confirmed that its generated `404.html` uses
+`<base href="/captain-bible-re/">`. Git found no whitespace errors in tracked
+changes; the untracked workflow received a separate no-index whitespace check
+during final review.
+
+The user selected GitHub Actions as the repository's Pages source and confirmed
+that the first deployment completed successfully. Checked the last Phase 6
+PLAN item and replaced README's one-time setup instruction with the active
+publication state. The book is now available at
+`https://peterkelly.github.io/captain-bible-re/`; later relevant pushes to
+`main` publish automatically through the workflow.
+
+### Preparing the Pages publication checkpoint
+
+The user requested a commit. Reviewed both index and working-tree changes. The
+combined checkpoint includes the already staged Pages workflow and deletion of
+the superseded `FREEDOS_SETUP_INSTRUCTIONS.md`, the publication configuration
+and records above, the generated-book ignore rule, and the project-repository
+link added to the book introduction. Confirmed that no live tracked file other
+than this historical log refers to the deleted setup brief; its implemented
+procedure remains documented in README, the environment chapter, and
+`tools/setup_freedos_image.py`.
+
+Ran the final combined validation:
+
+```sh
+git diff --check
+git diff --cached --check
+ruby -e 'require "yaml"; YAML.parse_file(".github/workflows/publish-docs.yml")'
+python3 -m unittest discover -s tests -v
+python3 -m py_compile tools/*.py tests/*.py
+tools/check_documentation.py
+tools/inspect_symbol_map.py
+bash -n run.sh tools/build_qemu_dos_trace.sh
+mdbook build docs
+test -f docs/book/index.html
+```
+
+All 110 tests passed in 4.176 seconds. Ruby parsed the workflow, every Python
+source compiled, the documentation checker reported 23 chapters plus README,
+the 175-entry symbol map passed, both shell scripts parsed, and mdBook produced
+`docs/book/index.html`. The generated 404 page retained the required
+`/captain-bible-re/` base, and both staged and unstaged diffs had no whitespace
+errors. Prepared to stage the exact eight-file publication checkpoint and
+commit it with the repository's required detailed message.
+
+The first combined `git add` named the already deleted
+`FREEDOS_SETUP_INSTRUCTIONS.md` as a normal path and failed with `pathspec did
+not match any files`. The deletion was already staged and remained intact.
+Staged the seven existing files separately and retained that indexed deletion
+as the eighth change.
+
+Created the requested checkpoint with subject `docs: Publish mdBook with
+GitHub Pages`. Git recorded eight changed files, 199 insertions, and 177
+deletions, including the new workflow and removal of the superseded setup
+brief. Appended this success record before amending the same checkpoint.

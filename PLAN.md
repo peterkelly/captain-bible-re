@@ -78,3 +78,9 @@ This plan is a living checklist. Findings and commands are recorded in
 - [x] Document reproducible procedures and all discovered formats and systems.
 - [x] Review the mdBook for gaps, contradictions, and unsupported claims.
 - [x] Build and verify the consolidated book.
+
+## Phase 6: Publication
+
+- [x] Configure mdBook output and repository metadata for GitHub Pages.
+- [x] Add a GitHub Actions workflow to build and deploy the book.
+- [x] Select GitHub Actions as the Pages source and confirm the first deployment.

@@ -6,7 +6,8 @@ language = "en"
 src = "src"
 
 [build]
-build-dir = "../build/docs-book"
+build-dir = "book"
 
 [output.html]
-git-repository-url = ""
+git-repository-url = "https://github.com/peterkelly/captain-bible-re"
+site-url = "/captain-bible-re/"

@@ -1,8 +1,15 @@
 # Captain Bible Reverse Engineering
 
+[![docs](https://img.shields.io/badge/docs-online-blue)](https://peterkelly.github.io/captain-bible-re/)
+
+<p align="center">
+  <img src="title.png" width="640">
+</p>
+
 This repository contains a reproducible environment and research notes for
-reverse-engineering *Captain Bible in the Dome of Darkness*, a DOS game from
-the 1990s. The original game files are expected in `CB/` and are intentionally
+reverse-engineering
+[Captain Bible in the Dome of Darkness](https://archive.org/details/msdos_Captain_Bible_in_the_Dome_of_Darkness_1994),
+a DOS game from the 1990s. The original game files are expected in `CB/` and are intentionally
 ignored by Git.
 
 The FreeDOS/QEMU environment and the planned static and dynamic analysis are
@@ -380,4 +387,16 @@ chapter gives a single end-to-end command sequence for every recovered format
 and system. Known Gaps and Evidence Boundaries separates confirmed results
 from deliberately unnamed fields and the limits of controlled scene-entry
 captures.
-The rendered book is written to `build/docs-book/`.
+The rendered book is written to `docs/book/`.
+
+Pushes to `main` that change the book or its publishing workflow build and
+publish the same output with GitHub Actions. The workflow can also be started
+manually from the Actions tab. It installs the tested mdBook 0.5.3 Linux
+binary, verifies its published SHA-256, uploads `docs/book/` as a Pages
+artifact, and deploys it to:
+
+<https://peterkelly.github.io/captain-bible-re/>
+
+The repository's Pages source is configured for GitHub Actions, and the first
+deployment has completed successfully. Subsequent relevant pushes publish
+automatically; no generated book files are committed.
