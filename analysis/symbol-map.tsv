@@ -1,0 +1,144 @@
+kind	offset	name	confidence	subsystem	evidence
+function	0xcb5c	runtime_startup	verified	startup	QEMU entry state and Microsoft C startup sequence
+function	0x8a82	game_main	verified	startup	Startup call target plus argv parsing and nonreturning main loop
+function	0x8a09	set_cwd_from_executable_path	high	startup	Drive and directory parsing followed by DOS chdir
+function	0x89af	parse_bible_translation_lock	high	startup	SOUND.5 translation word comparisons and lock assignment
+function	0x3363	initialize_hardware_and_data	verified	startup	DOS trace and calls loading drivers DD1.DAT and core subsystems
+function	0x1c88	show_study_bible	verified	dialogue	Study request path and live browser interaction
+function	0x2556	select_from_text_menu	high	dialogue	Text-list render input loop and selected-row return
+function	0x2933	show_dialogue_message	high	dialogue	Dialogue channel formatting render and wait behavior
+function	0x3a1e	bin_read_u8	high	bytecode	Interpreter cursor dereference and one-byte increment
+function	0x3a30	bin_read_u16	high	bytecode	Interpreter cursor little-endian read and two-byte increment
+function	0x3a64	bin_read_cstring_offset	high	bytecode	NUL scan from BIN cursor and relative-string offset return
+function	0x4001	load_palette_resource	verified	graphics	PAL name construction and validated 768-byte resources
+function	0x4091	play_music_resource	high	audio	MUS and IBM XMI name construction plus driver call
+function	0x4155	release_sound_effect_buffer	high	audio	Owned ABT buffer check driver stop and far free
+function	0x417f	play_sound_effect_resource	verified	audio	ABT load decode and QEMU-correlated playback buffer
+function	0x4235	stop_sound_effect	high	audio	Active sound check followed by driver stop
+function	0x3ad2	reset_scene_display_records	verified	scene-display	QEMU-correlated record count reset and slot release loop
+function	0x3aff	render_scene_display_records	verified	scene-display	QEMU-correlated ten-byte record dispatcher
+function	0x3b9b	resolve_animation_transform	high	animation	Animation step fields converted to render transform
+function	0x3d08	render_animation_slot	high	animation	Twelve-byte animation slot state and frame submission
+function	0x3da8	update_animation_slots	high	animation	Active-slot iteration timing and step advancement
+function	0x3f59	start_animation_slot	high	animation	Allocates and initializes slot from BIN step offset
+function	0x3fdf	stop_animation_slot	high	animation	Clears matching active animation slot
+function	0x451b	execute_bin_commands	verified	bytecode	145-entry dispatch table and complete corpus decoder
+function	0x6631	initialize_scene	verified	bytecode	BIN suffix construction resource load and interpreter start
+function	0x6a23	update_action_selector_overlay	high	input	Active action-target scan and selector ART rendering
+function	0x7997	update_scene_threads	high	bytecode	Display-thread iteration and saved BIN offset resumption
+function	0x7a5c	start_scene_thread	high	bytecode	Creates command-thread record at absolute BIN target
+function	0x7b12	handle_faith_depletion	high	state	Faith clamp and centralized game-over transition
+function	0x7d2b	initialize_new_session	high	state	New-game state clearing and initial scene setup
+function	0x875d	main_menu_and_game_loop	verified	input	Main-state dispatch with QEMU-correlated game startup
+function	0x7bed	poll_input_event	high	input	Keyboard and mouse merge into internal event codes
+function	0x834e	handle_study_bible_request	verified	dialogue	Thread suspension and live study-browser result flags
+function	0x8558	find_action_target_by_key	high	input	Ten-byte action table scan by selector key
+function	0x5ad6	find_text_record_by_selector	verified	text	Recovered index lookup agrees across all text banks
+function	0x5ce2	copy_text_record_component	verified	text	DDL range copy agrees with exported record components
+function	0x5ee7	write_wrapped_export_text	verified	text	QEMU-exported wrapping matches reconstructed output
+function	0x5f92	export_game_text	verified	text	Command-line export matches QEMU file byte for byte
+function	0x629c	load_text_bank	verified	text	Archive-name construction and all translation-bank joins
+function	0x034f	load_map_resource	verified	maps	Difficulty suffix construction and exact 768-byte grid
+function	0x0457	normalize_map_cells	high	maps	Full-grid cell normalization loop and bit masking
+function	0x075f	show_map_screen	high	maps	Map-grid glyph rendering and explored-cell tests
+function	0x0c6c	process_current_map_cell	verified	maps	Cell indexing variables flags and scene dispatch
+function	0x1191	initialize_script_state	verified	state	rep stosw clears exactly 100 script words
+function	0x1b6c	start_palette_blackout	high	graphics	Palette-effect state initialization from game-over paths
+function	0x1b86	enter_game_over_scene	high	state	Shared blackout and OVER scene transition call sites
+function	0x3979	reduce_faith	verified	state	Difficulty-scaled loss matches scripts and saved 0-10000 field
+function	0x43f5	test_state_flag	verified	state	128-bit bank index and mask calculation
+function	0x4413	set_state_flag	verified	state	Flag-bank OR with recovered mask table
+function	0x4433	clear_state_flag	verified	state	Flag-bank AND with inverted mask table
+function	0x4453	assign_state_flag	high	state	Boolean argument dispatches to set or clear helper
+function	0x446f	render_study_prompt	verified	dialogue	Prompt descriptor and QEMU-correlated study UI
+function	0x5b24	get_text_record_state	verified	text	Descriptor compact-bit lookup matches supplied saves
+function	0x5b76	set_text_record_state	verified	text	Descriptor compact-bit set matches script mutations
+function	0x5bbf	clear_text_record_state	verified	text	Descriptor compact-bit clear matches browser behavior
+function	0x7d8e	copy_live_state_to_save_buffers	verified	saves	Exact 200-byte state and checkpoint copy directions
+function	0x7e41	copy_save_buffers_to_live_state	verified	saves	Exact inverse copy verified against supplied states
+function	0x2b6f	choose_save_slot	high	saves	Nine-label menu and selected slot return
+function	0x7f01	write_save_index	verified	saves	Writes exact 243-byte SV0 layout
+function	0x7f58	read_save_index	verified	saves	Reads exact 243-byte SV0 layout and empty fallback
+function	0x7fd7	write_save_state	verified	saves	Writes exact 2752-byte SV1-SV9 or SVQ layout
+function	0x815a	initialize_empty_save_slot	high	saves	Clears fixed blocks and seeds default settings
+function	0x81a5	save_selected_slot	high	saves	Snapshot copy filename suffix and state writer call
+function	0x81ac	read_save_state	verified	saves	Reads exact 2752-byte state and restores live fields
+function	0x8d50	show_mouse_cursor	high	input	INT 33h function 1 wrapper
+function	0x8d5d	hide_mouse_cursor	high	input	INT 33h function 2 wrapper
+function	0x8d79	update_mouse_state	high	input	INT 33h position buttons clamp and edge accumulation
+function	0x8e0a	detect_mouse	high	hardware	INT 33h vector and reset checks
+function	0x90d4	detect_video_adapter	high	hardware	BIOS INT 10h VGA detection sequence
+function	0x92d0	abt_get_sample_rate	verified	audio	ABT header parsing returns 9000 for all 41 resources
+function	0x92e0	decode_abt	verified	audio	All resources decode and D003 matches live QEMU PCM
+function	0x93be	abt_decode_1bit_delta_block	verified	audio	Host decoder and live PCM validate signed delta table
+function	0x94cb	abt_decode_2bit_delta_block	verified	audio	Host decoder and live PCM validate signed delta table
+function	0x956e	abt_decode_4bit_delta_block	verified	audio	Host decoder and live PCM validate signed delta table
+function	0x97d0	archive_load_member	verified	archive	All 369 members extract to declared sizes
+function	0x99ab	archive_lookup_member	verified	archive	Directory scan and GC payload validation
+function	0x9bef	archive_read_raw_member	verified	archive	Marker-zero members copy with exact consumption
+function	0x9c5f	archive_refill_input	verified	archive	Buffered compressed-input refill and remaining-byte state
+function	0x9ca4	archive_decode_member	verified	archive	All compressed members reproduce declared bytes
+function	0x9d98	archive_expand_code	verified	archive	Prefix-suffix chain reconstruction in host extractor
+function	0x9ff7	vga_set_dac_entry	high	graphics	VGA DAC index and RGB port writes
+function	0xa017	vga_load_palette_bios	verified	graphics	INT 10h palette load and validated PAL data
+function	0xa032	vga_write_palette_range	verified	graphics	Retrace-synchronized DAC writes from PAL ranges
+function	0xa0c9	blit_rect_to_vga	verified	graphics	Common rectangle loop agrees with rendered frames
+function	0xa106	blit_rect_transparent_zero	verified	graphics	Index-zero skip agrees with sprite rendering
+function	0xa136	blit_rect_opaque	verified	graphics	Opaque row copy agrees with QEMU framebuffer
+function	0xacda	load_file_into_far_memory	verified	files	DOS trace confirms open seek allocate read and close
+function	0xb5a8	rotate_palette_range	high	graphics	Palette range shift and endpoint wrap
+function	0xb620	update_palette_effect	high	graphics	Timed palette rotation and blackout state update
+function	0xb818	load_art_resource	verified	graphics	ART slot allocation and all 143 descriptor tables
+function	0xb948	release_render_slot	verified	graphics	Slot ownership checks and far-memory release
+function	0xb99c	draw_art_frame_opaque	verified	graphics	Twelve-byte descriptor indexing and framebuffer match
+function	0xbcac	render_scene_display_object	verified	scene-display	Live ten-byte objects match direct-object rendering
+function	0xd0c2	libc_fclose	high	runtime	Microsoft C stream teardown wrapper and call sites
+function	0xd1ae	libc_fopen	high	runtime	Microsoft C fopen calling convention and mode strings
+function	0xd1d6	libc_fread	high	runtime	Microsoft C fread calling convention and consumers
+function	0xe22c	libc_strcat	high	runtime	Standard strcat loop and callers
+function	0xe26c	libc_strcpy	high	runtime	Standard strcpy loop and callers
+function	0xe29e	libc_strcmp	high	runtime	Standard strcmp loop and callers
+function	0xe302	libc_tolower	high	runtime	ASCII case-range conversion
+function	0xe31a	libc_toupper	high	runtime	ASCII case-range conversion
+function	0xe772	libc_puts	high	runtime	Microsoft C stdout string path
+function	0xe993	libc_chdir	high	runtime	DOS chdir wrapper and startup caller
+function	0xda82	libc_lowio_close	high	runtime	Microsoft C descriptor close wrapper
+function	0xdaa2	libc_lowio_seek	high	runtime	DOS seek wrapper and file-loader callers
+function	0xdb1c	libc_lowio_open	high	runtime	Microsoft C descriptor open path
+function	0xdcc0	libc_lowio_read	high	runtime	Chunked DOS read wrapper and callers
+function	0xdd9e	libc_lowio_write	high	runtime	Chunked DOS write wrapper and export callers
+handler	0x4672	bin_handler_configure_study_prompt	verified	bytecode	Opcode 0x7e operand schema and prompt state writes
+handler	0x51b7	bin_handler_clear_dialogue_choices	verified	bytecode	Opcode 0x45 clears live choice count
+handler	0x51c6	bin_handler_add_dialogue_choice	verified	bytecode	Opcode 0x44 appends six-byte live choice record
+handler	0x51ff	bin_handler_remove_dialogue_choice	high	bytecode	Opcode 0x13 removes matching choice target
+handler	0x5257	bin_handler_present_dialogue_choices	verified	bytecode	Opcode 0x46 renders and branches through live choice table
+handler	0x52a3	bin_handler_show_dialogue	verified	bytecode	Dialogue opcodes share formatting and channel dispatcher
+handler	0x5351	bin_handler_request_study_bible	verified	bytecode	Opcode 0x49 sets request consumed by main loop
+handler	0x5357	bin_handler_suspend_scene_thread	verified	bytecode	Opcode 0x72 yields command-thread execution
+handler	0x4e27	bin_handler_start_animation	verified	bytecode	Opcode 0x08 starts recovered animation record
+handler	0x4e64	bin_handler_stop_animation	verified	bytecode	Opcode 0x09 stops recovered animation record
+handler	0x4c96	bin_handler_add_action_target	verified	bytecode	Opcode 0x3a appends ten-byte action target
+handler	0x4d1e	bin_handler_enable_action_target	verified	bytecode	Opcode 0x3b sets target active byte
+handler	0x4d36	bin_handler_disable_action_target	verified	bytecode	Opcode 0x3c clears target active byte
+handler	0x505c	bin_handler_start_scene_thread_at	verified	bytecode	Opcode 0x3e starts thread at absolute BIN offset
+handler	0x50cf	bin_handler_wait_for_animation	high	bytecode	Opcode 0x3f blocks while animation is active
+handler	0x519f	bin_handler_enable_action_selection	high	bytecode	Opcode 0x41 enables selector input
+handler	0x51a8	bin_handler_disable_action_selection	high	bytecode	Opcode 0x42 disables selector input
+handler	0x511e	bin_handler_wait_for_sound_effect	high	bytecode	Opcode 0x59 blocks while sound is active
+handler	0x4e3d	bin_handler_start_linked_animation	verified	bytecode	Opcode 0x5f starts animation linked to display record
+handler	0x5074	bin_handler_stop_scene_thread	high	bytecode	Opcode 0x61 clears matching command thread
+handler	0x4e80	bin_handler_jump_if_animation_active	high	bytecode	Opcode 0x80 conditional branch on animation state
+handler	0x58f1	bin_handler_set_variable_random_modulo	high	bytecode	Opcode 0x82 writes bounded random result
+handler	0x5690	bin_handler_rotate_palette_range	high	bytecode	Opcode 0x6c forwards range and step to palette rotator
+handler	0x5795	bin_handler_patch_bin_byte_from_variable	high	bytecode	Opcode 0x7a writes variable low byte into loaded BIN
+handler	0x468c	bin_handler_blackout_palette	high	bytecode	Opcode 0x7e alternate operand starts blackout state
+handler	0x5905	bin_handler_sync_current_cell_flags_23_to_27	verified	bytecode	Opcode 0x8e copies current-cell movement flags
+data	0xeba8	str_microsoft_runtime	verified	runtime	Runtime banner present at predicted QEMU address
+data	0xef64	str_vga_not_detected	high	hardware	Referenced by failed VGA startup branch
+data	0xef83	str_sound_configuration	verified	startup	SOUND.5 filename used by traced startup open
+data	0xefb0	str_main_data_file	verified	archive	DD1.DAT filename used by traced startup open
+data	0xf156	str_export_open_error	high	text	Export fopen failure message reference
+data	0xf1e6	str_export_title	verified	text	Heading matches QEMU-exported study file
+data	0xf39b	str_save_index_suffix	verified	saves	SV0 suffix used by exact index reader and writer
+data	0xf47a	str_run_art	verified	graphics	RUN.ART startup resource and corrected DS translation
+data	0xed7a	room_entrance_code_by_kind	verified	maps	16-byte table matches all room class orientations

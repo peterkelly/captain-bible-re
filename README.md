@@ -112,6 +112,13 @@ Load the current high-confidence names into Rizin with:
 rizin -b 16 -i analysis/cb.rz build/analysis/CB_UNPACKED.EXE
 ```
 
+Audit all 108 named functions, 26 BIN handlers, and 9 data symbols against the
+Rizin script, with per-entry confidence and evidence, using:
+
+```sh
+tools/inspect_symbol_map.py
+```
+
 The generated executable and memory dumps remain under ignored `build/`.
 Research results, address conventions, function names, command-line behavior,
 and the recovered save layout are in the mdBook source.

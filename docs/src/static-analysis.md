@@ -324,88 +324,11 @@ are IFF/XMIDI files with `FORM XDIR`, one `INFO` sequence count, `CAT XMID`,
 and one `FORM XMID` containing `TIMB` and `EVNT`. The audio-format chapter
 documents both formats and their reproducible tools.
 
-## High-confidence function map
+## Checked symbol catalog
 
-| Load offset | Name |
-|---:|---|
-| `0x034F` | `load_map_resource` |
-| `0x0457` | `normalize_map_cells` |
-| `0x075F` | `show_map_screen` |
-| `0x0C6C` | `process_current_map_cell` |
-| `0x1191` | `initialize_script_state` |
-| `0x1B6C` | `start_palette_blackout` |
-| `0x1B86` | `enter_game_over_scene` |
-| `0x1C88` | `show_study_bible` |
-| `0x2556` | `select_from_text_menu` |
-| `0x2933` | `show_dialogue_message` |
-| `0x3363` | `initialize_hardware_and_data` |
-| `0x3979` | `reduce_faith` |
-| `0x3A1E` / `0x3A30` | Read byte/word BIN operands |
-| `0x3A64` | `bin_read_cstring_offset` |
-| `0x3AD2` | `reset_scene_display_records` |
-| `0x3AFF` | `render_scene_display_records` |
-| `0x3B9B` | `resolve_animation_transform` |
-| `0x3D08` | `render_animation_slot` |
-| `0x3DA8` | `update_animation_slots` |
-| `0x3F59` | `start_animation_slot` |
-| `0x3FDF` | `stop_animation_slot` |
-| `0x4001` | `load_palette_resource` |
-| `0x4091` | `play_music_resource` |
-| `0x4155` | `release_sound_effect_buffer` |
-| `0x417F` | `play_sound_effect_resource` |
-| `0x4235` | `stop_sound_effect` |
-| `0x43F5` / `0x4413` / `0x4433` | Test/set/clear state flags |
-| `0x446F` | `render_study_prompt` |
-| `0x451B` | `execute_bin_commands` |
-| `0x5AD6` | `find_text_record_by_selector` |
-| `0x5B24` / `0x5B76` / `0x5BBF` | Get/set/clear text-record state |
-| `0x5CE2` | `copy_text_record_component` |
-| `0x5EE7` | `write_wrapped_export_text` |
-| `0x5F92` | `export_game_text` |
-| `0x629C` | `load_text_bank` |
-| `0x6631` | `initialize_scene` |
-| `0x6A23` | `update_action_selector_overlay` |
-| `0x7997` | `update_scene_threads` |
-| `0x7A5C` | `start_scene_thread` |
-| `0x7B12` | `handle_faith_depletion` |
-| `0x7BED` | `poll_input_event` |
-| `0x7D2B` | `initialize_new_session` |
-| `0x7D8E` / `0x7E41` | Copy live state to/from save buffers |
-| `0x7F01` / `0x7F58` | Write/read the 243-byte save index |
-| `0x7FD7` / `0x81AC` | Write/read the 2,752-byte save state |
-| `0x834E` | `handle_study_bible_request` |
-| `0x8558` | `find_action_target_by_key` |
-| `0x875D` | `main_menu_and_game_loop` |
-| `0x89AF` | `parse_bible_translation_lock` |
-| `0x8A09` | `set_cwd_from_executable_path` |
-| `0x8A82` | `game_main` |
-| `0x8D79` | `update_mouse_state` |
-| `0x8E0A` | `detect_mouse` |
-| `0x90D4` | `detect_video_adapter` |
-| `0x92D0` | `abt_get_sample_rate` |
-| `0x92E0` | `decode_abt` |
-| `0x93BE` / `0x94CB` / `0x956E` | Decode packed ABT delta blocks |
-| `0x97D0` | `archive_load_member` |
-| `0x99AB` | `archive_lookup_member` |
-| `0x9BEF` | `archive_read_raw_member` |
-| `0x9C5F` | `archive_refill_input` |
-| `0x9CA4` | `archive_decode_member` |
-| `0x9D98` | `archive_expand_code` |
-| `0x9FF7` | `vga_set_dac_entry` |
-| `0xA017` | `vga_load_palette_bios` |
-| `0xA032` | `vga_write_palette_range` |
-| `0xA0C9` | `blit_rect_to_vga` |
-| `0xA106` | `blit_rect_transparent_zero` |
-| `0xA136` | `blit_rect_opaque` |
-| `0xACDA` | `load_file_into_far_memory` |
-| `0xB5A8` | `rotate_palette_range` |
-| `0xB620` | `update_palette_effect` |
-| `0xB818` | `load_art_resource` |
-| `0xB948` | `release_render_slot` |
-| `0xB99C` | `draw_art_frame_opaque` |
-| `0xBCAC` | `render_scene_display_object` |
-| `0xCB5C` | `runtime_startup` |
-
-The Rizin script additionally names verified Microsoft C library routines such
-as `fopen`, `fread`, `fclose`, `strcat`, `strcpy`, `strcmp`, `tolower`,
-`toupper`, `puts`, and `chdir`.
+The complete checked map now contains 108 named functions, 26 named BIN
+handlers, and 9 data symbols. Each entry has its own evidence statement and a
+Verified or High confidence rating. The dedicated symbol-map chapter defines
+those levels, summarizes subsystem coverage, documents address translation,
+and gives commands that check the catalog against both `analysis/cb.rz` and
+Rizin's resolved handler addresses.

@@ -4627,3 +4627,152 @@ reported 725 insertions and 9 deletions across the 12 files, including the
 three new files. Verified the resulting commit metadata, checked every message
 line against the 72-column rule, and confirmed that the worktree was clean.
 Amended this final success record into the same checkpoint.
+
+## 2026-07-15: Checked symbol and function catalog
+
+The user asked to continue. Began Phase 5 consolidation with a clean worktree
+at observed HEAD `d6e5014`. Read the remaining PLAN tasks, the complete Rizin
+script, the static-analysis function table, executable address conventions,
+README instructions, and prior symbol-related log entries. Reported that this
+slice would reconcile `analysis/cb.rz` with the documentation, attach explicit
+evidence and confidence to every name, and identify stale or unsupported map
+entries.
+
+Counted declarations directly from `analysis/cb.rz` with `awk`. It contains
+108 `afn` function names, 26 renamed switch-case handlers, and 9 named data
+flags. The book's former High-confidence table covered only a subset and had
+neither per-entry evidence nor a synchronization check. Duplicate-name and
+duplicate-offset scans found no collisions.
+
+### Rizin resolution audit
+
+Confirmed that `build/analysis/CB_UNPACKED.EXE` was present. The first handler
+query attempted the older `f~bin_handler_` syntax:
+
+```sh
+rizin -q -b 16 -e scr.color=false -i analysis/cb.rz \
+  -c 'f~bin_handler_' build/analysis/CB_UNPACKED.EXE
+```
+
+Current Rizin treated that as an invalid `f` invocation and printed 29 lines
+of usage text. It did not indicate a script failure. Repeated the audit with
+`-c fl`, saved the complete flag listing, and filtered it with `rg`. Rizin
+loaded without stderr and resolved exactly 26 `bin_handler_*` flags. Saved the
+ignored audit artifacts as:
+
+```text
+build/analysis/consolidation-functions.txt
+build/analysis/consolidation-functions.err
+build/analysis/consolidation-flags.txt
+build/analysis/consolidation-flags.err
+build/analysis/consolidation-handlers.txt
+```
+
+The resolved handlers span `0x4672..0x5905`. This supplies exact load offsets
+for names which appear only as `fr` renames of Rizin-generated case flags in
+`cb.rz`. Reported to the user that the operational script had 108 functions
+and 26 handler names and that the checked map would include those handlers
+instead of silently omitting them.
+
+### Catalog and inspector
+
+Added `analysis/symbol-map.tsv` with six columns: kind, load offset, name,
+confidence, subsystem, and concise evidence. It covers every named function,
+handler, and data flag in `cb.rz`. Classified 77 entries as Verified because
+static semantics also agree with an independent runtime capture, traced I/O,
+supplied save, exhaustive resource decode, or byte-level output comparison.
+Classified the remaining 66 as High because implementation, call sites, data
+layout, and cross-resource use uniquely support their descriptive names. No
+Medium entries are currently promoted into Rizin; ambiguous candidates remain
+unnamed.
+
+Added executable `tools/inspect_symbol_map.py` and set its execute bit. The
+tool validates TSV structure, controlled kinds and confidence labels, unique
+names and kind/offset pairs, nonempty evidence, and the 16-bit load range. It
+then parses `afn`, `fr`, and `f` declarations from `analysis/cb.rz` and demands
+exact set equality. An optional `--rizin-flags` input also verifies every
+handler's resolved address from `fl` output. Filters can show one kind or one
+confidence level.
+
+Added four tests in `tests/test_inspect_symbol_map.py`. The first focused run
+failed all four during setup because eight early TSV records had five fields:
+their evidence had accidentally occupied the subsystem column. Located every
+short row with:
+
+```sh
+awk -F '\t' 'NF != 6 || $5 == "" {print NR, NF, $0}' \
+  analysis/symbol-map.tsv
+```
+
+Added the missing subsystem values (`startup`, `dialogue`, `bytecode`, and
+`graphics`) and repeated the focused run. All four tests passed in 0.003
+seconds. The tests enforce exact 108/26/9 coverage, the Verified/High set,
+handler-flag parsing, nonempty evidence, and malformed-header rejection.
+
+Ran the inspector against the saved Rizin handler listing:
+
+```sh
+tools/inspect_symbol_map.py \
+  --rizin-flags build/analysis/consolidation-handlers.txt
+```
+
+It reported `symbols=143 data=9 function=108 handler=26 verified=77 high=66
+medium=0` and printed the full offset-sorted map. Repeated the audit against
+the complete unfiltered `consolidation-flags.txt`; it also passed. Saved a
+function-only listing and the final complete audit under ignored
+`build/analysis/` files.
+
+Reported the completed counts and confidence boundary to the user. Explicitly
+noted that Rizin still proposes about 340 recursive-analysis candidates, but
+the catalog does not treat an algorithmically discovered candidate as a
+recovered function without semantic evidence.
+
+### Documentation and validation
+
+Added the Symbol and Function Map chapter and linked it after Static Analysis.
+It documents address translation, confidence definitions, counts and evidence
+by subsystem, complete audit commands, handler-address verification, and the
+boundary between named functions and unresolved Rizin candidates. Replaced
+the stale selected function table in Static Analysis with the checked catalog
+summary, added the inspector command to README, and marked the first Phase 5
+task complete in PLAN.
+
+Ran the final catalog audit and repository validation:
+
+```sh
+tools/inspect_symbol_map.py \
+  --rizin-flags build/analysis/consolidation-flags.txt \
+  > build/analysis/symbol-map-audit.txt
+python3 -m unittest discover -s tests -v
+python3 -m py_compile tools/*.py tests/*.py
+mdbook build docs
+test -f build/docs-book/function-map.html
+bash -n run.sh
+git diff --check
+git status --short
+git diff --stat
+```
+
+All 97 tests passed in 4.135 seconds, every Python file compiled, mdBook built
+the new chapter, the HTML existence and shell syntax checks passed, and Git
+found no whitespace errors. Four tracked documentation/plan files are modified
+and the catalog, chapter, inspector, and test module are new. Left the complete
+symbol-map slice uncommitted because the user asked only to continue.
+
+### Symbol-map checkpoint
+
+The user requested a commit. Audited status, whitespace, tracked statistics,
+new-file line counts, mode summaries, the complete Rizin-handler catalog, and
+the focused symbol-map tests. The audit again reported 143 synchronized names
+with 77 Verified and 66 High entries; all four focused tests passed in 0.003
+seconds. Confirmed that the intended checkpoint consists only of PLAN, README,
+book, catalog, inspector, and regression changes from this consolidation
+slice. Prepared to stage all nine files and commit them with a detailed message
+conforming to the repository's subject and 72-column rules.
+
+Created the checkpoint with subject `analysis: Add checked symbol catalog`.
+Git reported 706 insertions and 86 deletions across nine files, including the
+four new catalog, chapter, inspector, and test files. The deletion count is the
+old partial function table replaced by the checked catalog summary. Added this
+success record and amended it into the same checkpoint, then verified the
+final message line lengths and clean worktree.

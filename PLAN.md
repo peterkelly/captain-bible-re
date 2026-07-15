@@ -70,7 +70,7 @@ This plan is a living checklist. Findings and commands are recorded in
 
 ## Phase 5: Consolidation
 
-- [ ] Produce a symbol/function map with evidence and confidence levels.
+- [x] Produce a symbol/function map with evidence and confidence levels.
 - [ ] Document reproducible procedures and all discovered formats and systems.
 - [ ] Review the mdBook for gaps, contradictions, and unsupported claims.
 - [ ] Build and verify the final book.
