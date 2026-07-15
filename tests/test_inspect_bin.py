@@ -82,8 +82,12 @@ class BinBytecodeTests(unittest.TestCase):
             0x5F: "start_linked_animation",
             0x60: "nop",
             0x61: "stop_scene_thread",
+            0x6C: "rotate_palette_range",
+            0x7A: "patch_bin_byte_from_variable",
+            0x7E: "blackout_palette",
             0x80: "jump_if_animation_active",
             0x82: "set_variable_random_modulo",
+            0x8E: "sync_current_cell_flags_23_to_27",
         }
         for opcode, name in expected.items():
             self.assertEqual(OPCODE_NAMES[opcode], name)
@@ -131,6 +135,102 @@ class BinBytecodeTests(unittest.TestCase):
         self.assertEqual(selectors.count(".12"), 6)
         self.assertEqual(selectors.count(".13"), 7)
         self.assertEqual(selectors.count(".14"), 7)
+
+    def test_combat_outcome_epilogues_and_faith_effects(self):
+        expected_losses = {
+            1: [0x0215, 0x07DB],
+            2: [0x006B, 0x0066, 0x01F6],
+            3: [0x040D, 0x0213, 0x07DB, 0x06A7],
+            4: [0x0254, 0x03ED],
+            5: [0x00D5, 0x07D9],
+            6: [],
+            7: [0x00E9, 0x00CF],
+        }
+        expected_kinds = {
+            1: {0x0B},
+            2: {0x0B},
+            3: {0x0B},
+            4: {0x0B},
+            5: {0x0B},
+            6: {0x0A},
+            7: {0x0B},
+        }
+
+        for number in range(1, 8):
+            commands = decode_stream(self.member(f"COMBAT{number}.BIN"))
+            by_offset = {command.offset: command for command in commands}
+            actions = action_target_definitions(commands)
+            retreat = next(action for action in actions if action.selector == ".13")
+            self.assertEqual(by_offset[retreat.target].opcode, 0x3D)
+
+            losses = [
+                int(command.operands[0].value)
+                for command in commands
+                if command.opcode == 0x81
+            ]
+            self.assertEqual(losses, expected_losses[number])
+
+            assigned = {}
+            map_kinds = set()
+            for command in commands:
+                if command.opcode == 0x1F:
+                    value = int(command.operands[0].value)
+                    variable = int(command.operands[1].value)
+                    assigned[variable] = value
+                elif command.opcode == 0x7B:
+                    variable = int(command.operands[0].value)
+                    map_kinds.add(assigned[variable])
+            self.assertEqual(map_kinds, expected_kinds[number])
+
+            set_flags = [
+                command.operands[0].value
+                for command in commands
+                if command.opcode == 0x76
+            ]
+            clear_flags = [
+                command.operands[0].value
+                for command in commands
+                if command.opcode == 0x75
+            ]
+            self.assertEqual(0x38 in set_flags, number != 6)
+            self.assertEqual(0x38 in clear_flags, number != 6)
+
+            hall_patches = [
+                command
+                for command in commands
+                if command.opcode == 0x7A
+                and command.operands[1].value == 0x20
+            ]
+            self.assertEqual(len(hall_patches), 1)
+            return_scenes = {
+                command.operands[0].value
+                for command in commands
+                if command.opcode == 0x0D
+            }
+            self.assertTrue({"CHAL", "GHALB", "GHALS"} <= return_scenes)
+
+    def test_zapper_victory_restores_full_faith(self):
+        commands = decode_stream(self.member("COMBAT7.BIN"))
+        assignments = [
+            command.operands[0].value
+            for command in commands
+            if command.opcode == 0x1F
+            and command.operands[1].value == 0x002A
+        ]
+        self.assertEqual(assignments, [1, 10000] * 5)
+
+    def test_power_scene_returns_to_selected_combat(self):
+        commands = decode_stream(self.member("POWER.BIN"))
+        patch = next(
+            command
+            for command in commands
+            if command.opcode == 0x7A
+            and command.operands[1].value == 0x003A
+        )
+        self.assertEqual(patch.operands[0].value, 0x01F3)
+        scene = next(command for command in commands if command.offset == patch.end)
+        self.assertEqual(scene.opcode, 0x0D)
+        self.assertEqual(scene.operands[0].value, "combat1")
 
     def test_combat7_first_animation_sequence(self):
         commands = decode_stream(self.member("COMBAT7.BIN"))

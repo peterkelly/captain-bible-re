@@ -3805,3 +3805,271 @@ found three commit-body lines of 73 characters. The subject and committed
 content were correct, but the message missed the repository limit by one
 column on those lines. Recorded the correction here and amended the same
 checkpoint with shorter wrapping.
+
+## 2026-07-15: Combat outcomes and progression
+
+The user asked to continue after checkpoint `4b151c2`. Confirmed the worktree
+was clean, reviewed the living plan and the new combat-runtime chapter, and
+selected the next open slice: trace each combat action target through script
+control flow and correlate outcomes with faith, power flags, map mutations,
+dialogue, and scene exits. During that review, noticed that the chapter's
+example command still used the incorrect archive prefix `358_COMBAT7.BIN`
+despite the actual extracted member being `337_COMBAT7.BIN`; the README and
+progress log already used the correct path. This documentation typo will be
+corrected as part of the current work.
+
+Reported the initial scope to the user: this pass would trace each action
+target through BIN control flow, correlate it with faith, flags, map changes,
+dialogue, and exits, and keep scene-local enemy variables distinct from
+proven persistent state.
+
+### Combat-script control-flow survey
+
+Generated complete ignored listings for `COMBAT1.BIN` through `COMBAT7.BIN`
+with `tools/inspect_bin.py`, then repeatedly searched and inspected bounded
+regions around action definitions, action targets, faith writes, state flags,
+map writes, scene changes, and subroutine calls. Representative commands
+were:
+
+```sh
+for n in 1 2 3 4 5 6 7; do
+  tools/inspect_bin.py "build/dd1/all/..._COMBAT${n}.BIN" \
+    > "build/analysis/combat${n}.txt"
+done
+rg -n 'add_action_target|reduce_faith|set_current_map_cell|\
+state_flag 0x38|change_scene|opcode_7a|opcode_7e' \
+  build/analysis/combat*.txt
+sed -n '600,730p' build/analysis/combat7.txt
+```
+
+The archive numeric prefixes differ per member, so the loop above represents
+the seven resolved paths rather than a literal shell glob. The individual
+listings record the exact offsets. The action destinations are:
+
+| Program | ATTACK | DEFEND | RETREAT | COMBAT |
+|---|---:|---:|---:|---:|
+| `COMBAT1` | `0x0BF3` | `0x0BCF` | `0x0C38` | `0x0B30` |
+| `COMBAT2` | `0x186F` | `0x184F` | `0x1BAC` | `0x1B07` |
+| `COMBAT3` | `0x0BB6` | `0x0B90` | `0x10C3` | `0x1031` |
+| `COMBAT4` | `0x17D5` | `0x17AF` | `0x1C9D` | `0x1C18` |
+| `COMBAT5` | `0x15D2` | `0x15B2` | `0x18F7` | `0x1839` |
+| `COMBAT6` | `0x07E8` | none | `0x087B` | `0x0827` |
+| `COMBAT7` | `0x0EC8` | `0x0EAB` | `0x1053` | `0x0FA7` |
+
+Compared these paths with `CB/MANUAL.TXT`. The manual independently says
+manual combat offers Attack, Defend, and Retreat; automatic combat offers
+Combat and Retreat; attacks succeed only during a cyber's vulnerable phase;
+Sword and Shield improve combat; and defeating the Zapper restores all
+faith. Its vulnerability hints remain useful for later visual correlation,
+but the present documentation does not assign exact animation counters from
+those prose descriptions without further proof.
+
+All seven Retreat destinations begin with an unconditional jump into the
+post-victory exit. They skip the map mutation. Victory in programs 1 through
+5 and 7 writes current-cell kind `0xB`. Program 6 instead writes `0xA` and
+copies parameter B to parameter A. The base Normal-difficulty faith-loss
+immediates are:
+
+```text
+COMBAT1  533, 2011
+COMBAT2  107, 102, 502
+COMBAT3  1037, 531, 2011, 1703
+COMBAT4  596, 1005
+COMBAT5  213, 2009
+COMBAT6  none
+COMBAT7  233, 207
+```
+
+These are all static loss sites, not a claim that one execution reaches all
+of them. The previously recovered `reduce_faith` routine halves them on Easy,
+uses them directly on Normal, multiplies them by four on Difficult, and
+suppresses them in installation no-combat mode.
+
+Six normal encounters set flag `0x38` during initialization and clear it at
+the shared exit. Disassembly of the Game Options routine shows flag `0x37`
+selecting the displayed Automatic Combat On/Off state, while flag `0x38`
+replaces that row's normal target with the disabled target `-2`. This proves
+`0x37` is the automatic-combat setting and `0x38` is its combat-active lock.
+Program 6 never sets or clears `0x38`, has no `DEFEND` action, and never calls
+the faith-loss opcode. Reported to the user that the corpus had converged on
+a shared normal epilogue plus a deliberately exceptional sixth encounter.
+
+Rendered representative ignored enemy frames to
+`build/graphics/combat-outcomes/guard0.png`, `crab0.png`, and `big0.png` and
+inspected them visually. `GUARD` is a red tracked, tank-like robot; `CRAB`
+shows an orange shell or lid; and `BIG` shows a large helmeted or crested
+robot head. A JavaScript orchestration attempt to display all three failed
+with `image detail must be a string when provided`; the render commands had
+already succeeded. Reissued the three image-view operations correctly and
+inspected every image. These observations are not used to force speculative
+enemy names into the format documentation.
+
+### Zapper reward, POWER, and faith exhaustion
+
+Inspected `COMBAT7.BIN` offsets `0x0D24..0x0DE9` and
+`0x0FA7..0x105E`. Its victory path calls a subroutine which alternates ten
+direct writes to faith:
+
+```text
+1, 10000, 1, 10000, 1, 10000, 1, 10000, 1, 10000
+```
+
+Each write is separated by a 500-tick delay. It ends at 10,000 and then
+writes map kind `0xB`, proving the manual's Zapper reward and its visible
+meter-flash implementation.
+
+An initial attempt to inspect `build/dd1/all/336_POWER.BIN` failed with
+`FileNotFoundError`; the archive list shows that the correct extracted path
+is `build/dd1/all/331_POWER.BIN`. Used the archive parser directly and then
+the correct member to inspect the relevant commands. `POWER.BIN` configures
+the study prompt, returns from success by copying the combat identifier to
+variable 29, adds ASCII `0x30`, patches the digit in inline `combat1`, and
+changes back to the selected combat. It is not the game-over scene.
+
+Traced the central faith check from `poll_input_event` instead. Function
+`0x7B12` clamps negative faith to zero and calls `0x1B86`. The latter selects
+the initialized strings `OVER` and `seg`, requests the new scene, starts the
+associated palette effect, and updates related state flags. Named these
+`handle_faith_depletion` and `enter_game_over_scene`.
+
+### Four more BIN operations
+
+Used Rizin against `build/analysis/CB_UNPACKED.EXE` with
+`analysis/cb.rz`. The first combined Rizin command placed the executable
+before `-c`, causing Rizin to treat the command string as a filename and
+report `Cannot open ...`. Repeated it with all options before the executable.
+The corrected disassembly recovered:
+
+- opcode `0x6C`: reads inclusive minimum, inclusive maximum, signed step,
+  and a script-variable offset; helper `0xB5A8` advances and wraps the phase,
+  rotates the palette-index mapping, and schedules a palette update;
+- opcode `0x7A`: reads a BIN byte offset and script-variable offset, then
+  writes the variable's low byte into the loaded BIN resource;
+- opcode `0x7E`: calls `0x1B6C` with 2; the palette updater immediately
+  writes black and counts down the effect before a scene change;
+- opcode `0x8E`: indexes a 16-by-16 byte table by current Y and X, then uses
+  bits 0 through 4 to assign state flags `0x23` through `0x27`.
+
+The last name remains deliberately structural:
+`sync_current_cell_flags_23_to_27`. The underlying 256-byte table's broader
+gameplay meaning is not yet proven. Named the other commands
+`rotate_palette_range`, `patch_bin_byte_from_variable`, and
+`blackout_palette`; named helpers `rotate_palette_range`,
+`start_palette_blackout`, and `assign_state_flag`.
+
+Opcode `0x7A` explains resource-name templates in two independent places.
+Every combat exit patches the `C` in `CHAL` from variable 16, selecting the
+current level's hall. `POWER.BIN` patches the digit in `combat1` from variable
+29. Opcode `0x6C` appears in persistent animation threads across combat and
+power scenes and uses their local variables as palette-cycle phases.
+
+### Inspector, tests, symbols, and documentation
+
+Extended `tools/inspect_bin.py` with the four recovered semantic names and
+script-variable annotations for opcode `0x6C` operand four and opcode `0x7A`
+operand two. Added corpus regression tests which extract the original archive
+members and assert:
+
+- each Retreat action enters with an unconditional jump;
+- the complete per-program faith-loss lists above;
+- victory kinds `0xB` for programs 1--5 and 7 and `0xA` for program 6;
+- the presence of both set and clear operations for flag `0x38` except in
+  program 6;
+- one current-level hall-name patch and all three return-scene templates in
+  every program;
+- the Zapper's exact alternating faith assignments; and
+- `POWER.BIN`'s selected-combat name patch and immediate scene change.
+
+The first large `apply_patch` attempted code, tests, and symbols together but
+failed because one `analysis/cb.rz` context did not match; no part of that
+atomic patch was applied. Applied code and tests separately. Two subsequent
+combined symbol patches also rejected a seemingly matching multi-hunk
+context, so applied smaller exact hunks successfully. Two combined
+documentation patches likewise failed on line-wrapping context and changed
+nothing; split them into targeted chapter patches. A later `rg` command used
+an unescaped backtick in its shell string and failed with an unmatched-quote
+syntax error; reran the search with a single-quoted, backtick-free pattern.
+
+Added the new executable and handler names to `analysis/cb.rz`. Updated the
+combat-runtime, script-state, scene-bytecode, world-map, and static-analysis
+chapters, corrected the `337_COMBAT7.BIN` example path, expanded the README,
+and split the plan's broad open item so combat outcomes are checked while
+remaining entities and progression stay open. Reported the proven Zapper,
+Retreat, map-kind, faith-loss, and sixth-encounter distinctions to the user
+as they were established.
+
+Ran three focused new tests first; all passed. Then ran:
+
+```sh
+python3 -m unittest discover -s tests -v
+python3 -m py_compile tools/*.py tests/*.py
+rizin -q -b 16 -e scr.color=false -i analysis/cb.rz \
+  -c 'afl; fl; q' build/analysis/CB_UNPACKED.EXE \
+  > build/analysis/combat-outcome-symbol-audit.txt \
+  2> build/analysis/combat-outcome-symbol-audit.err
+rg 'start_palette_blackout|enter_game_over_scene|handle_faith_depletion|\
+rotate_palette_range|bin_handler_(rotate|patch|blackout|sync)' \
+  build/analysis/combat-outcome-symbol-audit.txt
+```
+
+All 80 tests passed in 2.272 seconds and every Python source compiled. The
+symbol audit contains all four helpers/functions and four renamed command
+handlers at the expected offsets. Its five-byte standard-error file is only
+Rizin's terminal progress escape.
+
+### Final consistency pass
+
+Ran the remaining repository and documentation checks:
+
+```sh
+bash -n run.sh
+mdbook build docs
+test -f build/docs-book/combat-runtime.html
+test -f build/docs-book/game-state.html
+tools/inspect_bin.py build/dd1/all/337_COMBAT7.BIN | \
+  rg 'rotate_palette_range|patch_bin_byte_from_variable|\
+blackout_palette|sync_current_cell_flags_23_to_27|faith'
+python3 -m unittest tests.test_inspect_bin -v
+git diff --check
+git status --short
+git diff --stat
+```
+
+The shell script passed syntax checking. mdBook rebuilt the HTML book and
+both updated chapters exist. The live inspector output shows the four new
+semantic names, the map-level annotation on opcode `0x7A`, both faith-loss
+sites, and all ten Zapper faith assignments. All 24 focused BIN tests passed
+in 0.143 seconds, and `git diff --check` found no whitespace errors. The 11
+modified tracked files are exactly the plan, README, Rizin symbol map,
+relevant book chapters and progress log, BIN inspector, and its tests. Left
+the completed slice uncommitted because the user asked only to continue.
+
+Prepared the user report with these results: combat-outcome and progression
+control flow is now documented and regression-tested; Retreat skips victory
+map writes; ordinary victories produce kind `0xB`; the special guard produces
+kind `0xA` and moves its parameter; flags `0x37` and `0x38` are automatic
+combat and its active-scene lock; the Zapper restores faith to 10,000;
+negative faith selects `OVER`; and opcodes `0x6C`, `0x7A`, `0x7E`, and
+`0x8E` now have conservative semantic names. The report also states that all
+80 tests, Python compilation, Rizin symbol audit, shell syntax check, mdBook
+build, focused BIN tests, and whitespace checks passed, and that the work is
+intentionally uncommitted.
+
+### Preparing the combat-outcome checkpoint
+
+The user requested a commit. Began a final checkpoint audit covering the 11
+modified files from this slice: plan, README, Rizin symbols, five related book
+chapters plus this log, the BIN inspector, and its regression tests. Retained
+the completed validation evidence from immediately before the request: all 80
+tests and Python compilation passed, the Rizin audit resolved every new name,
+`run.sh` passed syntax checking, mdBook built successfully, all 24 focused BIN
+tests passed, and `git diff --check` was clean.
+
+Staged exactly those 11 paths and ran `git diff --cached --check`; it passed.
+Audited every proposed commit-message line with a small Python length check;
+the subject and body were all at most 72 columns. Created the checkpoint with
+subject `combat: Document encounter outcomes` and a detailed body explaining
+the shared epilogues, guard exception, faith behavior, new BIN semantics,
+archive-backed tests, symbol updates, and synchronized documentation. Added
+this successful commit action to the append-only log and amended it into the
+same checkpoint before the final clean-worktree audit.

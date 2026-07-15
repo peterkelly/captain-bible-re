@@ -38,6 +38,7 @@ afn initialize_scene @ 0x6631
 afn update_action_selector_overlay @ 0x6a23
 afn update_scene_threads @ 0x7997
 afn start_scene_thread @ 0x7a5c
+afn handle_faith_depletion @ 0x7b12
 afn initialize_new_session @ 0x7d2b
 afn main_menu_and_game_loop @ 0x875d
 afn poll_input_event @ 0x7bed
@@ -60,10 +61,13 @@ afn normalize_map_cells @ 0x457
 afn show_map_screen @ 0x75f
 afn process_current_map_cell @ 0xc6c
 afn initialize_script_state @ 0x1191
+afn start_palette_blackout @ 0x1b6c
+afn enter_game_over_scene @ 0x1b86
 afn reduce_faith @ 0x3979
 afn test_state_flag @ 0x43f5
 afn set_state_flag @ 0x4413
 afn clear_state_flag @ 0x4433
+afn assign_state_flag @ 0x4453
 af @ 0x446f
 afn render_study_prompt @ 0x446f
 afn get_text_record_state @ 0x5b24
@@ -111,6 +115,7 @@ afn vga_write_palette_range @ 0xa032
 afn blit_rect_to_vga @ 0xa0c9
 afn blit_rect_transparent_zero @ 0xa106
 afn blit_rect_opaque @ 0xa136
+afn rotate_palette_range @ 0xb5a8
 afn update_palette_effect @ 0xb620
 af @ 0xb948
 afn release_render_slot @ 0xb948
@@ -166,3 +171,7 @@ fr case.0x4552.95 bin_handler_start_linked_animation
 fr case.0x4552.97 bin_handler_stop_scene_thread
 fr case.0x4552.128 bin_handler_jump_if_animation_active
 fr case.0x4552.130 bin_handler_set_variable_random_modulo
+fr case.0x4552.108 bin_handler_rotate_palette_range
+fr case.0x4552.122 bin_handler_patch_bin_byte_from_variable
+fr case.0x4552.126 bin_handler_blackout_palette
+fr case.0x4552.142 bin_handler_sync_current_cell_flags_23_to_27

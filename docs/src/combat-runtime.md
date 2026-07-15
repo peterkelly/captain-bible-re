@@ -138,13 +138,74 @@ selected by its second operand. Together with animation waits, these
 operations let the combat scripts sequence visual attacks, sounds, and
 randomized branches without embedding those policies in an enemy structure.
 
+## Action and outcome control flow
+
+The four actions are entry points into the same encounter program, not
+numeric combat operations. `ATTACK` disables the current choices and runs an
+enemy-phase-specific animation path. `DEFEND` changes the available timing
+window; when Shield flag `0x31` is set, the scripts leave the attack option
+available longer. `COMBAT` uses opcode `0x82` and branches on Sword flag
+`0x30` and Shield flag `0x31` to choose successful, harmless, and
+faith-damaging sequences. The exact visual phase that makes each enemy
+vulnerable remains encoded in scene-local animation and counter variables.
+
+Opcode `0x81` contains the base loss used on Normal difficulty. The seven
+programs contain these loss sites:
+
+| Program | Base faith-loss immediates | Victory map mutation | Retreat target and exit entry |
+|---|---|---|---|
+| `COMBAT1` | 533, 2,011 | kind `0xB` | `0x0C38 -> 0x0C9D` |
+| `COMBAT2` | 107, 102, 502 | kind `0xB` | `0x1BAC -> 0x1BF6` |
+| `COMBAT3` | 1,037, 531, 2,011, 1,703 | kind `0xB` | `0x10C3 -> 0x10D6` |
+| `COMBAT4` | 596, 1,005 | kind `0xB` | `0x1C9D -> 0x1CC3` |
+| `COMBAT5` | 213, 2,009 | kind `0xB` | `0x18F7 -> 0x1902` |
+| `COMBAT6` | none | kind `0xA`; copy parameter B to A | `0x087B -> 0x087E` |
+| `COMBAT7` | 233, 207 | kind `0xB`; restore faith | `0x1053 -> 0x105E` |
+
+Each Retreat target is itself an unconditional jump to the common exit
+entry. It therefore skips the victory-only map mutation. The table records
+all static loss sites rather than claiming that every site executes in one
+fight; branches choose among them. Easy halves each immediate, Difficult
+multiplies it by four, and installation no-combat mode suppresses it.
+
+`COMBAT7` contains the manual's exceptional Zapper reward directly. Its
+victory subroutine alternates faith between 1 and 10,000 five times, producing
+a visible meter flash and ending at full faith. This happens before kind
+`0xB` is written to the defeated encounter's map cell.
+
+## Shared encounter epilogue
+
+Six programs set state flag `0x38` after defining their action table and
+clear it in the common exit. The Game Options input routine tests the same
+flag and disables the Automatic Combat menu target while it is set. Flag
+`0x38` is therefore the combat-active lock, while flag `0x37` stores the
+Automatic Combat setting itself. `COMBAT6` is exceptional: it has no
+`DEFEND` target, never changes flag `0x38`, contains no faith-loss opcode,
+and produces a different map transition. It is a scripted guard encounter,
+not one more instance of the six ordinary cyber fights.
+
+After victory or retreat, the programs clear current-cell parameter A and
+select a hall scene. Variable 67 chooses the literal `GHALB` or `GHALS`
+variants for two special cases. Otherwise opcode `0x7A` patches the first
+byte of the inline `CHAL` string from variable 16, the current map-level
+letter, yielding the appropriate `AHAL` through `GHAL` resource name.
+Opcode `0x7E` starts a palette blackout immediately before these scene
+changes.
+
+All seven combat programs also expose a separate `POWER` scene-change entry.
+`POWER.BIN` is the in-combat study/power interface, not a game-over scene. On
+a successful selection it copies the current combat number, adds ASCII
+`'0'`, patches the digit in the inline name `combat1`, and changes back to
+that encounter. The caller path into this special entry has not yet been
+fully recovered.
+
 ## Inspection
 
 Inspect animation definitions and action targets with:
 
 ```sh
 tools/inspect_bin.py \
-  build/dd1/all/358_COMBAT7.BIN --animations --actions
+  build/dd1/all/337_COMBAT7.BIN --animations --actions
 ```
 
 The summaries follow linear definition order. Calls and branches can skip or
@@ -167,7 +228,7 @@ action-target, and thread tables remains open.
   transition rule.
 - Separate the opcode-`0x02` interactive/display record family from the true
   BIN scheduler slots field by field.
-- Correlate each combat script's randomized branches with enemy phases,
-  successful attacks, defense, retreat, and encounter completion.
+- Correlate every randomized branch with the exact enemy phase and rendered
+  successful, harmless, or damaging sequence.
 - Capture the three runtime tables during a live encounter and compare them
   byte for byte with the static definitions.

@@ -217,10 +217,15 @@ paths search active targets and start a BIN scheduler slot at the selected
 target.
 
 Random branches, the Sword and Shield flags, opcode-`0x81` faith loss, and
-map/progression changes remain in script state. No enemy-health field exists
-in the display or action-target records. The combat-runtime chapter documents
-the tables, commands, corpus counts, inspector, and remaining dynamic
-validation boundary.
+map/progression changes live in script state. Every Retreat target jumps
+around the victory mutation into a shared exit. Six ordinary combats mark
+the current map cell as kind `0xB`; the exceptional guard program uses kind
+`0xA`, copies parameter B to A, omits faith loss, and never sets the
+combat-active flag. `COMBAT7` implements the Zapper reward by ending a meter
+flash at faith 10,000. No enemy-health field exists in the display or
+action-target records. The combat-runtime chapter documents the tables,
+commands, action outcomes, shared epilogue, and remaining dynamic validation
+boundary.
 
 ## Conversation and choice flow
 
@@ -308,6 +313,8 @@ documents both formats and their reproducible tools.
 | `0x075F` | `show_map_screen` |
 | `0x0C6C` | `process_current_map_cell` |
 | `0x1191` | `initialize_script_state` |
+| `0x1B6C` | `start_palette_blackout` |
+| `0x1B86` | `enter_game_over_scene` |
 | `0x1C88` | `show_study_bible` |
 | `0x2556` | `select_from_text_menu` |
 | `0x2933` | `show_dialogue_message` |
@@ -340,6 +347,7 @@ documents both formats and their reproducible tools.
 | `0x6A23` | `update_action_selector_overlay` |
 | `0x7997` | `update_scene_threads` |
 | `0x7A5C` | `start_scene_thread` |
+| `0x7B12` | `handle_faith_depletion` |
 | `0x7BED` | `poll_input_event` |
 | `0x7D2B` | `initialize_new_session` |
 | `0x7D8E` / `0x7E41` | Copy live state to/from save buffers |
@@ -370,6 +378,7 @@ documents both formats and their reproducible tools.
 | `0xA106` | `blit_rect_transparent_zero` |
 | `0xA136` | `blit_rect_opaque` |
 | `0xACDA` | `load_file_into_far_memory` |
+| `0xB5A8` | `rotate_palette_range` |
 | `0xB620` | `update_palette_effect` |
 | `0xB818` | `load_art_resource` |
 | `0xB948` | `release_render_slot` |

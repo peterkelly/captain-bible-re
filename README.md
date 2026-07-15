@@ -198,7 +198,9 @@ the conversation-flow chapter for its six-byte runtime table, study-Bible
 integration, and live QEMU correlation. The `--animations` view groups each
 animation header with its contiguous nine-byte steps; `--actions` lists
 screen coordinates, absolute targets, selectors, and recovered combat labels.
-The combat-runtime chapter documents their runtime tables and BIN scheduler.
+The combat-runtime chapter documents their runtime tables, BIN scheduler,
+action outcome branches, faith effects, shared victory/retreat epilogue, and
+map transitions.
 
 ## Inspecting audio resources
 

@@ -94,6 +94,19 @@ Five durable identifiers map exactly to the F4 through F8 status icons:
 | `0x33` | Candle |
 | `0x34` | Flight |
 
+Two adjacent flags control automatic combat:
+
+| Flag | Meaning |
+|---:|---|
+| `0x37` | Automatic Combat option is enabled. |
+| `0x38` | An ordinary combat scene is active; lock the option against changes. |
+
+The Game Options routine displays the on/off state from `0x37`. When `0x38`
+is set it assigns the Automatic Combat row a disabled target instead of the
+normal toggle target. `COMBAT1` through `COMBAT5` and `COMBAT7` set and clear
+`0x38` around their shared encounter lifetime. The exceptional guard program
+`COMBAT6` does neither.
+
 The seven victim scenes each set a distinct rescue flag at successful
 progression points:
 
@@ -143,6 +156,19 @@ This directly supports the manual's statement that Easy mode loses faith
 less readily and connects the installation no-combat option to the same
 damage path.
 
+Faith exhaustion is checked centrally after input processing rather than by
+individual scene scripts. `handle_faith_depletion` at `0x7B12` clamps a
+negative value to zero and calls `enter_game_over_scene` at `0x1B86`. That
+routine selects the initialized resource strings `OVER` and `seg`, sets the
+pending-scene state, and starts the accompanying palette effect. The
+`POWER.BIN` resource is a separate in-combat study interface and must not be
+confused with this game-over transition.
+
+One encounter also raises faith rather than reducing it: the Zapper victory
+subroutine in `COMBAT7.BIN` alternates direct assignments of 1 and 10,000,
+ending at the maximum. This implements the special full-faith reward stated
+in the manual.
+
 ## Text-record progression state
 
 Each loaded text descriptor has a persistent byte at record offset `+4`.
@@ -182,6 +208,7 @@ gameplay meanings to those temporary slots.
 | Load offset | Current name |
 |---:|---|
 | `0x1191` | `initialize_script_state` |
+| `0x1B86` | `enter_game_over_scene` |
 | `0x3979` | `reduce_faith` |
 | `0x43F5` | `test_state_flag` |
 | `0x4413` | `set_state_flag` |
@@ -189,6 +216,7 @@ gameplay meanings to those temporary slots.
 | `0x5B24` | `get_text_record_state` |
 | `0x5B76` | `set_text_record_state` |
 | `0x5BBF` | `clear_text_record_state` |
+| `0x7B12` | `handle_faith_depletion` |
 
 Offsets use the unpacked load-module convention documented elsewhere in this
 book.

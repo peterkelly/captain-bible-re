@@ -62,7 +62,8 @@ This plan is a living checklist. Findings and commands are recorded in
 - [x] Recover scene display objects, render fields, and visibility/frame controls.
 - [x] Reconstruct conversation choices, dialogue channels, and study-Bible integration.
 - [x] Recover combat action targets, animation slots, and BIN-thread control.
-- [ ] Reconstruct remaining gameplay entities, combat outcomes, and progression.
+- [x] Trace combat outcomes, faith depletion, and encounter map transitions.
+- [ ] Reconstruct remaining gameplay entities and progression.
 - [x] Build small extraction or inspection tools where they improve confidence.
 
 ## Phase 5: Consolidation

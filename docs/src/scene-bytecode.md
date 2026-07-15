@@ -119,6 +119,7 @@ control-flow behavior:
 | `0x61` | `B` | `stop_scene_thread` | Clears one BIN scheduler slot's active byte. |
 | `0x65` | `BB` | `clear_display_object_frames` | Sets the frame byte to zero across a consecutive display-record range. |
 | `0x66` | `BBBB` | `advance_display_object_frames` | Increments and range-wraps frame bytes across consecutive records. |
+| `0x6C` | `HHHH` | `rotate_palette_range` | Advances a script-variable phase by a signed step, wraps it within an inclusive palette-index range, and rotates that range's mapping. |
 | `0x6D` | `z` | `load_palette` | Uses the same palette-loading path as `0x4D`. |
 | `0x70` | none | `unload_last_art` | Releases the most recently loaded art slot. |
 | `0x72` | none | `suspend_scene_thread` | Marks the current command thread suspended until the input/UI path resumes it. |
@@ -126,9 +127,11 @@ control-flow behavior:
 | `0x75` / `0x76` | `B` | clear/set state flag | Mutates one identifier in the 128-bit state bank. |
 | `0x77` | none | `process_current_map_cell` | Calls the current-cell handler, which consults the cell and its neighbors. |
 | `0x78` | `B` | `load_map` | Combines a level letter with the current `E`/`N`/`D` difficulty code and loads a `.MAP` member. |
+| `0x7A` | `HH` | `patch_bin_byte_from_variable` | Writes the low byte of a script variable to an absolute offset in the current BIN resource. |
 | `0x7B` | `H` | `set_current_map_cell_kind` | Replaces the low nibble of the current cell from a script variable. |
 | `0x7C` | `H` | `set_current_map_cell_parameter_a` | Writes the current cell's second byte from a script variable. |
 | `0x7D` | `BH` | `configure_study_prompt` | Selects a companion-text component and record selector for the next study screen. |
+| `0x7E` | none | `blackout_palette` | Starts an immediate black palette effect before a scene transition. |
 | `0x7F` | `H` | `set_current_map_cell_parameter_b` | Writes the current cell's third byte from a script variable. |
 | `0x80` | `BH` | `jump_if_animation_active` | Selects a target when an animation state byte is nonzero. |
 | `0x81` | `H` | `reduce_faith` | Subtracts a difficulty-scaled immediate from faith unless no-combat mode is active. |
@@ -137,7 +140,21 @@ control-flow behavior:
 | `0x87` | none | `normalize_map_cells` | Applies recovered location-kind and parameter transitions across the grid. |
 | `0x88` | none | `clear_text_record_states` | Clears persistent byte `+4` in all 66 text descriptors. |
 | `0x89` | none | `mark_current_map_cell_explored` | Sets the current X bit in the current Y exploration row. |
+| `0x8E` | none | `sync_current_cell_flags_23_to_27` | Copies five bits from a 16-by-16 current-cell table into state flags `0x23` through `0x27`. |
 | `0x8F` / `0x90` | `HH` | variable bitwise AND | ANDs a destination with a variable / immediate. |
+
+Opcode `0x7A` deliberately modifies the loaded BIN buffer. Combat exits use
+it to replace the `C` in inline `CHAL` from the current level-letter
+variable; `POWER.BIN` replaces the digit in `combat1` from the selected
+combat number. It is therefore a resource-name templating mechanism rather
+than a persistent-state write.
+
+Opcode `0x6C` calls `rotate_palette_range` at `0xB5A8`. Its operands are
+inclusive minimum, inclusive maximum, signed step, and phase variable. The
+helper wraps the updated phase, fills the palette-index mapping across the
+range, and schedules a palette update. Opcode `0x7E` calls
+`start_palette_blackout` at `0x1B6C`; the next palette update writes an all
+black palette and counts down the effect state.
 
 The suffix strings are present in the executable data segment and were also
 checked in the QEMU process image: `.PAL` at `DS:0434`, `.ART` at `DS:0490`,
@@ -236,6 +253,7 @@ which definitions execute.
 | `0x0457` | `normalize_map_cells` |
 | `0x075F` | `show_map_screen` |
 | `0x0C6C` | `process_current_map_cell` |
+| `0x1B6C` | `start_palette_blackout` |
 | `0x1C88` | `show_study_bible` |
 | `0x2556` | `select_from_text_menu` |
 | `0x2933` | `show_dialogue_message` |
@@ -259,6 +277,7 @@ which definitions execute.
 | `0x7A5C` | `start_scene_thread` |
 | `0x834E` | `handle_study_bible_request` |
 | `0x8558` | `find_action_target_by_key` |
+| `0xB5A8` | `rotate_palette_range` |
 | `0xB948` | `release_render_slot` |
 | `0xBCAC` | `render_scene_display_object` |
 

@@ -79,6 +79,16 @@ parameter B to parameter A, and clears parameter B. In another relevant pass,
 location kinds `0x1` through `0x9` become `0xB`. Further control-flow work is
 needed to name the conditions and gameplay states behind those transitions.
 
+Combat programs perform closely matching transitions at their victory
+epilogues. `COMBAT1` through `COMBAT5` and `COMBAT7` replace the current low
+kind with `0xB`. The guard encounter in `COMBAT6` instead writes kind `0xA`
+and copies parameter B to parameter A. Every `RETREAT` action jumps around
+these writes into the shared scene-exit path, so retreat preserves the
+encounter cell. These scripts prove that `0xB` is a completed/cleared form for
+ordinary combat locations and connect the special `0xA` transition to the
+guard encounter, although the broader uses of both kinds remain more general
+than those labels.
+
 ## Save-state correlation
 
 Both the live grid and its checkpoint copy are serialized in every 2,752-byte
