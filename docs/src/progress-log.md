@@ -4073,3 +4073,187 @@ the shared epilogues, guard exception, faith behavior, new BIN semantics,
 archive-backed tests, symbol updates, and synchronized documentation. Added
 this successful commit action to the append-only log and amended it into the
 same checkpoint before the final clean-worktree audit.
+
+## 2026-07-15: Room classes and entrance encoding
+
+### Selecting the next progression slice
+
+The user asked to continue after commit `030de07`. Ran `git status --short`,
+`git log -1`, and read the open Phase 4 plan item plus the current world-map,
+script-state, README, and progress documentation. The worktree was clean.
+Reported that the next bounded target would be remaining gameplay entities
+and progression, beginning with map-cell kind/parameter handlers and scene
+corpus correlations rather than speculative animation-local variables.
+
+Inspected the existing Rizin output for `process_current_map_cell` at load
+offset `0x0C6C`, the map screen and world-map command handlers, the full
+unpacked code listing, all 21 `MAP` resources, the seven hall programs, and
+`ROOM1` through `ROOM4`. Generated ignored focused disassemblies at:
+
+```text
+build/analysis/ahal.txt
+build/analysis/room1.txt
+build/analysis/room2.txt
+build/analysis/room3.txt
+build/analysis/room4.txt
+```
+
+An early numeric filename loop looked for ROOM programs at outdated archive
+indices, suppressed its missing-file errors, and produced no useful output.
+Later used `rg --files` to recover the correct members: indices 333 through
+336 in reverse ROOM-number order.
+
+### Packed connection and room fields
+
+Traced the high-nibble tests in `process_current_map_cell` through the action
+flags and hall movement targets. This establishes the individual connection
+bits:
+
+```text
+0x10 up    0x20 down    0x40 left    0x80 right
+```
+
+For example, the down action increments map Y, right increments X, left
+decrements X, and up decrements Y. Reported that the map encoding was yielding
+a five-by-three entity model which matched the manual's five mapped room
+classes, pending scene-dispatch correlation.
+
+The room path is selected when the connection nibble is zero. For low kinds
+1 through 15, the executable subtracts one and divides by three, placing the
+quotient in script variable 13 and remainder in variable 14. The quotient
+selects five classes. Hall programs dispatch quotient zero to their
+level-specific victim scene and patch the digit in `room1` for quotients one
+through four.
+
+Initially examined raw executable file offset `0x01DA` for the orientation
+lookup and saw code/zero bytes because the disassembly used a data-segment
+relative address. Corrected the translation by adding the data-segment load
+base `0xEBA0` and MZ header size `0x0200`. The table at load offset `0xED7A`
+is:
+
+```text
+00 02 01 03 02 01 03 02 01 03 02 01 03 02 01 03
+```
+
+Neighbor checks correlate values 2, 1, and 3 with a room right, left, and
+above the hall. Therefore each three-code group represents west-, east-, and
+south-side entrances respectively. No fourth code permits a room below the
+hall.
+
+Decoded the five groups and independently checked their scene resources:
+
+| Kinds | Class | Dispatched scene and resource evidence |
+|---|---|---|
+| `1`--`3` | Victim | Per-level `JELO` through `NAGE` scene |
+| `4`--`6` | Trap | `ROOM1`; `TRAP`, `TRAP2`, and `TRAP3` |
+| `7`--`9` | Prayer | `ROOM2`; `PRAY` |
+| `A`--`C` | Communications | `ROOM3`; `COMM`, `COMM2`, and `FACE1` |
+| `D`--`F` | Jump Tunnel | `ROOM4`; `TUNNEL`, `TUNNEL2`, and `MONST1` |
+
+The current room's parameters are copied to variables 17 and 18. Trap scene
+control flow uses parameter A as a study-prompt selector and clears it after
+resolution. Hall neighbor processing copies the parameter B of right, left,
+and upper Trap rooms into variables 23, 24, and 25. A correct adjacent study
+result clears that byte in the neighboring room. Kept the meaning of the
+same parameter positions in other room classes open.
+
+Connected hall cells form a separate low-kind namespace. Hall logic uses
+kind `0xA` for a Scripture-station interaction, kinds `1` through `5` and `7`
+in cyber encounter paths, and other values for special or completed states.
+Because the combat pass already proved mutations to kinds `0xA` and `0xB`,
+did not assign global entity names to these values merely from the room
+quotient. Reported this contextual distinction to the user.
+
+### Map inspector and regression coverage
+
+Extended `tools/inspect_map.py` with named connection directions and decoded
+`room_class` and `room_entrance_side` properties. Added `--rooms`, which lists
+only zero-connection room cells with class, entrance, kind, and both mutable
+parameters. The existing `--cells` display now prints direction names next to
+the raw connection nibble.
+
+Added focused tests for bit decoding, all 15 synthetic room codes, rejection
+of connected and empty cells as rooms, the combinations used by all 21
+archive maps, four ROOM resource families, and all seven hall-to-victim scene
+associations. The first corpus test expected every class/orientation pair and
+failed because the archive contains no zero-connection kind `0xF`: a
+south-entry Jump Tunnel. Adjusted the assertion to encode that observed
+14-of-15 corpus fact while retaining synthetic coverage for the executable's
+full domain. The seven focused tests then passed.
+
+Ran the inspector against `CE.MAP` with `--rooms`. It decoded 14 room cells,
+including Prayer, Trap, Victim, and both used Jump Tunnel orientations, and
+showed their parameters. A resource-inspection loop immediately after the
+first test run again used three incorrect ROOM indices and printed no scene
+matches. Located the actual filenames with `rg --files`, reran the BIN
+inspector, and confirmed the resource names above. `ROOM3.BIN` requires its
+known split decode regions, so its names were also verified directly from
+the resource bytes.
+
+Added the 16-byte lookup table as `room_entrance_code_by_kind` in
+`analysis/cb.rz`. Updated the world-map and script-state chapters, README,
+and plan. The documentation now records the connection bits, quotient and
+remainder, class/scene mapping, entrances, contextual low-kind namespaces,
+Trap parameters, map-local variables, and the new inspector mode. Replaced
+the broad open Phase 4 item with a completed room-decoding task and a narrower
+open task for hallway entities and endgame progression.
+
+One combined documentation patch failed atomically because its context split
+the sentence about station parameters differently from the expected lines;
+no part was applied. Reapplied the changes in smaller exact patches.
+
+### Validation
+
+Ran the complete validation pass:
+
+```sh
+python3 -m unittest discover -s tests -v
+python3 -m py_compile tools/*.py tests/*.py
+mdbook build docs
+rizin -q -b 16 -e scr.color=false -i analysis/cb.rz \
+  -c 'fl~room_entrance; q' build/analysis/CB_UNPACKED.EXE \
+  > build/analysis/room-symbol-audit.txt \
+  2> build/analysis/room-symbol-audit.err
+bash -n run.sh
+git diff --check
+git status --short
+git diff --stat
+```
+
+All 83 tests passed in 2.855 seconds, every Python source compiled, and
+mdBook rebuilt the HTML book. Rizin resolved
+`room_entrance_code_by_kind` at `0xED7A` with size 16; its five-byte standard
+error is only the terminal progress escape. The run script passed shell
+syntax checking and `git diff --check` found no whitespace errors. Eight
+tracked files are modified: plan, README, Rizin symbols, the world-map and
+script-state chapters, this log, the map inspector, and its tests. Left the
+slice uncommitted because the user asked to continue rather than commit.
+
+After the full pass, wrapped several long test assertions and renamed the
+corpus test to state its 14-pair expectation precisely. Reran all eight map
+tests, compiled the two affected Python files, rebuilt mdBook, verified the
+world-map HTML and three key room-symbol strings, and repeated the whitespace
+and status checks. Every check passed; the tracked file set remained the same.
+
+### Room-decoding checkpoint
+
+The user requested a commit. Audited the eight modified paths with status,
+whitespace, name, and statistics commands. Staged exactly `PLAN.md`,
+`README.md`, `analysis/cb.rz`, the two updated book chapters, this log, the map
+inspector, and its test module. `git diff --cached --check` passed and the
+cached statistics remained 394 insertions and 12 deletions.
+
+Checked the proposed detailed commit message against the repository's
+72-column rule. The first three drafts were rejected locally for individual
+body lines of 74, 75, and 74 columns. Rewrapped those sentences, retained the
+required rationale and evidence, and created commit `2eba974` with subject:
+
+```text
+maps: Decode room classes and entrances
+```
+
+The detailed body explains the quotient/remainder and lookup-table evidence,
+the inspector and archive-backed coverage, contextual separation of hallway
+kinds, Trap parameters, Rizin symbol, and synchronized documentation. Added
+this successful checkpoint record afterward for amendment into the same
+commit, rather than leaving the action log outside the work it describes.

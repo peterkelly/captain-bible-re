@@ -63,7 +63,8 @@ This plan is a living checklist. Findings and commands are recorded in
 - [x] Reconstruct conversation choices, dialogue channels, and study-Bible integration.
 - [x] Recover combat action targets, animation slots, and BIN-thread control.
 - [x] Trace combat outcomes, faith depletion, and encounter map transitions.
-- [ ] Reconstruct remaining gameplay entities and progression.
+- [x] Decode room classes, entrance orientations, and Trap-room state.
+- [ ] Reconstruct remaining hallway entities and endgame progression.
 - [x] Build small extraction or inspection tools where they improve confidence.
 
 ## Phase 5: Consolidation

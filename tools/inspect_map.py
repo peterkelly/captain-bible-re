@@ -22,6 +22,24 @@ DIFFICULTIES = {
     "N": "Normal",
     "D": "Difficult",
 }
+CONNECTION_DIRECTIONS = (
+    (0x10, "up"),
+    (0x20, "down"),
+    (0x40, "left"),
+    (0x80, "right"),
+)
+ROOM_CLASSES = (
+    "victim",
+    "trap",
+    "prayer",
+    "communications",
+    "jump-tunnel",
+)
+ROOM_ENTRANCE_SIDES = (
+    "west",
+    "east",
+    "south",
+)
 
 
 class MapFormatError(ValueError):
@@ -43,6 +61,26 @@ class MapCell:
     @property
     def location_kind(self) -> int:
         return self.packed & 0x0F
+
+    @property
+    def connection_directions(self) -> tuple[str, ...]:
+        return tuple(
+            direction
+            for bit, direction in CONNECTION_DIRECTIONS
+            if self.connection_mask & bit
+        )
+
+    @property
+    def room_class(self) -> str | None:
+        if self.connection_mask or not 1 <= self.location_kind <= 15:
+            return None
+        return ROOM_CLASSES[(self.location_kind - 1) // 3]
+
+    @property
+    def room_entrance_side(self) -> str | None:
+        if self.room_class is None:
+            return None
+        return ROOM_ENTRANCE_SIDES[(self.location_kind - 1) % 3]
 
 
 @dataclass(frozen=True)
@@ -152,6 +190,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="list all nonzero cells after the compact kind grid",
     )
     parser.add_argument(
+        "--rooms",
+        action="store_true",
+        help="list decoded room cells and their entrance sides",
+    )
+    parser.add_argument(
         "--compare-save",
         type=Path,
         help="compare the resource with the live grid in a state save",
@@ -191,7 +234,20 @@ def main(argv: list[str] | None = None) -> int:
                 continue
             print(
                 f"({cell.x:02d},{cell.y:02d}) packed={cell.packed:#04x} "
-                f"connections={cell.connection_mask >> 4:#x} "
+                f"connections={cell.connection_mask >> 4:#x}"
+                f"[{','.join(cell.connection_directions) or '-'}] "
+                f"kind={cell.location_kind:#x} "
+                f"a={cell.parameter_a:#04x} b={cell.parameter_b:#04x}"
+            )
+
+    if args.rooms:
+        print("room cells:")
+        for cell in world_map.cells:
+            if cell.room_class is None:
+                continue
+            print(
+                f"({cell.x:02d},{cell.y:02d}) class={cell.room_class} "
+                f"entrance={cell.room_entrance_side} "
                 f"kind={cell.location_kind:#x} "
                 f"a={cell.parameter_a:#04x} b={cell.parameter_b:#04x}"
             )

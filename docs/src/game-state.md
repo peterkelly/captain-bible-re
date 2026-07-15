@@ -38,6 +38,21 @@ The first gameplay entry in `FIRST.BIN` demonstrates the interface directly:
 it stores X=0 in offset `0x16`, Y=6 in offset `0x18`, and faith=10,000 in
 offset `0x2A` before processing the current map cell.
 
+Map processing also produces several context-local words for the hall scene:
+
+| Index | DS address | Map-processing role |
+|---:|---:|---|
+| 13 | `7294` | Connected-cell low kind, or zero-mask room class `0`--`4`. |
+| 14 | `7296` | Room entrance code `0`--`2`, or a neighboring-cell kind during hall processing. |
+| 23 | `72A8` | Parameter B of a Trap room immediately right of the hall. |
+| 24 | `72AA` | Parameter B of a Trap room immediately left of the hall. |
+| 25 | `72AC` | Parameter B of a Trap room immediately above the hall. |
+
+These are not durable player attributes. `process_current_map_cell` rebuilds
+them from the live map, and other scenes can reuse the same general-purpose
+slots. The world-map chapter describes the room quotient/remainder and the
+adjacent Trap interaction that establish these meanings.
+
 ## Variable bytecode
 
 The core instruction family is now recovered. In this table, `var` operands

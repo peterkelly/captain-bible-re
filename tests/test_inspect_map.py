@@ -49,6 +49,60 @@ class MapResourceTests(unittest.TestCase):
             ),
             (0xA0, 0x02, 0x45),
         )
+        self.assertEqual(
+            world_map.cell(1, 1).connection_directions,
+            ("down", "right"),
+        )
+
+    def test_zero_connection_kinds_decode_as_five_room_classes(self):
+        expected_classes = (
+            "victim",
+            "trap",
+            "prayer",
+            "communications",
+            "jump-tunnel",
+        )
+        expected_sides = ("west", "east", "south")
+        for kind in range(1, 16):
+            cell = parse_map(bytes((kind, 0x12, 0x34)) + bytes(765)).cell(0, 0)
+            self.assertEqual(
+                cell.room_class,
+                expected_classes[(kind - 1) // 3],
+            )
+            self.assertEqual(
+                cell.room_entrance_side,
+                expected_sides[(kind - 1) % 3],
+            )
+
+        hall = parse_map(bytes((0x11, 0, 0)) + bytes(765)).cell(0, 0)
+        empty = parse_map(bytes(768)).cell(0, 0)
+        self.assertIsNone(hall.room_class)
+        self.assertIsNone(hall.room_entrance_side)
+        self.assertIsNone(empty.room_class)
+
+    def test_archive_room_cells_use_fourteen_class_orientation_pairs(self):
+        observed = set()
+        for level in "ABCDEFG":
+            for difficulty in "END":
+                world_map = load_archive_map(self.archive, level + difficulty)
+                for cell in world_map.cells:
+                    if cell.room_class is not None:
+                        observed.add((cell.room_class, cell.room_entrance_side))
+        self.assertEqual(
+            observed,
+            {
+                (room_class, entrance)
+                for room_class in (
+                    "victim",
+                    "trap",
+                    "prayer",
+                    "communications",
+                    "jump-tunnel",
+                )
+                for entrance in ("west", "east", "south")
+            }
+            - {("jump-tunnel", "south")},
+        )
 
     def test_supplied_save_matches_ce_map_with_four_mutations(self):
         original = load_archive_map(self.archive, "CE")
@@ -86,6 +140,35 @@ class MapResourceTests(unittest.TestCase):
                     if command.opcode == 0x78
                 )
         self.assertEqual(loaded, set("ABCDEFG"))
+
+    def test_room_and_victim_scene_dispatch_matches_decoded_classes(self):
+        members = {
+            entry.filename: self.archive.extract(entry)
+            for entry in self.archive.entries
+        }
+        room_resources = {
+            "ROOM1.BIN": (b"TRAP\0", b"TRAP2\0", b"TRAP3\0"),
+            "ROOM2.BIN": (b"PRAY\0",),
+            "ROOM3.BIN": (b"COMM\0", b"COMM2\0", b"FACE1\0"),
+            "ROOM4.BIN": (b"TUNNEL\0", b"TUNNEL2\0", b"MONST1\0"),
+        }
+        for filename, resource_names in room_resources.items():
+            for resource_name in resource_names:
+                self.assertIn(resource_name, members[filename])
+
+        for hall, victim in zip(
+            ("AHAL", "BHAL", "CHAL", "DHAL", "EHAL", "FHAL", "GHAL"),
+            (
+                b"JELO\0",
+                b"FEAR\0",
+                b"CULT\0",
+                b"LAW\0",
+                b"RICH\0",
+                b"DENY\0",
+                b"NAGE\0",
+            ),
+        ):
+            self.assertIn(victim, members[hall + ".BIN"])
 
     def test_rejects_invalid_size_name_and_coordinate(self):
         with self.assertRaisesRegex(MapFormatError, "expected 768"):

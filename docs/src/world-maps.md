@@ -34,9 +34,9 @@ at `DS:7290` and `DS:7292`.
 
 The first byte has two independently used nibbles:
 
-- The high nibble selects one of 16 connection or shape frames when the map
-  screen is drawn. It is conservatively called `connection_mask`; the
-  direction represented by each individual bit has not yet been mapped.
+- The high nibble is a four-direction connection mask: `0x10` is up, `0x20`
+  is down, `0x40` is left, and `0x80` is right. It selects one of 16
+  connection frames when the map screen is drawn.
 - The low nibble selects a location kind. Scripts can replace it while
   preserving the high nibble. Several numeric kinds can be correlated with
   map glyphs and gameplay branches, but a complete symbolic enumeration is
@@ -46,6 +46,60 @@ Parameters A and B are also manipulated separately by scene commands. The
 map screen uses them as text-record selectors for at least location kinds
 `0x6` and `0xA`, consistent with the manual's statement that stations and
 communication locations show verse references. Other meanings remain open.
+
+## Room encoding and dispatch
+
+A zero connection mask changes the meaning of low kinds `0x1` through `0xF`.
+They form five room classes of three entrance orientations each:
+
+```text
+room_class     = (location_kind - 1) / 3
+entrance_code  = (location_kind - 1) % 3
+```
+
+Both operations use integer quotient and remainder. The executable writes
+them to script variables 13 and 14. A static table at load offset `0xED7A`
+contains the same orientation sequence for neighbor detection.
+
+| Low kinds | Class | Scene | Map letter |
+|---|---|---|---|
+| `0x1`--`0x3` | Victim | Level-specific `JELO`, `FEAR`, `CULT`, `LAW`, `RICH`, `DENY`, or `NAGE` | V |
+| `0x4`--`0x6` | Trap | `ROOM1` | T |
+| `0x7`--`0x9` | Prayer | `ROOM2` | P |
+| `0xA`--`0xC` | Communications | `ROOM3` | C |
+| `0xD`--`0xF` | Jump Tunnel | `ROOM4` | J |
+
+The scene-resource identities provide independent confirmation. `ROOM1`
+loads `TRAP`, `TRAP2`, and `TRAP3`; `ROOM2` loads `PRAY`; `ROOM3` loads
+`COMM`, `COMM2`, and `FACE1`; and `ROOM4` loads `TUNNEL`, `TUNNEL2`, and
+`MONST1`. The hall programs dispatch victim class zero to the seven named
+victim scenes and patch the final digit of `room1` for the other four
+classes. These five classes are also exactly the `T`, `P`, `C`, `J`, and `V`
+rooms described by the manual and rendered by the map screen.
+
+| Kind within each class | Room position from hall | Entrance side |
+|---:|---|---|
+| First (`1`, `4`, `7`, `A`, `D`) | Right / east | West |
+| Second (`2`, `5`, `8`, `B`, `E`) | Left / west | East |
+| Third (`3`, `6`, `9`, `C`, `F`) | Above / north | South |
+
+There is no encoding for a room below a hall cell. The executable supports
+all 15 class/orientation codes, but the 21 shipped maps use only 14: no map
+contains a south-entry Jump Tunnel (`0xF`) with a zero connection mask.
+
+Room codes and connected-hall codes are separate contexts. For example, a
+zero-mask `0xA` is a Communications room, while kind `0xA` on a connected
+hall cell participates in station and post-encounter behavior. Treating the
+low nibble as one global enum would incorrectly merge these states.
+
+The parameters are likewise class-specific. `process_current_map_cell`
+copies the current room's parameter A and B to variables 17 and 18. Trap
+scripts use parameter A as a study-prompt selector and clear it after the
+interaction. When a Trap room is adjacent to a hall, its parameter B becomes
+one of three contextual prompt values in variables 23 through 25; a correct
+study result clears that byte in the adjacent cell. This identifies both
+bytes as mutable encounter state in that class without assuming that they
+have the same meaning in Prayer, Communications, or Jump Tunnel rooms.
 
 ## Runtime state and scene commands
 
@@ -116,12 +170,14 @@ Inspect a resource directly from the archive:
 ```sh
 tools/inspect_map.py CB/DD1.DAT --map CE
 tools/inspect_map.py CB/DD1.DAT --map CE --cells
+tools/inspect_map.py CB/DD1.DAT --map CE --rooms
 ```
 
 The compact display prints the low location-kind nibble at every coordinate.
-`--cells` adds the packed byte, connection nibble, kind, and both parameters
-for every nonzero cell. Compare a resource with the live grid in a state save
-with:
+`--cells` adds the packed byte, named connection directions, kind, and both
+parameters for every nonzero cell. `--rooms` lists decoded room class,
+entrance side, and parameters. Compare a resource with the live grid in a
+state save with:
 
 ```sh
 tools/inspect_map.py \
@@ -129,8 +185,10 @@ tools/inspect_map.py \
 ```
 
 The parser requires an exact 768-byte grid and a valid level/difficulty name.
-Tests cover all 21 archive members, row-major addressing, all seven script
-level selectors, invalid inputs, and the four saved mutations above.
+Tests cover all 21 archive members, row-major addressing, connection
+directions, the complete encoded room domain, the 14 combinations present in
+the corpus, room/victim scene resources, all seven script level selectors,
+invalid inputs, and the four saved mutations above.
 
 ## Relevant executable functions and data
 
@@ -140,6 +198,7 @@ level selectors, invalid inputs, and the four saved mutations above.
 | `0x0457` | `normalize_map_cells` |
 | `0x075F` | `show_map_screen` |
 | `0x0C6C` | `process_current_map_cell` |
+| `0xED7A` | 16-byte kind-to-entrance-code lookup table |
 | `DS:5B16` | Live 768-byte grid |
 | `DS:7290` / `DS:7292` | Current X / Y coordinates |
 | `DS:72C4` | Sixteen explored-row bitmaps |

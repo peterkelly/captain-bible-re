@@ -148,6 +148,7 @@ f str_export_open_error 0xd @ 0xf156
 f str_export_title 0x27 @ 0xf1e6
 f str_save_index_suffix 5 @ 0xf39b
 f str_run_art 8 @ 0xf47a
+f room_entrance_code_by_kind 0x10 @ 0xed7a
 
 fr case.0x4552.125 bin_handler_configure_study_prompt
 fr case.0x4552.69 bin_handler_clear_dialogue_choices
