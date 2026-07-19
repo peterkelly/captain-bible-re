@@ -13,8 +13,11 @@ a DOS game from the 1990s. The original game files are expected in `CB/` and are
 ignored by Git.
 
 The FreeDOS/QEMU environment and the planned static and dynamic analysis are
-complete. See `PLAN.md` for the living checklist and
-`docs/src/progress-log.md` for the complete activity log.
+complete. A separate [clean-room engine specification](spec/src/introduction.md)
+is under `spec/`; it describes the game mechanics and portable compatibility
+contract without depending on the DOS program's internal implementation. See
+`PLAN.md` for the living checklist and `docs/src/progress-log.md` for the
+complete activity log.
 
 ## Requirements
 
@@ -25,7 +28,7 @@ complete. See `PLAN.md` for the living checklist and
 - Pillow (for `ART`/`PAL` rendering)
 - A C compiler, `pkg-config`, and GLib development headers for DOS tracing
 - A POSIX shell
-- mdBook (for the research book)
+- mdBook (for the research and specification books)
 - Rizin (for the supplied symbol script and further disassembly)
 
 The setup is being developed and tested with QEMU 11.0.2 and mdBook 0.5.3 on
@@ -388,15 +391,17 @@ filter.
 
 ## Documentation
 
-Run the documentation integrity check and build the research book with:
+Run the documentation integrity check and build both books with:
 
 ```sh
 tools/check_documentation.py
 mdbook build docs
+mdbook build spec
 ```
 
 The checker validates SUMMARY coverage, local chapter links and anchors, and
-repository commands used in shell examples. The Reproducing the Results
+repository commands used in shell examples in both books. The research book's
+Reproducing the Results
 chapter gives a single end-to-end command sequence for every recovered format
 and system. Known Gaps and Evidence Boundaries separates confirmed results
 from deliberately unnamed fields and the limits of controlled scene-entry
@@ -405,11 +410,17 @@ The rendered book is written to `docs/book/`. A custom stylesheet removes
 mdBook's fixed 750-pixel content limit so tables and disassembly listings use
 the available browser width.
 
-Pushes to `main` that change the book or its publishing workflow build and
-publish the same output with GitHub Actions. The workflow can also be started
-manually from the Actions tab. It installs the tested mdBook 0.5.3 Linux
-binary, verifies its published SHA-256, uploads `docs/book/` as a Pages
-artifact, and deploys it to:
+The clean-room specification is written to `spec/book/`. Its source begins at
+`spec/src/SUMMARY.md` and is organized as an implementation contract: player
+mechanics, lifecycle and input, every resource format, all 145 scene opcodes,
+runtime services, maps, dialogue, combat, progression and the endgame, saves,
+configuration, conformance tests, and explicitly bounded unspecified details.
+
+Pushes to `main` that change the research book or its publishing workflow build
+and publish that output with GitHub Actions. The specification remains a
+separate local build. The workflow can also be started manually from the
+Actions tab. It installs the tested mdBook 0.5.3 Linux binary, verifies its
+published SHA-256, uploads `docs/book/` as a Pages artifact, and deploys it to:
 
 <https://peterkelly.github.io/captain-bible-re/>
 

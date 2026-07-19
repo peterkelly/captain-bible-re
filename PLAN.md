@@ -102,3 +102,14 @@ This plan is a living checklist. Findings and commands are recorded in
 - [x] Verify names, side effects, branches, variables, and corpus usage.
 - [x] Correct every discrepancy and add exhaustive audit regressions.
 - [x] Reconcile all opcode documentation and rerun the complete validation suite.
+
+## Phase 9: Clean-room engine specification
+
+- [x] Define the clean-room scope, compatibility levels, and normative language.
+- [x] Scaffold a standalone mdBook under `spec/`.
+- [x] Explain the game, controls, mechanics, and complete progression to new readers.
+- [x] Specify all resource formats and resource-loading behavior.
+- [x] Specify the complete scene bytecode and runtime subsystem contracts.
+- [x] Specify configuration, persistence, error behavior, and text export.
+- [x] Add conformance guidance and clearly bounded unspecified behavior.
+- [x] Validate links, chapter coverage, clean-room language, and both mdBook builds.

@@ -1,0 +1,14 @@
+[book]
+title = "Captain Bible Compatible Engine Specification"
+authors = ["Captain Bible clean-room specification project"]
+description = "Behavioral and data-format specification for a compatible Captain Bible engine"
+language = "en"
+src = "src"
+
+[build]
+build-dir = "book"
+
+[output.html]
+git-repository-url = "https://github.com/peterkelly/captain-bible-re"
+site-url = "/captain-bible-re/"
+additional-css = ["theme/wide.css"]

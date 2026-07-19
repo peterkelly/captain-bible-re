@@ -6016,3 +6016,174 @@ Staged those 24 reviewed paths explicitly with `git add`, then ran
 subject `Audit all BIN opcode documentation`; its body records why the audit
 uses the executable CFG, why the string and mixed-region corrections matter,
 and which regression boundaries were added.
+
+## 2026-07-19: Clean-room engine specification
+
+The user requested a second mdBook under `spec/` that a developer with no
+prior knowledge of Captain Bible can use to build a compatible engine. The
+book must explain the game mechanics as well as the technical contracts, and
+must not depend on implementation details of the legacy DOS program.
+
+Started with `git status --short`, `rg --files docs/src`, the research-book
+summary and heading inventory, and focused reads of the manual plus every
+current system chapter. Defined the specification boundary as observable game
+behavior and original data compatibility: resource names and byte layouts,
+scene opcodes, signed arithmetic, state transitions, save files, controls, and
+player-facing timing are in scope. DOS addresses, segmented pointers, compiler
+artifacts, disassembly workflow, QEMU captures, and names of functions in the
+legacy executable are evidence and therefore excluded from the new book.
+
+Added Phase 9 to PLAN. The intended specification structure begins with story,
+objective, controls, difficulty, and the normal play loop, then progresses
+through engine lifecycle, resources, rendering, sound, text, all 145 scene
+opcodes, scene scheduling and animation, maps, conversations, combat,
+progression, saves, configuration, and conformance. Unknown producer-side
+fields and behavior not exercised by shipped data will be identified as
+compatibility boundaries rather than filled with invented requirements.
+
+Created `spec/book.toml`, `spec/theme/wide.css`, and a 19-chapter source tree
+under `spec/src`. The book begins with a zero-prior-knowledge explanation of
+the story, objective, difficulty modes, hall actions, study interactions,
+manual and automatic combat, room types, Cyber vulnerabilities, controls, and
+the complete seven-building and Unibot progression. The technical chapters
+then specify engine lifecycle, `DD1.DAT` and its compression, every resource
+format, text joining, all 145 scene opcodes, cooperative scheduling, display
+objects, animation, map cells, dialogue, combat, state, saves, launch options,
+text export, conformance tests, and deliberately bounded behavior.
+
+Kept the new book clean-room by expressing the VM in terms of resource-relative
+offsets, signed script words, logical records, and visible state transitions.
+It contains no addresses from the legacy program and no dependency on QEMU,
+Rizin, disassembly, compiler conventions, or segmented memory. Original file
+offsets, opcode values, resource names, map values, and save fields remain in
+scope because a new implementation must consume them.
+
+During the cross-chapter reconciliation, corrected several easy-to-confuse
+contracts before treating the book as complete. Opcode `02` carries thread,
+X, Y, and scale rather than a delay. Conditional `BHs` callback operands use a
+nonnegative target with default thread -1 or a negative thread selector
+followed by an explicit target. Opcode `7D` obtains its selector from a script
+variable. Opcode `91` takes divisor then destination and reads the separate
+16-by-16 auxiliary cell table also used by opcode `8E`, not byte zero of the
+three-byte `MAP` grid. Save restore copies checkpoint fields into live state
+rather than resuming the arbitrary serialized live dialogue position. The
+specification also records the exploration rows within variables 37 through
+52 and the exact four-table `CP2.BIN` trailer.
+
+Expanded `tools/check_documentation.py` to discover both `docs/src` and
+`spec/src`, checking each summary, all local links and anchors, and repository
+commands. Added an optional-second-book regression to
+`tests/test_check_documentation.py`. Added `tests/test_specification.py` to
+require the exact 19-chapter set, prohibit dependencies on reverse-engineering
+methods, and compare all 145 specification opcode names and schemas with the
+machine-readable decoder catalog. Updated README with the book purpose and
+both build commands, updated PLAN, and ignored generated `spec/book/` output.
+
+Ran the focused checks while drafting and reconciliation:
+
+```sh
+python3 -m unittest \
+  tests.test_specification \
+  tests.test_check_documentation \
+  tests.test_opcode_documentation -v
+tools/check_documentation.py
+mdbook build spec
+test -f spec/book/index.html
+mdbook build docs
+test -f docs/book/index.html
+git diff --check
+```
+
+All 11 focused tests passed. The documentation checker reported 23 research
+chapters and 19 specification chapters plus README. Both books built their
+index pages and the whitespace check was silent.
+
+After adding the fuller player-facing mechanics and final semantic fixes, ran
+the complete noninteractive verification:
+
+```sh
+python3 -m unittest discover -s tests -v
+python3 -m py_compile tools/*.py tests/*.py
+tools/check_documentation.py
+tools/audit_bin_opcodes.py
+mdbook build spec
+test -f spec/book/index.html
+mdbook build docs
+test -f docs/book/index.html
+git diff --check
+```
+
+All 132 tests passed in 5.570 seconds. Python compilation was silent. The
+opcode audit again reported 145 opcodes, 134 distinct handlers, 122 used
+values, and 25,829 shipped commands. Both mdBooks built successfully and the
+final whitespace check passed. Generated books remain ignored.
+
+The detailed reconciliation also used `sed` and `rg` over `scene-bytecode.md`,
+`world-maps.md`, `game-state.md`, `conversation-flow.md`, `combat-runtime.md`,
+`endgame.md`, `save-formats.md`, `static-analysis.md`, and `MANUAL.TXT`. A
+narrow Rizin `pd` check of the conditional callback handlers confirmed that a
+negative `BHs` word is negated into the explicit thread slot before the extra
+word becomes the target. The first broader `pdf` form printed the containing
+interpreter and was truncated, so repeated it with bounded `pd` ranges. A
+read-only Python comparison found four shortened conditional-branch mnemonics
+in the draft; changed them to the canonical decoder names and extended the
+regression to compare names as well as schemas.
+
+Two large patch applications initially failed cleanly because their expected
+context crossed a wrapped line in `bytecode.md` and then the end of this log.
+No partial changes were made. Reapplied each as smaller exact-context patches.
+An early repository-wide `rg` also entered generated `docs/book` search data
+and produced truncated output; later searches excluded generated books.
+
+After updating PLAN, README, this log, and `.gitignore`, ran the final bounded
+documentation check:
+
+```sh
+python3 -m unittest \
+  tests.test_specification \
+  tests.test_check_documentation -v
+tools/check_documentation.py
+mdbook build spec
+test -f spec/book/index.html
+mdbook build docs
+test -f docs/book/index.html
+git diff --check
+git status --short
+```
+
+All seven tests passed, the checker again reported 23 plus 19 chapters, both
+index files were rebuilt, and the whitespace check passed. `git status` showed
+only this task's specification, tracking, checker, and test changes. A final
+`git status --untracked-files=all spec` confirmed that generated `spec/book/`
+files are ignored and only `book.toml`, `theme/wide.css`, and `src/*.md` are
+untracked specification inputs.
+
+The user then requested a commit. Ran `git status --short
+--untracked-files=all`, `git diff --check`, `git diff --stat`, and a focused
+status of `spec/` plus `tests/test_specification.py`. The worktree contained
+the six intended modified tracking/checker files and 23 intended new inputs:
+the specification configuration, stylesheet, summary, 19 chapters, and its
+regression test. Generated `spec/book/` output was absent from the untracked
+list. The whitespace check passed and no unrelated path was present.
+
+Prepared one commit covering the complete clean-room specification and its
+validation support. The commit message explains why the separate book exists,
+why portable behavior and original data contracts are documented instead of
+legacy implementation structure, and why both books now share integrity
+checks. The immediately preceding validation remains 132 complete tests, a
+successful 145-opcode audit, two successful mdBook builds, and the final seven
+focused documentation/specification tests.
+
+Staged the 29 intended paths explicitly. The first
+`git diff --cached --check` reported trailing blank lines at the ends of
+`configuration.md` and `conformance.md`. Removed those two blank lines with no
+content change, then restaged the corrected files and this log before repeating
+the cached checks.
+
+The repeated cached whitespace check passed. The staged summary contained the
+expected 29 files, 2,466 insertions, and 16 deletions. The first `git commit`
+attempt could not create `.git/index.lock` under the restricted filesystem and
+made no commit. Retried the same reviewed, 72-column-wrapped message with Git
+repository write approval and created the requested commit, then amended that
+same commit only to include this final failure/retry record in the progress
+log.

@@ -147,11 +147,24 @@ def check_summary(source: Path) -> list[str]:
     return errors
 
 
+def book_sources(repository: Path) -> tuple[Path, ...]:
+    """Return every mdBook source directory present in the repository."""
+
+    return tuple(
+        source
+        for name in ("docs", "spec")
+        if (source := repository / name / "src").is_dir()
+    )
+
+
 def check_documentation(repository: Path) -> list[str]:
     repository = repository.resolve()
-    source = repository / "docs" / "src"
-    markdown_files = [repository / "README.md", *sorted(source.glob("*.md"))]
-    errors = check_summary(source)
+    sources = book_sources(repository)
+    markdown_files = [
+        repository / "README.md",
+        *(path for source in sources for path in sorted(source.glob("*.md"))),
+    ]
+    errors = [error for source in sources for error in check_summary(source)]
     for markdown in markdown_files:
         errors.extend(check_links(markdown))
         errors.extend(check_repository_commands(markdown, repository))
@@ -176,9 +189,13 @@ def main(argv: list[str] | None = None) -> int:
         for error in errors:
             print(f"error: {error}", file=sys.stderr)
         return 1
-    source = args.repository.resolve() / "docs" / "src"
-    chapter_count = len(list(source.glob("*.md"))) - 1
-    print(f"documentation OK: {chapter_count} chapters plus README")
+    sources = book_sources(args.repository.resolve())
+    counts = [len(list(source.glob("*.md"))) - 1 for source in sources]
+    descriptions = ", ".join(
+        f"{source.parent.name}: {count} chapters"
+        for source, count in zip(sources, counts)
+    )
+    print(f"documentation OK: {descriptions}; plus README")
     return 0
 
 

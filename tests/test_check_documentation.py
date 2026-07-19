@@ -41,6 +41,27 @@ class DocumentationChecks(unittest.TestCase):
             self.assertTrue(any("missing link target" in error for error in errors))
             self.assertTrue(any("missing command" in error for error in errors))
 
+    def test_checks_optional_spec_book(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            docs = root / "docs" / "src"
+            spec = root / "spec" / "src"
+            docs.mkdir(parents=True)
+            spec.mkdir(parents=True)
+            (root / "README.md").write_text("# Test\n", encoding="utf-8")
+            (docs / "SUMMARY.md").write_text(
+                "# Summary\n\n- [Research](research.md)\n", encoding="utf-8"
+            )
+            (docs / "research.md").write_text("# Research\n", encoding="utf-8")
+            (spec / "SUMMARY.md").write_text(
+                "# Summary\n\n- [Spec](spec.md)\n", encoding="utf-8"
+            )
+            (spec / "spec.md").write_text(
+                "# Spec\n\n[missing](missing.md)\n", encoding="utf-8"
+            )
+            errors = check_documentation(root)
+            self.assertTrue(any("spec.md" in error for error in errors))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,4 +1,4 @@
-# Introduction
+# Captain Bible reverse-engineering
 
 Project repository: [https://github.com/peterkelly/captain-bible-re](https://github.com/peterkelly/captain-bible-re)
 
