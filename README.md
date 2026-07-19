@@ -119,7 +119,7 @@ Load the current high-confidence names into Rizin with:
 rizin -b 16 -i analysis/cb.rz build/analysis/CB_UNPACKED.EXE
 ```
 
-Audit all 140 named functions, 26 BIN handlers, and 9 data symbols against the
+Audit all 140 named functions, 71 BIN handlers, and 9 data symbols against the
 Rizin script, with per-entry confidence and evidence, using:
 
 ```sh
@@ -197,8 +197,9 @@ Use `--scale 2` for a nearest-neighbor enlarged sheet.
 ## Inspecting scene bytecode
 
 The 62 extracted `BIN` resources contain scene programs. The recovered
-decoder knows the operand layout of all 145 dispatched opcodes and assigns
-semantic names where static evidence is strong:
+decoder knows the operand layout and dispatch effect of all 145 opcodes. It
+assigns semantic names to every value, including conservative low-level names
+for the 23 values absent from the shipped scripts:
 
 ```sh
 tools/inspect_bin.py build/dd1/all/005_INTRO.BIN
@@ -214,7 +215,9 @@ Most resources are code from beginning to end. `CP2.BIN` has a data trailer,
 and `ROOM3.BIN` has three command regions separated by zero-filled reserved
 blocks, so those regions require explicit `--start` and `--limit` values. The
 mdBook scene-bytecode chapter describes the interpreter, command schema,
-startup sequence, QEMU memory correlation, and currently identified opcodes.
+startup sequence, QEMU memory correlation, and complete opcode catalog. It
+also records the corrected two-word layout of opcode `0x69`, which removes 11
+phantom commands from the linear corpus.
 The `--objects` view summarizes the display records defined in linear command
 order, including thread/animation types and direct objects' coordinates,
 scale, flags, frame, and ART slot. See the scene-display-object chapter for

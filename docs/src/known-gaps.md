@@ -24,8 +24,9 @@ dynamic checks.
 - The opcode-`0x02` 16-byte interactive/display records, the last two bytes of
   12-byte animation slots, and some animation mode transitions need finer
   field names.
-- Conversation opcode `0x15` and several dialogue presentation states have
-  visible formatting roles but no precise user-facing names.
+- The three bytes written by dialogue-presentation opcodes `0x5C` and `0x5D`
+  are assigned to their two channels, but their finer layout roles remain
+  deliberately unnamed.
 - Combat's `POWER` re-entry exists and is decoded, but its complete caller path
   has not been isolated. Randomized branches are not all labeled by rendered
   enemy phase.
@@ -44,13 +45,16 @@ where script transitions or map rendering establish their roles.
 ## Static-analysis coverage
 
 The checked catalog contains every project-assigned Rizin name: 140 functions,
-26 BIN handlers, and 9 data symbols. It is not a claim that the executable has
+71 BIN handlers, and 9 data symbols. It is not a claim that the executable has
 only 140 functions. Rizin proposes roughly 340 candidates, including false
 merges across data and jump tables; unsupported candidates remain unnamed.
 
-Similarly, all 145 opcode operand layouts are known, but only handlers with
-strong gameplay semantics receive descriptive executable symbols. The BIN
-inspector uses structural `opcode_XX` names for the rest.
+All 145 opcode operand layouts and dispatch effects now have inspector names.
+Thirteen newly named values do not occur in shipped scripts, so their names
+stay close to directly observed state writes and callees. The low-level timer
+role of unused opcode `0x1B`, unused modal-menu opcode `0x47`, and the precise
+filename assembled by opcode `0x8D` remain evidence boundaries rather than
+reasons to leave their handlers structurally unnamed.
 
 ## Resolved former gaps
 

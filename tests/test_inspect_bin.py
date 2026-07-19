@@ -41,6 +41,9 @@ class BinBytecodeTests(unittest.TestCase):
     def test_has_layout_for_every_dispatched_opcode(self):
         self.assertEqual(set(OPCODE_SCHEMAS), set(range(1, 0x92)))
 
+    def test_has_name_for_every_dispatched_opcode(self):
+        self.assertEqual(set(OPCODE_NAMES), set(OPCODE_SCHEMAS))
+
     def test_recovered_state_opcode_names(self):
         self.assertEqual(OPCODE_NAMES[0x1E], "copy_variable")
         self.assertEqual(OPCODE_NAMES[0x20], "jump_if_zero")
@@ -421,8 +424,21 @@ class BinBytecodeTests(unittest.TestCase):
                 commands.extend(decode_stream(data, start, limit))
                 region_count += 1
         self.assertEqual(region_count, 64)
-        self.assertEqual(len(commands), 25_840)
+        self.assertEqual(len(commands), 25_829)
         self.assertEqual(len({command.opcode for command in commands}), 122)
+
+    def test_load_bin_word_consumes_offset_and_destination(self):
+        commands = decode_stream(self.member("CP2.BIN"), 0, 0x1D55)
+        command = next(
+            command for command in commands if command.offset == 0x15D4
+        )
+        self.assertEqual(command.opcode, 0x69)
+        self.assertEqual(command.name, "load_bin_word")
+        self.assertEqual(
+            tuple(operand.value for operand in command.operands),
+            (0x0DEB, 0x0040),
+        )
+        self.assertEqual(command.end, 0x15D9)
 
     def test_conditional_extra_word_after_negative_operand(self):
         command = decode_command(bytes.fromhex("11 01 f8 ff e6 01"), 0)

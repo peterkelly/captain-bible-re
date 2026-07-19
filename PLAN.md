@@ -1,6 +1,6 @@
 # Captain Bible Reverse-Engineering Plan
 
-Last updated: 2026-07-15
+Last updated: 2026-07-19
 
 This plan is a living checklist. Findings and commands are recorded in
 `docs/src/progress-log.md`.
@@ -84,3 +84,12 @@ This plan is a living checklist. Findings and commands are recorded in
 - [x] Configure mdBook output and repository metadata for GitHub Pages.
 - [x] Add a GitHub Actions workflow to build and deploy the book.
 - [x] Select GitHub Actions as the Pages source and confirm the first deployment.
+
+## Phase 7: Complete BIN opcode semantics
+
+- [x] Inventory every structurally named opcode and its shipped-script usage.
+- [x] Trace each handler, shared state table, and relevant engine consumer.
+- [x] Correct opcode `0x69`'s two-word schema and rebuild the corpus counts.
+- [x] Assign evidence-based names to all 145 dispatched opcodes.
+- [x] Record the recovered semantics in the inspector, symbol map, and mdBook.
+- [x] Add regression coverage and run the complete validation suite.

@@ -8,11 +8,11 @@ change scenes, update variables, branch, call subroutines, and coordinate
 animation. The executable's interpreter dispatches opcodes `0x01` through
 `0x91` through a 145-entry near-pointer table at load offset `0x59AB`.
 
-The operand layout has been recovered for every dispatched opcode. Linear
-decoding identifies 25,840 commands in 64 code regions and uses 122 of the 145
-possible opcodes. Semantic names remain conservative: operand boundaries are
-known for the whole instruction set, while many handlers still need gameplay
-correlation before their purpose can be named.
+The operand layout and an evidence-based handler name have now been recovered
+for every dispatched opcode. Linear decoding identifies 25,829 commands in 64
+code regions and uses 122 of the 145 possible opcodes. Names for commands that
+do not occur in the shipped scripts describe their direct engine effects rather
+than claiming an unobserved gameplay role.
 
 ## Runtime model
 
@@ -143,6 +143,67 @@ control-flow behavior:
 | `0x8E` | none | `sync_current_cell_flags_23_to_27` | Copies five bits from a 16-by-16 current-cell table into state flags `0x23` through `0x27`. |
 | `0x8F` / `0x90` | `HH` | variable bitwise AND | ANDs a destination with a variable / immediate. |
 
+### Formerly structural commands
+
+The final unnamed-handler pass connected the remaining 51 opcode values to
+their consumers. Thirteen of these values never occur in the shipped command
+regions; their rows are marked **unused** and rely on static handler behavior.
+
+| Opcode | Operands | Recovered name | Operation |
+|---:|---|---|---|
+| `0x0A` | none | `wait_for_scene_thread_movement` | Yields the current BIN thread until primary movement state is 0 or 2. |
+| `0x0B` | `BB` | `add_navigation_edge` | Appends an undirected two-node edge used by the recursive route finder. |
+| `0x0C` | `BBz` | `add_scene_entry` | Associates an entry/segment string with the two initial navigation-node bytes used after `change_scene`. |
+| `0x0E`, `0x4A`, `0x4B`, `0x56` | none | `nop` | **Unused.** All four jump-table entries point at the interpreter's continue loop. |
+| `0x10` | `BHHz` | `configure_scene_thread_action` | Gives a scene thread selector X/Y coordinates and an inline action label. |
+| `0x11` | `BHs` | `add_navigation_arrival_handler` | Maps a destination node to a BIN target and optional explicit thread slot. |
+| `0x12` | `BHs` | `add_navigation_departure_handler` | Maps a source node to a BIN target and optional explicit thread slot. |
+| `0x15` | `B` | `select_study_record` | Selects the text descriptor expanded by study placeholders and clears both success continuations. |
+| `0x16` | `HHH` | `set_palette_mapping_range_from_variable` | Fills an inclusive palette-index mapping range with one script-variable value and schedules an update. |
+| `0x17` | `BHs` | `add_reverse_edge_departure_handler` | Adds a callback for starting traversal opposite an edge's stored order. |
+| `0x18` | `BHs` | `add_forward_edge_departure_handler` | **Unused.** Adds the corresponding forward-departure callback. |
+| `0x19` | `BHs` | `add_forward_edge_arrival_handler` | Adds a callback for completing traversal in stored edge order. |
+| `0x1A` | `BHs` | `add_reverse_edge_arrival_handler` | Adds a callback for completing reverse traversal. |
+| `0x1B` | `H` | `prime_primary_scene_thread_timer` | **Unused.** Stores the negated operand in the primary motion timer and raises its completion signal. |
+| `0x1C`, `0x1D` | `B` | enable/disable scene-thread action | Enables or disables one scene thread as an input selector. |
+| `0x40` | `B` | `set_scene_thread_motion_state` | Writes the current thread's motion state; state 2 immediately runs the scene-motion update. |
+| `0x47` | `B` | `set_modal_menu_selection` | **Unused.** Seeds the selection consumed and reset by the modal text-menu path. |
+| `0x4C` | `B` | `fill_screen` | Fills the complete 320-by-200 framebuffer with one palette index. |
+| `0x4F` | `BB` | `configure_study_navigation_success` | **Unused.** Selects a study record and the navigation node entered after success. |
+| `0x50` | none | `clear_study_record_selection` | **Unused.** Clears both active study-record selector words. |
+| `0x51` | `BHB` | `configure_study_thread_success` | Selects a study record plus the BIN target and thread slot started after success. |
+| `0x53` | `B` | `set_scene_thread_origin` | Initializes the primary navigation object's current and previous node. |
+| `0x54` | `B` | `move_scene_thread_to` | Requests movement to a navigation node, including path search and animation setup. |
+| `0x5A` | `H` | `jump_if_digital_audio_fallback` | Tests the fallback-audio flag and conditionally jumps; contradictory hardware guards make the shipped path unable to take the branch. |
+| `0x5B` | `B` | `set_scene_thread_direction` | Selects one of four movement orientations and its sprite/render offset. |
+| `0x5C`, `0x5D` | `BBB` | configure dialogue presentation | Writes the three presentation fields used by Captain Bible / character dialogue channels. |
+| `0x5E` | `H` | `set_deferred_scene_thread_target` | **Unused.** Sets a target that the main loop later starts in scheduler slot 2. |
+| `0x62`, `0x63` | `H` | store mouse X/Y | Stores the current mouse coordinate in the selected script variable. |
+| `0x64` | `H` | `jump_if_confirm_pressed` | Consumes the Enter-or-click latch and jumps to an absolute target when set. |
+| `0x67` | none | `request_restore_saved_game` | Leaves the scene loop through mode 2, which restores retained save buffers. |
+| `0x68` | `H` | `wrap_variable_1280` | Wraps a script variable by 1,280 into the engine's signed coordinate interval. |
+| `0x69` | `HH` | `load_bin_word` | Loads a little-endian word at an immediate current-BIN offset into a variable. |
+| `0x6A` | `HH` | `patch_bin_word_from_variable` | Writes a variable word to an immediate current-BIN offset. |
+| `0x6B` | `B` | `load_text_bank` | Replaces the active companion-text bank and clears all 66 descriptors. |
+| `0x6E` | `B` | `start_primary_scene_thread_overlay` | **Unused.** Loads and starts a resource-driven transient overlay for scene thread zero. |
+| `0x6F` | none | `wait_for_primary_scene_thread_overlay` | **Unused.** Yields while that transient overlay remains active. |
+| `0x71` | `HH` | `load_bin_word_indirect` | Uses one variable as the BIN offset, loads a word, and stores it in another variable. |
+| `0x79` | none | `clear_navigation_handlers` | Clears scene-entry, edge-transition, arrival, and departure callback counts. |
+| `0x83` | `HBH` | `copy_text_record_component_to_bin` | Selects a text record through a variable and copies one component to an immediate BIN offset. |
+| `0x84` | `HH` | `load_bin_byte` | Loads a byte at an immediate current-BIN offset into a variable. |
+| `0x8A` | `BH` | `jump_if_animation_finished` | Jumps when the selected animation is in state 0, 5, or 6. |
+| `0x8B` | none | `consume_random_text_record` | **Unused.** When variable zero is 2, clears one random available text descriptor and starts a 3,000-tick timer. |
+| `0x8C` | `H` | `jump_if_no_combat` | Jumps when the installation's `SOUND.5` no-combat flag is set. |
+| `0x8D` | `H` | `jump_if_file_missing` | Constructs and opens a runtime filename, jumping when `fopen` fails. |
+| `0x91` | `HH` | `set_variable_current_cell_byte_modulo` | Stores the current map cell's first byte modulo the immediate divisor in a variable. |
+
+Opcode `0x69` was previously recorded as a one-word instruction. Its handler
+actually reads an immediate BIN offset and a destination-variable offset. In
+`CP2.BIN`, the second word's low byte happened to be opcode `0x40`, so all
+streams still decoded while eleven destination operands appeared as phantom
+commands. Correcting the schema reduces the corpus total from 25,840 to 25,829
+without changing the set of 122 opcodes genuinely used by shipped scripts.
+
 Opcode `0x7A` deliberately modifies the loaded BIN buffer. Combat exits use
 it to replace the `C` in inline `CHAL` from the current level-letter
 variable; `POWER.BIN` replaces the digit in `combat1` from the selected
@@ -234,8 +295,8 @@ Output includes the file-offset range, opcode, current semantic name, and
 typed operands. Variable operands show both their word index and encoded byte
 offset, with recovered names such as `var[21:faith]@0x002a`. Other words with
 their high bit set are displayed in both unsigned hexadecimal and signed
-decimal forms. Unidentified handlers retain names such as `opcode_3a`,
-preserving useful structure without assigning speculative semantics.
+decimal forms. Every dispatched opcode now has a name; low-level names for
+unused commands deliberately describe state changes rather than inferred UI.
 
 Add `--objects` to append a linear summary of commands which define display
 records, `--choices` to inventory dialogue target/text pairs, or

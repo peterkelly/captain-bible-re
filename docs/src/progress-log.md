@@ -5612,3 +5612,171 @@ Created the requested checkpoint with subject `docs: Publish mdBook with
 GitHub Pages`. Git recorded eight changed files, 199 insertions, and 177
 deletions, including the new workflow and removal of the superseded setup
 brief. Appended this success record before amending the same checkpoint.
+
+## 2026-07-19: Completing the BIN opcode catalog
+
+The user asked to determine the currently unknown opcode meanings. Began by
+checking the clean worktree and searching the plan, README, scene-bytecode
+chapter, gap list, inspector, tests, Rizin script, and symbol catalog:
+
+```sh
+git status --short
+rg -n "Phase|opcode|unknown|OPCODE_NAMES|SCRIPT_VARIABLE_OPERANDS" \
+  PLAN.md README.md docs/src/scene-bytecode.md docs/src/known-gaps.md \
+  tools/inspect_bin.py tests analysis/cb.rz analysis/symbol-map.tsv
+sed -n '1,330p' tools/inspect_bin.py
+sed -n '1,130p' PLAN.md
+sed -n '1,130p' docs/src/known-gaps.md
+sed -n '1,280p' docs/src/scene-bytecode.md
+```
+
+`OPCODE_SCHEMAS` covered values `0x01..0x91`, while 51 values still fell back
+to structural `opcode_XX` names. Parsed the 145-word dispatch table at load
+offset `0x59AB` and mapped every such value to its concrete handler. The first
+Python formatting attempt failed with `SyntaxError: unexpected character
+after line continuation character` because an escaped quote appeared inside
+an f-string expression. Replaced that expression with `str.format` and
+obtained the complete mapping.
+
+The first corpus counter also used `(0, 0x08C6)` as `ROOM3.BIN`'s initial
+region and stopped at invalid opcode zero at `0x0336`. Re-read the regression
+test and corrected the three regions to `0x0000..0x0336`,
+`0x0C96..0x1754`, and `0x1768..EOF`; `CP2.BIN` remained limited to
+`0x0000..0x1D55`. The initial structural-name inventory contained 51 values,
+13 of which were absent from shipped code.
+
+Inspected handler bodies, shared state consumers, and corpus contexts with
+commands including:
+
+```sh
+rizin -q -b 16 -e scr.color=false -e asm.bytes=false \
+  -i analysis/cb.rz -c 'pdf @ 0x67bb' -c 'pdf @ 0x6822' \
+  -c 'pdf @ 0x6889' -c 'pdf @ 0x6da5' -c q \
+  build/analysis/CB_UNPACKED.EXE
+rizin -q -b 16 -e scr.color=false -e asm.bytes=false \
+  -i analysis/cb.rz -c 'pdf @ 0x6ebd' -c 'pdf @ 0x6f46' \
+  -c 'pdf @ 0x7469' -c 'pdf @ 0x737f' -c q \
+  build/analysis/CB_UNPACKED.EXE
+rizin -q -b 16 -e scr.color=false -e asm.bytes=false \
+  -i analysis/cb.rz -c 'axt @ 0x7dc0' -c 'axt @ 0x7dc2' \
+  -c 'axt @ 0x7dc4' -c 'axt @ 0x7dc7' -c q \
+  build/analysis/CB_UNPACKED.EXE
+rizin -q -b 16 -e scr.color=false -e asm.bytes=false \
+  -i analysis/cb.rz -c 'pdf @ 0xb53a' -c 'axt @ 0x82e4' \
+  -c 'pd 55 @ 0xb55c' -c q build/analysis/CB_UNPACKED.EXE
+```
+
+The navigation system provided the largest cluster. Opcode `0x0B` appends
+two-node edges searched recursively by `0x6DA5`. Opcodes `0x11` and `0x12`
+append destination-arrival and source-departure callbacks consumed at
+`0x67BB` and `0x6822`. Shared handler `0x4F44` records edge callbacks:
+`0x17` reverse departure, `0x18` forward departure, `0x19` forward arrival,
+and `0x1A` reverse arrival. Opcode `0x54` requests motion to a node, `0x5B`
+selects one of four directions, and `0x0A` waits until motion is idle.
+Opcodes `0x53`, `0x40`, `0x1C`, and `0x1D` initialize the node, set the motion
+state, and enable or disable a scene-thread selector. Opcode `0x10` supplies
+that selector's coordinates and inline label. Opcode `0x79` clears the four
+entry and callback counts.
+
+Tracing `0x7CC0` to the main loop at `0x87C1` proved that opcode `0x64`
+branches on and consumes the Enter-or-click latch. Tracing state word `0x7A`
+through `game_main` showed that opcode `0x67` requests mode 2, which restores
+the retained save buffers. The `SOUND.5` installation analysis established
+that opcode `0x8C` branches on the no-combat flag. Opcode `0x5A` tests the
+digital-audio fallback flag, but only after guards that require a real driver
+and the capability whose absence sets that flag. Its branch is therefore
+unreachable in the recovered shipped engine path; the documentation records
+the contradictory guards instead of hiding the apparent bug.
+
+The study path at `handle_study_bible_request` established three configuration
+forms. Opcode `0x15` selects a text record and clears success continuations;
+unused `0x4F` adds a navigation-node continuation; opcode `0x51` adds a BIN
+target and scheduler-slot continuation. Unused `0x50` clears the active record
+selectors. Opcodes `0x5C` and `0x5D` write the three presentation fields for
+Captain Bible and character dialogue respectively. Unused opcode `0x47`
+seeds a modal menu selection, while unused `0x5E` stores a target later started
+by the main loop in scheduler slot 2.
+
+Other direct effects recovered in this pass include full-screen fill
+(`0x4C`), palette-map range fill from a variable (`0x16`), mouse X/Y reads
+(`0x62`/`0x63`), signed 1,280-unit variable wrapping (`0x68`), direct and
+indirect BIN word loads (`0x69`/`0x71`), BIN word patching (`0x6A`), BIN byte
+loading (`0x84`), companion text-bank loading (`0x6B`), text-component copying
+into BIN memory (`0x83`), finished-animation branching (`0x8A`), file-open
+failure branching (`0x8D`), and current-map-cell byte modulo (`0x91`). Unused
+opcode `0x8B` consumes one random available text descriptor when variable zero
+is 2. Unused `0x6E` starts, and `0x6F` waits for, a primary scene-thread
+transient overlay. Opcodes `0x0E`, `0x4A`, `0x4B`, and `0x56` all dispatch to
+the exact same no-op continuation address `0x4535`.
+
+### Correcting opcode 0x69's boundary
+
+While checking the binary-memory commands byte by byte, disassembly at
+`0x56F4` showed that opcode `0x69` calls `bin_read_u16`, enters the shared BIN
+word-load path, and then calls `bin_read_u16` again for its destination
+variable. The schema incorrectly said `H` rather than `HH`. The old decoder
+still reached every region boundary because each destination's low byte was a
+valid opcode; in `CP2.BIN` the word `0x0040` appeared as a false opcode
+`0x40` command.
+
+Changed `0x69` to `HH`, added all newly proven variable-operand positions,
+and rebuilt the entire archive corpus with a Python counter. The corrected
+result is 64 regions, 25,829 commands, and the same 122 genuinely used opcode
+values. There are eleven `0x69` commands, exactly accounting for the reduction
+from 25,840. Added a regression for `CP2.BIN` offset `0x15D4`: it now decodes
+as `load_bin_word 0x0DEB, var@0x0040` ending at `0x15D9`, with no phantom
+command at `0x15D7`.
+
+Assigned names to all 145 entries in `OPCODE_NAMES` and added a set-equality
+test against `OPCODE_SCHEMAS`. Added 45 distinct newly recovered handler flags
+to `analysis/cb.rz` and matching evidence rows to the checked symbol map. Four
+no-op opcodes and the four directional callback opcodes share implementations,
+so the expanded executable catalog contains 71 distinct BIN handler symbols,
+not 145. `tools/inspect_symbol_map.py` reports 220 total entries: 140
+functions, 71 handlers, and 9 data symbols.
+
+Updated PLAN with the opcode-completion phase; updated README, Static Analysis,
+Scene Bytecode, Function Map, and Known Gaps. The scene-bytecode chapter now
+contains a complete table for the 51 formerly structural values, explicitly
+marks the 13 values absent from shipped code, documents the unreachable
+`0x5A` branch condition, and explains the `0x69` correction. Historical
+progress entries retain their older counts as a chronological record.
+
+The first full test run after expanding the symbol catalog failed one of 112
+tests. The catalog correctly used the already supported `medium` confidence
+for the two unused handlers whose higher-level roles remain uncertain, but the
+test still asserted that the observed confidence set was exactly `verified`
+and `high`. Kept the honest confidence values and updated that test to accept
+all three levels allowed by `inspect_symbol_map.py`. The next full run passed
+all 112 tests in 4.265 seconds.
+
+Ran the remaining reconciliation checks:
+
+```sh
+python3 -m py_compile tools/*.py tests/*.py
+tools/check_documentation.py
+tools/inspect_symbol_map.py
+mdbook build docs
+test -f docs/book/index.html
+git diff --check
+rizin -q -b 16 -e scr.color=false -i analysis/cb.rz \
+  -c 'fl~bin_handler' -c q build/analysis/CB_UNPACKED.EXE | \
+  python3 -c '...compare live flags with the TSV catalog...'
+tools/inspect_bin.py build/dd1/all/315_CP2.BIN --limit 0x1d55 | \
+  rg -C 2 '^15d4'
+```
+
+All Python files compiled. The documentation checker reported 23 chapters
+plus README, mdBook built `docs/book/index.html`, and Git found no whitespace
+errors. The symbol checker reported 220 entries with 115 verified, 103 high,
+and 2 medium-confidence entries. The live Rizin output matched all 71 handler
+address/name pairs exactly. The final CP2 inspector check shows `0x15D4` as
+the five-byte `load_bin_word 0x0DEB, var[32]@0x0040`, followed immediately by
+the real subtraction at `0x15D9`.
+
+After checking the last two PLAN items, ran `git diff --check`, the
+documentation checker, and the focused BIN/symbol-map suites once more. Git
+reported no whitespace errors, documentation remained consistent, and all 32
+focused tests passed in 0.177 seconds. The worktree contains only the 12
+intended modified source, analysis, test, and documentation files; no generated
+book output is tracked.

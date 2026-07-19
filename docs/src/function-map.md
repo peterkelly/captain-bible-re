@@ -92,8 +92,8 @@ tools/inspect_symbol_map.py \
   --rizin-flags build/analysis/cb-flags.txt
 ```
 
-The current Rizin run resolves all 26 handlers at the cataloged offsets and
-emits no script errors. Archive-backed unit tests enforce the 140/26/9 counts
+The current Rizin run resolves all 71 handlers at the cataloged offsets and
+emits no script errors. Archive-backed unit tests enforce the 140/71/9 counts
 and exact catalog-to-script coverage without requiring Rizin during the normal
 test suite.
 
@@ -104,7 +104,8 @@ several candidates cross jump tables or data. The catalog therefore does not
 claim that 140 functions are the whole executable. They are the complete set
 of names supported by the reverse-engineering evidence so far.
 
-Likewise, the 26 handler names cover only handlers whose gameplay semantics
-were needed by the recovered systems. Structurally, all 145 opcode operand
-layouts are known, but many remaining handlers retain generated case labels
-until their exact effect warrants a descriptive executable symbol.
+The 71 handler names cover every distinct implementation needed to describe
+all 145 opcodes; shared implementations account for dialogue variants, four
+no-op values, four edge-transition callbacks, and other paired commands.
+Unused handlers keep low-level names when shipped scripts cannot establish a
+more specific gameplay role.
