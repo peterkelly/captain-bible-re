@@ -390,7 +390,9 @@ chapter gives a single end-to-end command sequence for every recovered format
 and system. Known Gaps and Evidence Boundaries separates confirmed results
 from deliberately unnamed fields and the limits of controlled scene-entry
 captures.
-The rendered book is written to `docs/book/`.
+The rendered book is written to `docs/book/`. A custom stylesheet removes
+mdBook's fixed 750-pixel content limit so tables and disassembly listings use
+the available browser width.
 
 Pushes to `main` that change the book or its publishing workflow build and
 publish the same output with GitHub Actions. The workflow can also be started

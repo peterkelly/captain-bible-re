@@ -1,0 +1,4 @@
+/* Let long tables and disassembly listings use the available viewport. */
+:root {
+    --content-max-width: none;
+}

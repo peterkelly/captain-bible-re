@@ -5780,3 +5780,38 @@ reported no whitespace errors, documentation remained consistent, and all 32
 focused tests passed in 0.177 seconds. The worktree contains only the 12
 intended modified source, analysis, test, and documentation files; no generated
 book output is tracked.
+
+## 2026-07-19: Full-width mdBook layout
+
+The user reported that large tables remained difficult to read when widening
+the browser because mdBook kept the article at a fixed maximum width. Checked
+the clean worktree and current documentation layout with `git status --short`,
+`rg --files docs`, and focused `sed` reads of `docs/book.toml`, `PLAN.md`,
+`README.md`, and this progress log. Ran `mdbook --version`, which reported
+0.5.3, and searched the generated theme CSS. The built-in variables stylesheet
+sets `--content-max-width: 750px`, and the general stylesheet applies that
+variable as the `max-width` of `.content main`.
+
+Created `docs/theme/wide.css` with `--content-max-width: none` on `:root` and
+registered it through `additional-css` in `docs/book.toml`. Using the existing
+variable removes the limit consistently from the article and the related
+search layout while preserving mdBook's sidebar, padding, and responsive
+rules. Added a completed publication task to PLAN and described the override
+in README.
+
+Ran the documentation checker and rebuilt the book. The checker reported 23
+chapters plus README, and mdBook wrote `docs/book/index.html`. An initial test
+for the literal output path `docs/book/theme/wide.css` stopped because mdBook
+0.5.3 fingerprints additional stylesheets. A `find` and HTML-head inspection
+showed the actual output as `theme/wide-d12ccf4c.css`, linked after the built-in
+stylesheets. Its contents retain `--content-max-width: none`. Started a
+temporary localhost server for a rendered layout check; the sandbox rejected
+the first loopback bind, so repeated it with the required approval. The user
+then inspected the rendered book visually and confirmed that the full-width
+fix works. Stopped the temporary server immediately afterward.
+
+Before the requested commit, reviewed the complete five-file change set with
+`git status --short`, `git diff`, `git diff --stat`, and `git diff --check`.
+The diff contained only the stylesheet, its mdBook configuration, and the
+corresponding PLAN, README, and progress-log updates; the whitespace check
+passed.

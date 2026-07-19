@@ -84,6 +84,7 @@ This plan is a living checklist. Findings and commands are recorded in
 - [x] Configure mdBook output and repository metadata for GitHub Pages.
 - [x] Add a GitHub Actions workflow to build and deploy the book.
 - [x] Select GitHub Actions as the Pages source and confirm the first deployment.
+- [x] Remove the rendered book's fixed content-width limit.
 
 ## Phase 7: Complete BIN opcode semantics
 

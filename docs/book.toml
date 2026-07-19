@@ -11,3 +11,4 @@ build-dir = "book"
 [output.html]
 git-repository-url = "https://github.com/peterkelly/captain-bible-re"
 site-url = "/captain-bible-re/"
+additional-css = ["theme/wide.css"]
