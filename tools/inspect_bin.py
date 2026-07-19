@@ -94,15 +94,17 @@ ACTION_LABELS = COMBAT_ACTION_LABELS | HALL_ACTION_LABELS
 
 
 # Operand layout recovered from execute_bin_commands at load-module offset
-# 0x451b. B is an unsigned byte, H is a little-endian 16-bit word, z is a
-# NUL-terminated CP437 string, 9 is a nine-byte opaque animation record, and
-# s adds another word when the immediately preceding H is negative.
+# 0x451b. B is an unsigned byte, H is a little-endian 16-bit word, z is an
+# inline NUL-terminated CP437 string, p is a string pointer encoded as either
+# an inline NUL-terminated string or 0xFF plus an explicit 16-bit offset, 9 is
+# a nine-byte opaque animation record, and s adds another word when the
+# immediately preceding H is negative.
 OPCODE_SCHEMAS = {
     0x01: "z", 0x02: "BHHH", 0x03: "BBHHB", 0x04: "BBHHHB",
     0x05: "", 0x06: "H", 0x07: "9", 0x08: "BB", 0x09: "B",
-    0x0A: "", 0x0B: "BB", 0x0C: "BBz", 0x0D: "zz", 0x0E: "",
-    0x0F: "H", 0x10: "BHHz", 0x11: "BHs", 0x12: "BHs",
-    0x13: "H", 0x14: "z", 0x15: "B", 0x16: "HHH", 0x17: "BHs",
+    0x0A: "", 0x0B: "BB", 0x0C: "BBp", 0x0D: "zz", 0x0E: "",
+    0x0F: "H", 0x10: "BHHp", 0x11: "BHs", 0x12: "BHs",
+    0x13: "H", 0x14: "p", 0x15: "B", 0x16: "HHH", 0x17: "BHs",
     0x18: "BHs", 0x19: "BHs", 0x1A: "BHs", 0x1B: "H",
     0x1C: "B", 0x1D: "B", 0x1E: "HH", 0x1F: "HH",
     0x20: "HH", 0x21: "HH", 0x22: "HHH", 0x23: "HHH",
@@ -111,11 +113,11 @@ OPCODE_SCHEMAS = {
     0x2C: "HH", 0x2D: "HH", 0x2E: "HH", 0x2F: "HH",
     0x30: "HH", 0x31: "HH", 0x32: "H", 0x33: "H",
     0x34: "H", 0x35: "", 0x36: "B", 0x37: "B", 0x38: "BH",
-    0x39: "BH", 0x3A: "HHHz", 0x3B: "B", 0x3C: "B",
+    0x39: "BH", 0x3A: "HHHp", 0x3B: "B", 0x3C: "B",
     0x3D: "H", 0x3E: "BH", 0x3F: "B", 0x40: "B", 0x41: "",
-    0x42: "", 0x43: "BBHHHB", 0x44: "Hz", 0x45: "",
-    0x46: "", 0x47: "B", 0x48: "z", 0x49: "", 0x4A: "",
-    0x4B: "", 0x4C: "B", 0x4D: "z", 0x4E: "z", 0x4F: "BB",
+    0x42: "", 0x43: "BBHHHB", 0x44: "Hp", 0x45: "",
+    0x46: "", 0x47: "B", 0x48: "p", 0x49: "", 0x4A: "",
+    0x4B: "", 0x4C: "B", 0x4D: "z", 0x4E: "p", 0x4F: "BB",
     0x50: "", 0x51: "BHB", 0x52: "B", 0x53: "B", 0x54: "B",
     0x55: "", 0x56: "", 0x57: "BH", 0x58: "", 0x59: "",
     0x5A: "H", 0x5B: "B", 0x5C: "BBB", 0x5D: "BBB",
@@ -238,7 +240,7 @@ OPCODE_NAMES = {
     0x65: "clear_display_object_frames",
     0x66: "advance_display_object_frames",
     0x67: "request_restore_saved_game",
-    0x68: "wrap_variable_1280",
+    0x68: "adjust_variable_1280_once",
     0x69: "load_bin_word",
     0x6A: "patch_bin_word_from_variable",
     0x6B: "load_text_bank",
@@ -281,6 +283,16 @@ OPCODE_NAMES = {
     0x90: "and_variable",
     0x91: "set_variable_current_cell_byte_modulo",
 }
+
+
+def code_regions(filename: str, size: int) -> tuple[tuple[int, int], ...]:
+    """Return the independently recovered executable regions of a BIN member."""
+
+    if filename.upper() == "CP2.BIN":
+        return ((0, 0x1D55),)
+    if filename.upper() == "ROOM3.BIN":
+        return ((0, 0x0336), (0x0C96, 0x1754), (0x1768, size))
+    return ((0, size),)
 
 
 # These operands are even byte offsets into the 200-byte primary-state block.
@@ -366,6 +378,16 @@ def decode_command(data: bytes, offset: int, limit: int | None = None) -> BinCom
             operands.append(Operand("u16", raw))
             position += 2
         elif field == "z":
+            _require(data, position, 1, limit)
+            end = data.find(b"\0", position, limit)
+            if end < 0:
+                raise BinFormatError(
+                    f"unterminated string operand at {position:#x}"
+                )
+            value = data[position:end].decode("cp437")
+            operands.append(Operand("string", value))
+            position = end + 1
+        elif field == "p":
             _require(data, position, 1, limit)
             if data[position] == 0xFF:
                 _require(data, position, 3, limit)

@@ -16,6 +16,7 @@ from inspect_bin import (  # noqa: E402
     SCRIPT_VARIABLE_OPERANDS,
     action_target_definitions,
     animation_sequence_definitions,
+    code_regions,
     decode_command,
     decode_stream,
     dialogue_choice_definitions,
@@ -290,12 +291,7 @@ class BinBytecodeTests(unittest.TestCase):
     def test_dialogue_choice_corpus_count(self):
         count = 0
         for filename, data in self.bin_members.items():
-            regions = ((0, len(data)),)
-            if filename == "CP2.BIN":
-                regions = ((0, 0x1D55),)
-            elif filename == "ROOM3.BIN":
-                regions = ((0, 0x0336), (0x0C96, 0x1754), (0x1768, len(data)))
-            for start, limit in regions:
+            for start, limit in code_regions(filename, len(data)):
                 commands = decode_stream(data, start, limit)
                 count += len(dialogue_choice_definitions(commands))
         self.assertEqual(count, 40)
@@ -330,12 +326,7 @@ class BinBytecodeTests(unittest.TestCase):
 
     def test_script_variable_operands_are_even_offsets_in_primary_state(self):
         for filename, data in self.bin_members.items():
-            regions = ((0, len(data)),)
-            if filename == "CP2.BIN":
-                regions = ((0, 0x1D55),)
-            elif filename == "ROOM3.BIN":
-                regions = ((0, 0x0336), (0x0C96, 0x1754), (0x1768, len(data)))
-            for start, limit in regions:
+            for start, limit in code_regions(filename, len(data)):
                 for command in decode_stream(data, start, limit):
                     positions = SCRIPT_VARIABLE_OPERANDS.get(command.opcode, ())
                     for position in positions:
@@ -407,20 +398,25 @@ class BinBytecodeTests(unittest.TestCase):
         commands = decode_stream(cp2, 0, 0x1D55)
         self.assertEqual(commands[-1].end, 0x1D55)
 
+    def test_mixed_resource_boundaries_are_centralized(self):
+        self.assertEqual(code_regions("CP2.BIN", 0x1E55), ((0, 0x1D55),))
+        self.assertEqual(
+            code_regions("ROOM3.BIN", 0x19DC),
+            ((0, 0x0336), (0x0C96, 0x1754), (0x1768, 0x19DC)),
+        )
+
+    def test_title_save_index_probe_target_is_fallthrough(self):
+        commands = decode_stream(self.member("TITLE.BIN"))
+        probes = [command for command in commands if command.opcode == 0x8D]
+        self.assertEqual(len(probes), 1)
+        self.assertEqual(probes[0].offset, 0x012C)
+        self.assertEqual(probes[0].operands[0].value, probes[0].end)
+
     def test_complete_command_corpus_count(self):
         commands = []
         region_count = 0
         for filename, data in self.bin_members.items():
-            regions = ((0, len(data)),)
-            if filename == "CP2.BIN":
-                regions = ((0, 0x1D55),)
-            elif filename == "ROOM3.BIN":
-                regions = (
-                    (0, 0x0336),
-                    (0x0C96, 0x1754),
-                    (0x1768, len(data)),
-                )
-            for start, limit in regions:
+            for start, limit in code_regions(filename, len(data)):
                 commands.extend(decode_stream(data, start, limit))
                 region_count += 1
         self.assertEqual(region_count, 64)
@@ -450,7 +446,7 @@ class BinBytecodeTests(unittest.TestCase):
 
     def test_room3_command_regions_surround_reserved_zero_blocks(self):
         data = self.member("ROOM3.BIN")
-        regions = ((0, 0x0336), (0x0C96, 0x1754), (0x1768, len(data)))
+        regions = code_regions("ROOM3.BIN", len(data))
         for start, limit in regions:
             with self.subTest(start=start, limit=limit):
                 commands = decode_stream(data, start, limit)
@@ -466,11 +462,40 @@ class BinBytecodeTests(unittest.TestCase):
         with self.assertRaisesRegex(BinFormatError, "unterminated string"):
             decode_command(b"\x01INTRO", 0)
 
-    def test_decodes_explicit_string_offset_escape(self):
-        command = decode_command(bytes.fromhex("01 ff 34 12"), 0)
-        self.assertEqual(command.end, 4)
-        self.assertEqual(command.operands[0].kind, "string_offset")
-        self.assertEqual(command.operands[0].value, 0x1234)
+    def test_decodes_explicit_string_pointer_offset_escape(self):
+        command = decode_command(bytes.fromhex("44 34 12 ff 78 56"), 0)
+        self.assertEqual(command.end, 6)
+        self.assertEqual(command.operands[1].kind, "string_offset")
+        self.assertEqual(command.operands[1].value, 0x5678)
+
+    def test_inline_string_does_not_treat_ff_as_an_offset_escape(self):
+        command = decode_command(bytes.fromhex("01 ff 00"), 0)
+        self.assertEqual(command.end, 3)
+        self.assertEqual(command.operands[0].kind, "string")
+        self.assertEqual(command.operands[0].value, "\u00a0")
+
+    def test_shipped_string_offsets_only_use_pointer_capable_opcodes(self):
+        offsets = []
+        for filename, data in self.bin_members.items():
+            for start, limit in code_regions(filename, len(data)):
+                for command in decode_stream(data, start, limit):
+                    for operand in command.operands:
+                        if operand.kind == "string_offset":
+                            offsets.append(
+                                (
+                                    filename,
+                                    command.offset,
+                                    command.opcode,
+                                    operand.value,
+                                )
+                            )
+        self.assertEqual(
+            offsets,
+            [
+                ("ROOM3.BIN", 0x181C, 0x48, 0x0336),
+                ("ROOM3.BIN", 0x18CE, 0x4E, 0x0336),
+            ],
+        )
 
 
 if __name__ == "__main__":

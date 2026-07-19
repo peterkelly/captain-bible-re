@@ -45,16 +45,17 @@ where script transitions or map rendering establish their roles.
 ## Static-analysis coverage
 
 The checked catalog contains every project-assigned Rizin name: 140 functions,
-71 BIN handlers, and 9 data symbols. It is not a claim that the executable has
-only 140 functions. Rizin proposes roughly 340 candidates, including false
-merges across data and jump tables; unsupported candidates remain unnamed.
+134 distinct BIN handler addresses, and 9 data symbols. It is not a claim that
+the executable has only 140 functions. Rizin proposes roughly 340 candidates,
+including false merges across data and jump tables; unsupported candidates
+remain unnamed.
 
 All 145 opcode operand layouts and dispatch effects now have inspector names.
-Thirteen newly named values do not occur in shipped scripts, so their names
-stay close to directly observed state writes and callees. The low-level timer
-role of unused opcode `0x1B`, unused modal-menu opcode `0x47`, and the precise
-filename assembled by opcode `0x8D` remain evidence boundaries rather than
-reasons to leave their handlers structurally unnamed.
+Twenty-three values do not occur in shipped scripts, including thirteen from
+the final unnamed-handler pass, so their names stay close to directly observed
+state writes and callees. The finer gameplay role of unused opcode `0x1B`'s
+motion-transition latch and unused modal-menu opcode `0x47` remain evidence
+boundaries rather than reasons to leave their handlers structurally unnamed.
 
 ## Resolved former gaps
 
@@ -77,6 +78,11 @@ work answered. Current chapters supersede those chronological notes:
   captured animation records match their static first-step and interval fields.
 - Representative startup, story, exploration, study, map, faith, menu, save,
   combat, and defeat screens were exercised in visible, silent QEMU.
+- The complete dispatch audit establishes 145 opcode values, 134 distinct
+  handlers, and exact operand-reader paths. Pointer-capable strings are now
+  distinguished from inline-only names.
+- Opcode `0x8D` constructs the active player's save-index filename. Its only
+  shipped use tests `.SV0`, and its branch target equals its fallthrough.
 
 The append-only progress log is intentionally historical and can contain an
 earlier hypothesis followed by its correction. Format and system chapters are

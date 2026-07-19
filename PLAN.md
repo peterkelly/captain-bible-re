@@ -94,3 +94,11 @@ This plan is a living checklist. Findings and commands are recorded in
 - [x] Assign evidence-based names to all 145 dispatched opcodes.
 - [x] Record the recovered semantics in the inspector, symbol map, and mdBook.
 - [x] Add regression coverage and run the complete validation suite.
+
+## Phase 8: Independent BIN opcode audit
+
+- [x] Inventory every opcode claim, schema, handler, test, and book location.
+- [x] Re-derive all 145 dispatch targets and operand-read paths from the EXE.
+- [x] Verify names, side effects, branches, variables, and corpus usage.
+- [x] Correct every discrepancy and add exhaustive audit regressions.
+- [x] Reconcile all opcode documentation and rerun the complete validation suite.

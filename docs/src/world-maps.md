@@ -8,8 +8,8 @@ Easy, Normal, and Difficult, matching the three modes described by the
 manual. Archive directory entries 215 through 235 contain this complete
 cross product, and every member expands to exactly 768 bytes.
 
-Scene opcode `0x78` supplies a level letter. Its handler at load offset
-`0x034F` reads script variable zero as a difficulty index, selects one byte
+Scene opcode `0x78` supplies a level letter. Its `load_map_resource` helper at
+load offset `0x034F` reads script variable zero as a difficulty index, selects one byte
 from the literal `END`, appends `.MAP`, and loads the resulting archive
 member into the live grid at `DS:5B16`. Uses across the scene corpus supply
 all seven letters. For example, level C on Easy mode loads `CE.MAP`.
@@ -37,10 +37,14 @@ The first byte has two independently used nibbles:
 - The high nibble is a four-direction connection mask: `0x10` is up, `0x20`
   is down, `0x40` is left, and `0x80` is right. It selects one of 16
   connection frames when the map screen is drawn.
-- The low nibble selects a location kind. Scripts can replace it while
-  preserving the high nibble. Several numeric kinds can be correlated with
-  map glyphs and gameplay branches, but a complete symbolic enumeration is
-  not yet justified.
+- The low nibble selects a location kind. Shipped scripts replace it while
+  preserving the high nibble. More precisely, opcode `0x7B` preserves the
+  old high nibble and ORs it with the low byte of a script variable; the
+  handler does not mask that variable to four bits. All shipped callers use
+  only `0x00`, `0x05`, `0x0A`, `0x0B`, and `0x0C`, so they have the intended
+  low-nibble effect. Several
+  numeric kinds can be correlated with map glyphs and gameplay branches, but
+  a complete symbolic enumeration is not yet justified.
 
 Parameters A and B are also manipulated separately by scene commands. The
 map screen uses them as text-record selectors for at least location kinds
@@ -173,7 +177,7 @@ have direct support in their handlers:
 |---:|---|---|
 | `0x77` | none | Process the current cell, consulting adjacent cells and current state. |
 | `0x78` | `B` | Load the selected level's map for the current difficulty. |
-| `0x7B` | `H` | Set the current cell's low location-kind nibble from a script variable while preserving its high nibble. |
+| `0x7B` | `H` | Preserve the current high nibble and OR in a script variable's low byte. Shipped values are all valid low-nibble kinds. |
 | `0x7C` | `H` | Set parameter A from a script variable. |
 | `0x7F` | `H` | Set parameter B from a script variable. |
 | `0x87` | none | Normalize location cells after loading or state changes. |

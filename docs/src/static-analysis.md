@@ -168,11 +168,12 @@ all 143 resources and the exact QEMU framebuffer comparison.
 
 The 62 `BIN` members contain scene programs interpreted by `0x451B`. The
 routine reads opcodes `0x01` through `0x91` and dispatches through a 145-entry
-handler table at `0x59AB`. Shared readers at `0x3A1E`, `0x3A30`, and `0x3A64`
-consume bytes, little-endian words, and NUL-terminated strings from a far
-resource cursor. Static handler analysis recovers the operand layout and
-dispatch effect for all 145 commands; 122 opcodes occur across 25,829 decoded
-commands.
+table at `0x59AB`, containing 134 distinct handler addresses. Shared readers
+at `0x3A1E`, `0x3A30`, and `0x3A64` consume bytes, little-endian words, and
+pointer-capable strings from a far resource cursor; four resource-name
+handlers use separate inline-only string loops. An independent control-flow
+audit recovers the operand layout and dispatch effect for all 145 commands.
+Of those, 122 occur across 25,829 decoded commands.
 
 `initialize_scene` at `0x6631` appends `.BIN`, loads the resource, and starts
 the interpreter at file offset zero. `update_scene_threads` at `0x7997`

@@ -24,6 +24,12 @@ The main event loop writes `Q` before an F10 quick save or F9 quick load and
 restores `0` afterward. Thus quick save is a tenth state without an entry in
 the nine-label index.
 
+Scene opcode `0x8D` reuses this exact active-prefix plus mutable-suffix
+construction. Its sole shipped site is `TITLE.BIN:0x012C`, while the suffix is
+`.SV0`, so it probes the player's label index in `rb` mode. Its missing-file
+target `0x012F` equals the next command, so the shipped title program enters
+`INTRO` whether the open succeeds or fails.
+
 The manual requires an extensionless legal DOS name of at most eight
 characters, or permits a complete path such as `d:\players\jimmy`. That is a
 user-facing constraint, not executable validation: the parser copies the

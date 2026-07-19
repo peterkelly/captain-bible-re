@@ -5815,3 +5815,204 @@ Before the requested commit, reviewed the complete five-file change set with
 The diff contained only the stylesheet, its mdBook configuration, and the
 corresponding PLAN, README, and progress-log updates; the whitespace check
 passed.
+
+## 2026-07-19: Independent BIN opcode audit
+
+The user requested an extremely thorough second pass because correcting
+opcode `0x69` from one word to two showed that a stream reaching its expected
+end is not sufficient proof of an operand schema. Added Phase 8 to PLAN. The
+audit will independently re-derive every dispatch target and operand-read path
+from `CB_UNPACKED.EXE`, then verify handler semantics, script-variable roles,
+shipped-corpus usage, tests, the symbol map, Rizin annotations, and all mdBook
+claims.
+
+Started with `git status --short`, broad `rg` inventories of opcode references,
+and focused reads of `tools/inspect_bin.py`, `tests/test_inspect_bin.py`,
+`analysis/cb.rz`, `analysis/symbol-map.tsv`, and the scene-bytecode chapter.
+Checked the available analysis artifacts and ran Rizin 0.9.1 against
+`build/analysis/CB_UNPACKED.EXE`. `pdfj` reports 1,817 instructions in
+`execute_bin_commands`, and `pxhj 290 @ 0x59ab` returns exactly 145 dispatch
+pointers. The JSON instruction records expose direct call targets and both
+edges of conditional branches, which is sufficient to machine-walk each
+handler's calls to `bin_read_u8`, `bin_read_u16`, and
+`bin_read_cstring_offset`, including shared tails such as opcodes `0x69`,
+`0x71`, and `0x84`.
+
+The initial inventory found one definite evidence-label error before the
+schema walk: the symbol-map row for `bin_handler_configure_study_prompt` says
+opcode `0x7E`, although its dispatch entry is `0x7D`; opcode `0x7E` is the
+separate palette-blackout handler. The scene-bytecode table and inspector use
+the correct values, so this is a catalog description defect rather than a
+decoder boundary error.
+
+Continued with `git status --short` and the focused command
+`python3 -m unittest tests.test_audit_bin_opcodes tests.test_inspect_bin
+tests.test_inspect_symbol_map`. After updating the catalog-count expectation,
+all 39 tests passed. A small Python `csv`/`Counter` inventory then established
+the complete expanded symbol totals: 283 entries comprising 140 functions,
+134 handlers, and 9 data symbols. The subsystem total is 141 bytecode entries;
+the prior function-map chapter still contained several obsolete 71-handler
+and 175-entry statements.
+
+Added `tools/audit_bin_opcodes.py`. It reads the 145 little-endian dispatch
+pointers with Rizin `pxhj`, reads the complete interpreter CFG with `pdfj`,
+and walks every reachable path from each target. Calls to `bin_read_u8`,
+`bin_read_u16`, and `bin_read_cstring_offset` produce independent operand
+events. Strongly connected-component analysis identifies the four inline
+byte-reading string loops at `0x4D8C`, `0x4DA4`, `0x4DE9`, and `0x540F`; a
+direct `add word [0xf6], 9` identifies opcode `0x07`'s raw record. The audit
+expands conditional `BHs` into both `BH` and `BHH`, and permits an operand-free
+retry path only for the shared dialogue handler at `0x52A3`.
+
+The dispatch table has 145 entries but 134 distinct addresses. The only shared
+groups are opcodes `04/43`, the no-ops `0E/4A/4B/56/60`, dialogue
+`14/48/4E`, edge callbacks `17/18/19/1A`, and palette loads `4D/6D`. Expanded
+`analysis/cb.rz` and `analysis/symbol-map.tsv` so every one of the 134 targets
+has a checked handler symbol. Generated `analysis/opcode-audit.tsv`, joining
+each opcode to its address, symbol, confidence, declared schema, observed read
+paths, variable operands, use count, resource set, and first site. Running
+`tools/audit_bin_opcodes.py --write-report analysis/opcode-audit.tsv` reports
+145 opcodes, 134 handlers, 122 used values, and 25,829 commands.
+
+The structural walk confirmed all byte and word counts after the earlier
+`0x69` fix, but found that the old `z` marker conflated two implementations.
+Opcodes `01`, `0D`, `4D`, and `6D` use inline-only NUL loops. Opcodes `0C`,
+`10`, `14`, `3A`, `44`, `48`, and `4E` call the pointer reader, which also
+accepts `FF` plus a word offset. Split those encodings into `z` and `p` in the
+decoder and tests. An exhaustive corpus assertion found exactly two explicit
+offset uses: `ROOM3.BIN:0x181C` (`0x48`) and `ROOM3.BIN:0x18CE` (`0x4E`), both
+pointing to `0x0336`.
+
+Tried Rizin's `pdc` on three handlers, but this Rizin 0.9.1 build has no
+decompiler command; its help redirected the work to ordinary `pd`
+disassembly. Also tried the older `psz` spelling while checking initialized
+strings; this build uses the newer `ps` syntax. An initial inspector command
+used nonexistent extracted index `345_TITLE.BIN`; `rg --files build` found the
+correct `332_TITLE.BIN`, whose bytes and decoded listing confirm opcode `0x8D`
+at `0x012C` with target `0x012F`, exactly its fallthrough.
+
+Reviewed disassembly around `0x4623`, `0x491C`, `0x500E`, `0x5089`, `0x514D`,
+`0x52A3`, `0x54DC`, `0x556E`, `0x56C2`, `0x589F`, `0x58F1`, and `0x5971`,
+plus motion-state consumers at `0x758A` and `0x7778`. This produced several
+semantic refinements: opcode `0x0F` subtracts its word from scheduler delay;
+unused `0x1B` sets a consumed motion-transition latch rather than a proven
+completion signal; `0x68` makes only one signed-threshold correction;
+`0x7B` ORs an unmasked variable byte with the preserved map high nibble;
+`0x84` sign-extends its loaded byte; and `0x91` uses signed division after
+zero-extending the cell byte. Opcode `0x5A` is now described by its exact four
+nonzero guards rather than the older unreachable-path inference.
+
+Resolved opcode `0x8D` by joining its handler with the save filename routines
+and sole script site. It copies the active player prefix, appends the mutable
+suffix, and opens the result as `rb`; at title startup this is the `.SV0`
+index. Failure selects `0x012F`, which is also fallthrough, so both outcomes
+enter the same `INTRO` scene change. The handler calls `fclose` after either
+path, even when `fopen` returned null. Updated the current-reference chapters,
+symbol evidence, README, and reproducing commands; chronological older
+progress entries remain unchanged.
+
+Continued the semantic pass through all 134 distinct handler bodies and their
+direct callees rather than stopping after operand-width agreement. The review
+confirmed that opcode `0x3F` retries unless animation state is exactly 0, 5,
+or 6; unused `0x65` reads `first, count`; unused `0x66` reads `first, count,
+minimum, maximum`; and unused `0x8B` tests descriptor state byte `+4`, clears
+it, and starts a 3,000-tick timer only when variable zero is 2. It also
+confirmed that `0x08` reads `animation, mode`, `0x5F` reads `animation,
+linked animation, mode`, and `0x3A` reads `target, x, y, label`. Corrected the
+symbol evidence that had called `0x5F`'s second operand a display record and
+had described opcode `0x10`'s pointer-capable label as inline-only.
+
+While applying the corpus join uniformly, found one lingering mixed-resource
+boundary of `0x1D5A` in the gallery tool and a map test. Direct inspection
+shows that `CP2.BIN` code ends at `0x1D55`, immediately before its 256-byte
+Unibot graph. Added `code_regions()` to `tools/inspect_bin.py` as the single
+source for the `CP2.BIN` and `ROOM3.BIN` regions, then changed the audit,
+gallery, and tests to use it. Regression tests now require the exact CP2 end
+and all three ROOM3 regions.
+
+Added `tests/test_opcode_documentation.py` and made the Scene Bytecode catalog
+one-to-one by splitting grouped rows whose opcodes have different names. The
+test extracts all 145 rows from the Markdown, compares every schema and name
+with `OPCODE_SCHEMAS` and `OPCODE_NAMES`, and compares every **Unused** marker
+with the zero-use rows in the checked audit report. It also walks all other
+mdBook chapters and checks every compact opcode schema table against the same
+catalog. This prevents a correction in the decoder from leaving a conflicting
+schema in World Maps, Conversation Flow, or another secondary chapter.
+
+The cross-chapter `rg` review found one address-description ambiguity in
+World Maps: load offset `0x034F` is `load_map_resource`, called by opcode
+`0x78`'s handler at `0x460E`, rather than the handler itself. Corrected that
+wording. Replaced the broad statement that shipped opcode-`0x7B` callers use
+values in `0x00..0x0F` with the exact observed set `00`, `05`, `0A`, `0B`,
+and `0C`. A regression checks all 30 sites: each is immediately preceded by
+`set_variable` for the same operand, and the immediate values equal that
+five-value set. Marked the unused direct-display and frame-range commands in
+both the canonical catalog and the display-object chapter.
+
+The documentation reconciliation also removed stale handler totals and old
+open questions from Function Map, Known Gaps, Conversation Flow, Static
+Analysis, Combat Runtime, Save Formats, and the other current-reference
+chapters. The final catalog is 283 symbols: 140 named functions, 134 distinct
+handler addresses, and 9 data symbols. Confidence totals are 163 verified,
+118 high, and 2 medium. The two medium entries are deliberately limited to
+the higher-level gameplay roles of unused opcodes `0x1B` and `0x47`; their
+operand widths and direct state effects are still established.
+
+Ran the focused audit command repeatedly while making the corrections:
+
+```sh
+python3 -m unittest \
+  tests.test_opcode_documentation \
+  tests.test_audit_bin_opcodes \
+  tests.test_inspect_bin \
+  tests.test_inspect_map \
+  tests.test_fullscreen_gallery \
+  tests.test_inspect_symbol_map
+tools/audit_bin_opcodes.py --write-report analysis/opcode-audit.tsv
+git diff --check
+```
+
+The final focused run passed 61 tests. The regenerated report again contained
+145 opcodes, 134 handlers, 122 used values, and 25,829 commands. A live Rizin
+flag dump loaded `analysis/cb.rz` without errors, and
+`tools/inspect_symbol_map.py --rizin-flags` matched all cataloged names and
+addresses. Searches for the superseded handler counts, CP2 boundary, `0x68`
+wrap name, `0x5A` reachability claim, `0x7B` masking claim, and `0x7D`/`0x7E`
+prompt mix-up found no remaining current-reference instances.
+
+Ran the complete noninteractive verification:
+
+```sh
+python3 -m unittest discover -s tests -v
+python3 -m py_compile tools/*.py tests/*.py
+tools/check_documentation.py
+tools/inspect_symbol_map.py
+tools/audit_bin_opcodes.py
+bash -n run.sh tools/build_qemu_dos_trace.sh
+mdbook build docs
+test -f docs/book/index.html
+git diff --check
+```
+
+All 128 tests passed in 5.421 seconds. Python compilation and shell syntax
+checks were silent and successful. The documentation checker reported 23
+chapters plus README, the opcode audit reproduced its checked report, and
+mdBook wrote `docs/book/index.html`. This build exposed a stale command in the
+Reproducing Results chapter that tested `build/docs-book/index.html`; corrected
+both that command and its output-directory sentence to the actual configured
+`docs/book/`, then rebuilt and rechecked the book. The final whitespace check
+passed.
+
+Before the requested commit, ran `git status --short`, `git diff --check`,
+`git diff --stat`, and `git diff --name-only`. The worktree contained the 20
+intended modified files plus the four new audit report, audit tool, and test
+files; no unrelated changes or whitespace errors were present. The rendered
+book remains ignored and is not part of the commit.
+
+Staged those 24 reviewed paths explicitly with `git add`, then ran
+`git diff --cached --check`, `git status --short`, and
+`git diff --cached --stat`. The staged snapshot contained 1,623 insertions and
+163 deletions with no whitespace errors. Created the requested commit with the
+subject `Audit all BIN opcode documentation`; its body records why the audit
+uses the executable CFG, why the string and mixed-region corrections matter,
+and which regression boundaries were added.

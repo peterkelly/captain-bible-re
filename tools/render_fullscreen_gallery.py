@@ -11,7 +11,7 @@ import sys
 from PIL import Image, ImageDraw, ImageFont
 
 from extract_dd1 import DD1Archive
-from inspect_bin import BinFormatError, decode_stream
+from inspect_bin import BinFormatError, code_regions, decode_stream
 from render_art import ArtResource, expand_vga_palette, parse_vga_palette
 
 
@@ -33,14 +33,6 @@ class FullscreenFrame:
     palette: bytes
 
 
-def _command_regions(filename: str, size: int) -> tuple[tuple[int, int], ...]:
-    if filename == "CP2.BIN":
-        return ((0, 0x1D5A),)
-    if filename == "ROOM3.BIN":
-        return ((0, 0x0336), (0x0C96, 0x1754), (0x1768, size))
-    return ((0, size),)
-
-
 def infer_art_palettes(archive: DD1Archive) -> dict[str, tuple[str, ...]]:
     """Infer ART-to-PAL associations from linear resource-loading commands."""
 
@@ -49,7 +41,7 @@ def infer_art_palettes(archive: DD1Archive) -> dict[str, tuple[str, ...]]:
         if entry.extension != "BIN":
             continue
         data = archive.extract(entry)
-        for start, limit in _command_regions(entry.filename, len(data)):
+        for start, limit in code_regions(entry.filename, len(data)):
             try:
                 commands = decode_stream(data, start, limit)
             except BinFormatError as error:

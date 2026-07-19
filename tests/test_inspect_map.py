@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
 from extract_dd1 import DD1Archive  # noqa: E402
-from inspect_bin import decode_stream  # noqa: E402
+from inspect_bin import code_regions, decode_stream  # noqa: E402
 from inspect_map import (  # noqa: E402
     MapFormatError,
     compare_maps,
@@ -183,18 +183,35 @@ class MapResourceTests(unittest.TestCase):
             if entry.extension != "BIN":
                 continue
             data = self.archive.extract(entry)
-            regions = [(0, len(data))]
-            if entry.filename == "CP2.BIN":
-                regions = [(0, 0x1D5A)]
-            elif entry.filename == "ROOM3.BIN":
-                regions = [(0, 0x0336), (0x0C96, 0x1754), (0x1768, len(data))]
-            for start, limit in regions:
+            for start, limit in code_regions(entry.filename, len(data)):
                 loaded.update(
                     chr(command.operands[0].value)
                     for command in decode_stream(data, start, limit)
                     if command.opcode == 0x78
                 )
         self.assertEqual(loaded, set("ABCDEFG"))
+
+    def test_every_map_kind_write_uses_a_low_nibble_immediate(self):
+        observed = []
+        for entry in self.archive.entries:
+            if entry.extension != "BIN":
+                continue
+            data = self.archive.extract(entry)
+            for start, limit in code_regions(entry.filename, len(data)):
+                commands = decode_stream(data, start, limit)
+                for index, command in enumerate(commands):
+                    if command.opcode != 0x7B:
+                        continue
+                    previous = commands[index - 1]
+                    self.assertEqual(previous.opcode, 0x1F)
+                    self.assertEqual(
+                        previous.operands[1].value, command.operands[0].value
+                    )
+                    value = previous.operands[0].value
+                    self.assertLessEqual(value, 0x0F)
+                    observed.append(value)
+        self.assertEqual(len(observed), 30)
+        self.assertEqual(set(observed), {0x00, 0x05, 0x0A, 0x0B, 0x0C})
 
     def test_room_and_victim_scene_dispatch_matches_decoded_classes(self):
         members = {

@@ -64,12 +64,12 @@ The definition and direct frame-control commands are:
 | Opcode | Operands | Effect |
 |---:|---|---|
 | `0x02` | `thread, x, y, scale` | Initializes a 16-byte command-thread slot and appends a type-`0x02` display record. |
-| `0x03` | `frame, art, x, y, flags` | Appends a native-scale type-`0x03` display object. |
+| `0x03` | `frame, art, x, y, flags` | Appends a native-scale type-`0x03` display object; unused by shipped scripts. |
 | `0x04` / `0x43` | `frame, art, x, y, scale, flags` | Appends a scaled type-`0x43` display object. |
 | `0x06` | `delay` | Begins an animation sequence and appends a type-`0x06` display record. |
 | `0x07` | nine-byte record | Supplies an animation step retained within the BIN stream. |
-| `0x65` | `first, count` | Sets frame byte `+7` to zero for a consecutive display-record range. |
-| `0x66` | `first, count, minimum, maximum` | Increments each selected frame and resets values outside the inclusive range to `minimum`. |
+| `0x65` | `first, count` | Sets frame byte `+7` to zero for a consecutive display-record range; unused by shipped scripts. |
+| `0x66` | `first, count, minimum, maximum` | Increments each selected frame and resets values outside the inclusive range to `minimum`; unused by shipped scripts. |
 | `0x85` | `index` | Sets ART-slot bit 7, hiding a direct display object. |
 | `0x86` | `index` | Clears ART-slot bit 7, showing a direct display object. |
 

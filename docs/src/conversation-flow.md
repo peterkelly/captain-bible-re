@@ -16,15 +16,26 @@ offsets and their transient menu records live in a separate table.
 ## Dialogue commands
 
 Three commands share the handler at load offset `0x52A3`. The handler chooses
-presentation parameters from the opcode and stores a far pointer to the
-inline text. The input layer then displays the modal box and waits for Enter,
-Escape, or a click.
+presentation parameters from the opcode and stores a far pointer to text in
+the current BIN resource. The input layer then displays the modal box and
+waits for Enter, Escape, or a click.
 
 | Opcode | Operands | Current name | Corpus evidence |
 |---:|---|---|---|
-| `0x14` | string | `show_adversary_dialogue` | Ten uses, all in `FACE.BIN`, spoken by the Tower of Deception. |
-| `0x48` | string | `show_character_dialogue` | 306 uses in 12 resources for the boss, victims, and allies. |
-| `0x4E` | string | `show_captain_bible_dialogue` | 281 uses in 25 resources, normally Captain Bible's side of a conversation. |
+| `0x14` | `p` | `show_adversary_dialogue` | Ten uses, all in `FACE.BIN`, spoken by the Tower of Deception. |
+| `0x48` | `p` | `show_character_dialogue` | 306 uses in 12 resources for the boss, victims, and allies. |
+| `0x4E` | `p` | `show_captain_bible_dialogue` | 281 uses in 25 resources, normally Captain Bible's side of a conversation. |
+
+Here `p` is either inline NUL-terminated CP437 text or byte `0xFF` followed by
+an explicit 16-bit offset in the same BIN resource. `ROOM3.BIN` uses the
+offset form twice, at commands `0x181C` and `0x18CE`, to reuse text beginning
+at `0x0336`. Those are the only explicit string offsets in shipped code.
+
+The handler has a deliberate retry path that reads no operand. If a modal
+dialogue is already active, it suspends the command thread at the original
+command offset. Once the modal state clears, re-execution consumes `p` and
+continues. This no-read path is synchronization behavior, not an optional
+text operand.
 
 Opcode `0x4E` is a presentation channel rather than a hard type system. A few
 scripts reuse it for system or caption text such as `Verse loaded: &` and the
@@ -156,13 +167,10 @@ that branches can change the menu seen at runtime.
 
 ## Remaining boundaries
 
-- Opcode `0x15` changes dialogue presentation state around verse passages,
-  but its most precise user-facing label is still open.
 - The exact formatting roles of every dialogue state and frame are not yet
   named.
 - Conversation choices and verse answers alter progression flags, but they do
   not expose a separate enemy-health, hit-test, or combat-entity structure.
-- Combat scripts use additional opcode clusters that require a separate pass.
 
 ## Relevant executable routines
 

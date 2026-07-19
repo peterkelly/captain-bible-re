@@ -73,8 +73,16 @@ rizin -b 16 -i analysis/cb.rz build/analysis/CB_UNPACKED.EXE
 tools/inspect_symbol_map.py
 ```
 
+Then verify every BIN dispatch target and operand-reading path against the
+unpacked executable, symbol catalog, decoder, and original archive:
+
+```sh
+tools/audit_bin_opcodes.py
+```
+
 The executable and symbol-map chapters define load offsets, file offsets,
-segment translation, confidence levels, and optional handler-address auditing.
+segment translation, confidence levels, and handler-address auditing. The
+checked per-opcode report is `analysis/opcode-audit.tsv`.
 
 ## 4. Extract the resource archive
 
@@ -207,16 +215,17 @@ python3 -m unittest discover -s tests -v
 python3 -m py_compile tools/*.py tests/*.py
 tools/check_documentation.py
 tools/inspect_symbol_map.py
+tools/audit_bin_opcodes.py
 bash -n run.sh tools/build_qemu_dos_trace.sh
 mdbook build docs
-test -f build/docs-book/index.html
+test -f docs/book/index.html
 ```
 
 The tests read original inputs directly from `CB/` and do not depend on a
 previous extraction directory. The documentation checker requires every book
 chapter to appear exactly once in `SUMMARY.md`, validates local links and
 anchors, and confirms that repository commands in shell examples exist and are
-executable. The final HTML is written to `build/docs-book/`.
+executable. The final HTML is written to `docs/book/`.
 
 ## Result boundaries
 

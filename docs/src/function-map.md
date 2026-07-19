@@ -2,12 +2,12 @@
 
 The checked symbol catalog is `analysis/symbol-map.tsv`. It records every
 project-assigned name in `analysis/cb.rz`, rather than only a selected list of
-interesting routines. The current map contains 175 entries:
+interesting routines. The current map contains 283 entries:
 
 | Kind | Count | Meaning |
 |---|---:|---|
 | Function | 140 | Application, driver API, decoder, rendering, and Microsoft C routines |
-| BIN handler | 26 | Named cases in the 145-entry scene-opcode dispatcher |
+| BIN handler | 134 | Every distinct implementation address in the 145-entry scene-opcode dispatcher |
 | Data | 9 | Strings and one recovered room-orientation table |
 
 All offsets are 16-bit linear offsets from the DOS load-module base. Add
@@ -23,9 +23,9 @@ levels:
 
 | Level | Requirement | Current entries |
 |---|---|---:|
-| Verified | Static semantics plus independent agreement with QEMU state, traced I/O, supplied saves, or exhaustive resource decoding | 82 |
-| High | Instruction behavior, callers, data layout, and cross-resource use uniquely support the name | 93 |
-| Medium | Best current interpretation, but a material semantic ambiguity remains | 0 |
+| Verified | Static semantics plus independent agreement with QEMU state, traced I/O, supplied saves, or exhaustive resource decoding | 163 |
+| High | Instruction behavior, callers, data layout, and cross-resource use uniquely support the name | 118 |
+| Medium | Best current interpretation, but a material semantic ambiguity remains | 2 |
 
 “Verified” does not mean source-level names were recovered: the executable has
 no debug symbols. It means the descriptive name has an independent check
@@ -40,7 +40,7 @@ and data symbols:
 
 | Subsystem | Entries | Principal evidence |
 |---|---:|---|
-| Bytecode | 33 | Complete opcode layouts, switch targets, and decoded BIN corpus |
+| Bytecode | 141 | Complete opcode layouts, switch targets, and decoded BIN corpus |
 | Runtime | 16 | Microsoft C startup banner, standard implementations, and call sites |
 | Graphics | 14 | ART/PAL validation and QEMU framebuffer comparison |
 | Saves | 10 | Exact supplied SV0/SV1–SV9/SVQ structures and copy directions |
@@ -92,10 +92,11 @@ tools/inspect_symbol_map.py \
   --rizin-flags build/analysis/cb-flags.txt
 ```
 
-The current Rizin run resolves all 71 handlers at the cataloged offsets and
-emits no script errors. Archive-backed unit tests enforce the 140/71/9 counts
-and exact catalog-to-script coverage without requiring Rizin during the normal
-test suite.
+The current Rizin run resolves all 134 distinct handlers at the cataloged
+offsets and emits no script errors. Archive-backed unit tests enforce the
+140/134/9 counts and exact catalog-to-script coverage. The independent opcode
+audit additionally reads the dispatch table and handler control-flow graph
+from Rizin during its dedicated test.
 
 ## Boundaries
 
@@ -104,8 +105,8 @@ several candidates cross jump tables or data. The catalog therefore does not
 claim that 140 functions are the whole executable. They are the complete set
 of names supported by the reverse-engineering evidence so far.
 
-The 71 handler names cover every distinct implementation needed to describe
-all 145 opcodes; shared implementations account for dialogue variants, four
-no-op values, four edge-transition callbacks, and other paired commands.
-Unused handlers keep low-level names when shipped scripts cannot establish a
-more specific gameplay role.
+The 134 handler names cover every distinct implementation needed to describe
+all 145 opcodes. The repeated addresses are the paired scaled-object command,
+five no-op values, three dialogue variants, four edge-transition callbacks,
+and the paired palette-loading command. Unused handlers keep low-level names
+when shipped scripts cannot establish a more specific gameplay role.

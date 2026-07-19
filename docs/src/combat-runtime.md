@@ -60,11 +60,13 @@ is counted by the word at `DS:B114`. The recovered fields are:
 | `+9` | 1 | Associated render/display slot. |
 | `+10` | 2 | Internal timing state; exact split remains unnamed. |
 
-Opcode `0x08` starts a slot with no parent, while `0x5F` starts a slot with an
-explicit link. Opcode `0x09` stops a slot and releases its render slot.
-Opcode `0x3F` suspends the current BIN thread while an animation remains
-active, except for the two nonblocking modes 5 and 6. Opcode `0x80` branches
-when a chosen animation's state byte is nonzero.
+Opcode `0x08` reads `animation, mode` and starts the slot with parent/link
+value -1. Opcode `0x5F` reads `animation, linked animation, mode` and supplies
+the explicit link. Opcode `0x09` stops a slot and releases its render slot.
+Opcode `0x3F` suspends the current BIN thread unless the animation state is 0,
+5, or 6. Opcode `0x80` branches when a chosen animation's state byte is
+nonzero; opcode `0x8A` branches for exactly the same three finished states
+accepted by `0x3F`.
 
 The executable routines at `0x3B9B`, `0x3D08`, `0x3DA8`, `0x3F59`, and
 `0x3FDF` resolve linked transforms, render one slot, update all slots, start a

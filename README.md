@@ -119,12 +119,22 @@ Load the current high-confidence names into Rizin with:
 rizin -b 16 -i analysis/cb.rz build/analysis/CB_UNPACKED.EXE
 ```
 
-Audit all 140 named functions, 71 BIN handlers, and 9 data symbols against the
-Rizin script, with per-entry confidence and evidence, using:
+Audit all 140 named functions, 134 distinct BIN handlers, and 9 data symbols
+against the Rizin script, with per-entry confidence and evidence, using:
 
 ```sh
 tools/inspect_symbol_map.py
 ```
+
+Independently compare all 145 opcode dispatch entries and operand-reader paths
+with the decoder, all 134 distinct handler symbols, and all 25,829 shipped
+commands using:
+
+```sh
+tools/audit_bin_opcodes.py
+```
+
+The checked per-opcode result is `analysis/opcode-audit.tsv`.
 
 The generated executable and memory dumps remain under ignored `build/`.
 Research results, address conventions, function names, command-line behavior,
@@ -217,7 +227,8 @@ blocks, so those regions require explicit `--start` and `--limit` values. The
 mdBook scene-bytecode chapter describes the interpreter, command schema,
 startup sequence, QEMU memory correlation, and complete opcode catalog. It
 also records the corrected two-word layout of opcode `0x69`, which removes 11
-phantom commands from the linear corpus.
+phantom commands from the linear corpus, and the independent executable-CFG
+audit of every declared operand path.
 The `--objects` view summarizes the display records defined in linear command
 order, including thread/animation types and direct objects' coordinates,
 scale, flags, frame, and ART slot. See the scene-display-object chapter for

@@ -139,7 +139,7 @@ function	0xdaa2	libc_lowio_seek	high	runtime	DOS seek wrapper and file-loader ca
 function	0xdb1c	libc_lowio_open	high	runtime	Microsoft C descriptor open path
 function	0xdcc0	libc_lowio_read	high	runtime	Chunked DOS read wrapper and callers
 function	0xdd9e	libc_lowio_write	high	runtime	Chunked DOS write wrapper and export callers
-handler	0x4672	bin_handler_configure_study_prompt	verified	bytecode	Opcode 0x7e operand schema and prompt state writes
+handler	0x4672	bin_handler_configure_study_prompt	verified	bytecode	Opcode 0x7d operand schema and prompt state writes
 handler	0x51b7	bin_handler_clear_dialogue_choices	verified	bytecode	Opcode 0x45 clears live choice count
 handler	0x51c6	bin_handler_add_dialogue_choice	verified	bytecode	Opcode 0x44 appends six-byte live choice record
 handler	0x51ff	bin_handler_remove_dialogue_choice	high	bytecode	Opcode 0x13 removes matching choice target
@@ -153,11 +153,11 @@ handler	0x4c96	bin_handler_add_action_target	verified	bytecode	Opcode 0x3a appen
 handler	0x4d1e	bin_handler_enable_action_target	verified	bytecode	Opcode 0x3b sets target active byte
 handler	0x4d36	bin_handler_disable_action_target	verified	bytecode	Opcode 0x3c clears target active byte
 handler	0x505c	bin_handler_start_scene_thread_at	verified	bytecode	Opcode 0x3e starts thread at absolute BIN offset
-handler	0x50cf	bin_handler_wait_for_animation	high	bytecode	Opcode 0x3f blocks while animation is active
+handler	0x50cf	bin_handler_wait_for_animation	high	bytecode	Opcode 0x3f continues only for animation states 0 5 or 6 and otherwise retries
 handler	0x519f	bin_handler_enable_action_selection	high	bytecode	Opcode 0x41 enables selector input
 handler	0x51a8	bin_handler_disable_action_selection	high	bytecode	Opcode 0x42 disables selector input
 handler	0x511e	bin_handler_wait_for_sound_effect	high	bytecode	Opcode 0x59 blocks while sound is active
-handler	0x4e3d	bin_handler_start_linked_animation	verified	bytecode	Opcode 0x5f starts animation linked to display record
+handler	0x4e3d	bin_handler_start_linked_animation	verified	bytecode	Opcode 0x5f starts an animation linked to another animation slot
 handler	0x5074	bin_handler_stop_scene_thread	high	bytecode	Opcode 0x61 clears matching command thread
 handler	0x4e80	bin_handler_jump_if_animation_active	high	bytecode	Opcode 0x80 conditional branch on animation state
 handler	0x58f1	bin_handler_set_variable_random_modulo	high	bytecode	Opcode 0x82 writes bounded random result
@@ -169,13 +169,13 @@ handler	0x50a2	bin_handler_wait_for_scene_thread_movement	verified	bytecode	Opco
 handler	0x4dbe	bin_handler_add_navigation_edge	verified	bytecode	Opcode 0x0b appends a two-node edge consumed by the route finder
 handler	0x4d4e	bin_handler_add_scene_entry	high	bytecode	Opcode 0x0c appends an entry name and initial navigation nodes
 handler	0x4535	bin_handler_nop	verified	bytecode	Opcodes 0x0e 0x4a 0x4b and 0x56 dispatch directly to the continue loop
-handler	0x4c61	bin_handler_configure_scene_thread_action	verified	bytecode	Opcode 0x10 sets selector coordinates and an inline action label
+handler	0x4c61	bin_handler_configure_scene_thread_action	verified	bytecode	Opcode 0x10 sets selector coordinates and an action-label pointer
 handler	0x4ee6	bin_handler_add_navigation_arrival_handler	verified	bytecode	Opcode 0x11 maps a destination node to a BIN thread target
 handler	0x4fb0	bin_handler_add_navigation_departure_handler	verified	bytecode	Opcode 0x12 maps a source node to a BIN thread target
 handler	0x5384	bin_handler_select_study_record	verified	bytecode	Opcode 0x15 selects the text record used by inline study substitutions
 handler	0x5543	bin_handler_set_palette_mapping_range_from_variable	verified	bytecode	Opcode 0x16 fills an inclusive palette map range from a script variable
 handler	0x4f44	bin_handler_add_edge_transition_handler	verified	bytecode	Opcodes 0x17 through 0x1a append directional departure and arrival callbacks
-handler	0x500e	bin_handler_prime_primary_scene_thread_timer	medium	bytecode	Unused opcode 0x1b negates its operand into the primary motion timer and raises its signal
+handler	0x500e	bin_handler_prime_primary_scene_thread_timer	medium	bytecode	Unused opcode 0x1b negates its operand into the primary motion timer and sets a consumed motion-transition latch
 handler	0x4cf3	bin_handler_enable_scene_thread_action	verified	bytecode	Opcode 0x1c enables one scene-thread selector record
 handler	0x4d09	bin_handler_disable_scene_thread_action	verified	bytecode	Opcode 0x1d disables one scene-thread selector record
 handler	0x5179	bin_handler_set_scene_thread_motion_state	verified	bytecode	Opcode 0x40 writes the current thread motion state and renders state 2 immediately
@@ -186,7 +186,7 @@ handler	0x53bd	bin_handler_clear_study_record_selection	high	bytecode	Unused opc
 handler	0x539b	bin_handler_configure_study_thread_success	verified	bytecode	Opcode 0x51 configures record target and thread for successful study
 handler	0x5440	bin_handler_set_scene_thread_origin	verified	bytecode	Opcode 0x53 initializes the primary navigation origin node
 handler	0x5468	bin_handler_move_scene_thread_to	verified	bytecode	Opcode 0x54 requests movement to a destination navigation node
-handler	0x514d	bin_handler_jump_if_digital_audio_fallback	high	bytecode	Opcode 0x5a branches on the digital fallback flag after hardware guards
+handler	0x514d	bin_handler_jump_if_digital_audio_fallback	high	bytecode	Opcode 0x5a branches only when all four digital effects guard values are nonzero
 handler	0x54dc	bin_handler_set_scene_thread_direction	verified	bytecode	Opcode 0x5b selects movement orientation and render offset
 handler	0x5504	bin_handler_configure_captain_bible_dialogue	high	bytecode	Opcode 0x5c writes the three Captain Bible presentation fields
 handler	0x551f	bin_handler_configure_character_dialogue	high	bytecode	Opcode 0x5d writes the three character presentation fields
@@ -195,7 +195,7 @@ handler	0x556e	bin_handler_store_mouse_x	verified	bytecode	Opcode 0x62 stores th
 handler	0x5580	bin_handler_store_mouse_y	verified	bytecode	Opcode 0x63 stores the live mouse Y coordinate in a script variable
 handler	0x5592	bin_handler_jump_if_confirm_pressed	verified	bytecode	Opcode 0x64 consumes the Enter or click latch and selects an absolute target
 handler	0x580e	bin_handler_request_restore_saved_game	verified	bytecode	Opcode 0x67 exits the scene loop through the restore-save mode
-handler	0x56c2	bin_handler_wrap_variable_1280	verified	bytecode	Opcode 0x68 wraps a variable into the signed 1280-unit interval
+handler	0x56c2	bin_handler_adjust_variable_1280_once	verified	bytecode	Opcode 0x68 applies one minus or plus 1280 correction at exact signed thresholds
 handler	0x56f4	bin_handler_load_bin_word	verified	bytecode	Opcode 0x69 reads a BIN word at an immediate offset into a variable
 handler	0x5764	bin_handler_patch_bin_word_from_variable	verified	bytecode	Opcode 0x6a writes a variable word to an immediate BIN offset
 handler	0x5817	bin_handler_load_text_bank	verified	bytecode	Opcode 0x6b replaces the active text bank and clears descriptors
@@ -204,12 +204,75 @@ handler	0x5117	bin_handler_wait_for_primary_scene_thread_overlay	high	bytecode	U
 handler	0x5726	bin_handler_load_bin_word_indirect	verified	bytecode	Opcode 0x71 reads a BIN word at a variable offset into another variable
 handler	0x46f2	bin_handler_clear_navigation_handlers	verified	bytecode	Opcode 0x79 clears all four scene navigation callback tables
 handler	0x57c6	bin_handler_copy_text_record_component_to_bin	verified	bytecode	Opcode 0x83 copies a selected text component into the loaded BIN buffer
-handler	0x56f9	bin_handler_load_bin_byte	verified	bytecode	Opcode 0x84 reads a BIN byte at an immediate offset into a variable
+handler	0x56f9	bin_handler_load_bin_byte	verified	bytecode	Opcode 0x84 sign-extends a BIN byte at an immediate offset into a variable
 handler	0x4ea6	bin_handler_jump_if_animation_finished	verified	bytecode	Opcode 0x8a selects a target for animation states 0 5 or 6
 handler	0x5899	bin_handler_consume_random_text_record	high	bytecode	Unused opcode 0x8b clears a random available text descriptor and starts its timer
 handler	0x4ed8	bin_handler_jump_if_no_combat	verified	bytecode	Opcode 0x8c selects an absolute target when installation forbids combat
-handler	0x589f	bin_handler_jump_if_file_missing	high	bytecode	Opcode 0x8d opens a constructed file and selects its target on failure
-handler	0x5971	bin_handler_set_variable_current_cell_byte_modulo	verified	bytecode	Opcode 0x91 stores the current map-cell byte modulo an immediate divisor
+handler	0x589f	bin_handler_jump_if_file_missing	verified	bytecode	Opcode 0x8d probes the active-prefix save-index name and its sole shipped target equals fallthrough
+handler	0x5971	bin_handler_set_variable_current_cell_byte_modulo	verified	bytecode	Opcode 0x91 zero-extends the current-cell byte and stores its signed-division remainder
+handler	0x4ddf	bin_handler_load_art	verified	bytecode	Opcode 0x01 inline name loop and numbered ART-slot loader
+handler	0x4bbf	bin_handler_create_scene_thread	verified	bytecode	Opcode 0x02 operand reads and type-0x02 display-record initialization
+handler	0x4a5c	bin_handler_add_native_scale_display_object	verified	bytecode	Opcode 0x03 operand reads and implicit 0x0100-scale display record
+handler	0x4ad5	bin_handler_add_scaled_display_object	verified	bytecode	Opcodes 0x04 and 0x43 share the six-operand scaled display-record body
+handler	0x476d	bin_handler_return_minus_one	high	bytecode	Opcode 0x05 returns minus one from the interpreter
+handler	0x4b5e	bin_handler_begin_animation_sequence	verified	bytecode	Opcode 0x06 reads the interval and initializes an animation definition
+handler	0x4b56	bin_handler_animation_step	verified	bytecode	Opcode 0x07 advances the BIN cursor over one nine-byte animation record
+handler	0x4d82	bin_handler_change_scene	verified	bytecode	Opcode 0x0d reads two inline names and installs the next scene transition
+handler	0x5089	bin_handler_adjust_thread_delay	high	bytecode	Opcode 0x0f subtracts one word from the current scheduler slot delay
+handler	0x4557	bin_handler_copy_variable	verified	bytecode	Opcode 0x1e reads two variable offsets and copies one signed word
+handler	0x4577	bin_handler_set_variable	verified	bytecode	Opcode 0x1f stores an immediate word in the selected script variable
+handler	0x458f	bin_handler_jump_if_zero	verified	bytecode	Opcode 0x20 reads a variable and absolute target then branches on zero
+handler	0x4787	bin_handler_jump_if_nonzero	verified	bytecode	Opcode 0x21 reads a variable and absolute target then branches on nonzero
+handler	0x47a7	bin_handler_jump_if_variables_equal	high	bytecode	Opcode 0x22 compares two variables and selects an absolute target
+handler	0x47da	bin_handler_jump_if_variable_equals	high	bytecode	Opcode 0x23 compares a variable with an immediate and selects a target
+handler	0x47f8	bin_handler_jump_if_variables_not_equal	high	bytecode	Opcode 0x24 compares two variables for inequality and selects a target
+handler	0x4827	bin_handler_jump_if_variable_not_equal	high	bytecode	Opcode 0x25 compares a variable and immediate for inequality
+handler	0x4845	bin_handler_jump_if_variable_greater_than_variable	high	bytecode	Opcode 0x26 performs a signed variable-to-variable greater-than branch
+handler	0x4875	bin_handler_jump_if_variable_greater_than	high	bytecode	Opcode 0x27 performs a signed variable-to-immediate greater-than branch
+handler	0x4893	bin_handler_jump_if_variable_less_than_variable	high	bytecode	Opcode 0x28 performs a signed variable-to-variable less-than branch
+handler	0x48c3	bin_handler_jump_if_variable_less_than	high	bytecode	Opcode 0x29 performs a signed variable-to-immediate less-than branch
+handler	0x48e1	bin_handler_add_variable	verified	bytecode	Opcode 0x2a adds one script variable to another
+handler	0x4900	bin_handler_add_to_variable	verified	bytecode	Opcode 0x2b adds an immediate word to a script variable
+handler	0x4957	bin_handler_subtract_variable	verified	bytecode	Opcode 0x2c subtracts one script variable from another
+handler	0x4976	bin_handler_subtract_from_variable	verified	bytecode	Opcode 0x2d subtracts an immediate word from a script variable
+handler	0x4992	bin_handler_multiply_variables	high	bytecode	Opcode 0x2e signed-multiplies a destination by another variable
+handler	0x49b7	bin_handler_multiply_variable	high	bytecode	Opcode 0x2f signed-multiplies a destination by an immediate
+handler	0x49ca	bin_handler_divide_variables	high	bytecode	Opcode 0x30 signed-divides a destination by another variable
+handler	0x49f1	bin_handler_divide_variable	high	bytecode	Opcode 0x31 signed-divides a destination by an immediate
+handler	0x4a08	bin_handler_increment_variable	verified	bytecode	Opcode 0x32 increments the selected script variable
+handler	0x4a1b	bin_handler_decrement_variable	verified	bytecode	Opcode 0x33 decrements the selected script variable
+handler	0x470c	bin_handler_call	verified	bytecode	Opcode 0x34 saves the current cursor and selects an absolute target
+handler	0x4744	bin_handler_return	verified	bytecode	Opcode 0x35 restores the bytecode return cursor
+handler	0x501f	bin_handler_set_text_record_state	verified	bytecode	Opcode 0x36 reads a record selector and sets persistent state byte four
+handler	0x5044	bin_handler_clear_text_record_state	verified	bytecode	Opcode 0x37 reads a record selector and clears persistent state byte four
+handler	0x4a2e	bin_handler_jump_if_text_record_set	verified	bytecode	Opcode 0x38 reads a selector and target then branches on record state
+handler	0x4a45	bin_handler_jump_if_text_record_clear	verified	bytecode	Opcode 0x39 reads a selector and target then branches on clear record state
+handler	0x4703	bin_handler_jump	verified	bytecode	Opcode 0x3d selects one absolute BIN target
+handler	0x5405	bin_handler_load_palette	verified	bytecode	Opcodes 0x4d and 0x6d read an inline name and load its PAL resource
+handler	0x5426	bin_handler_play_music	verified	bytecode	Opcode 0x52 reads one track byte and calls the XMI music loader
+handler	0x5487	bin_handler_snapshot_state	verified	bytecode	Opcode 0x55 copies live state into the retained save buffers
+handler	0x548d	bin_handler_play_sound_effect	verified	bytecode	Opcode 0x57 reads effect identifier and rate then calls the ABT playback path
+handler	0x54a5	bin_handler_stop_sound_effect	verified	bytecode	Opcode 0x58 conditionally stops digital playback and frees its buffer
+handler	0x55ba	bin_handler_clear_display_object_frames	verified	bytecode	Opcode 0x65 clears frame bytes across an indexed display-record range
+handler	0x561c	bin_handler_advance_display_object_frames	verified	bytecode	Opcode 0x66 increments and wraps frames across a display-record range
+handler	0x4e16	bin_handler_unload_last_art	verified	bytecode	Opcode 0x70 releases the current final ART slot and decrements the slot count
+handler	0x45ac	bin_handler_jump_if_state_flag_clear	verified	bytecode	Opcode 0x73 tests one state-flag identifier and conditionally selects a target
+handler	0x45d0	bin_handler_jump_if_state_flag_set	verified	bytecode	Opcode 0x74 tests one state-flag identifier and conditionally selects a target
+handler	0x45f0	bin_handler_clear_state_flag	verified	bytecode	Opcode 0x75 reads and clears one packed state-flag identifier
+handler	0x45ff	bin_handler_set_state_flag	verified	bytecode	Opcode 0x76 reads and sets one packed state-flag identifier
+handler	0x461d	bin_handler_process_current_map_cell	verified	bytecode	Opcode 0x77 directly calls the current-cell transition handler
+handler	0x460e	bin_handler_load_map	verified	bytecode	Opcode 0x78 reads one level byte and calls the difficulty-qualified MAP loader
+handler	0x4623	bin_handler_set_current_map_cell_kind	verified	bytecode	Opcode 0x7b ORs a variable low byte with the preserved current-cell high nibble
+handler	0x469c	bin_handler_set_current_map_cell_parameter_a	verified	bytecode	Opcode 0x7c writes the current cell second byte from a script variable
+handler	0x46c7	bin_handler_set_current_map_cell_parameter_b	verified	bytecode	Opcode 0x7f writes the current cell third byte from a script variable
+handler	0x4e73	bin_handler_reduce_faith	verified	bytecode	Opcode 0x81 reads an immediate amount and calls the difficulty-scaled faith reducer
+handler	0x55ec	bin_handler_hide_display_object	verified	bytecode	Opcode 0x85 sets the high hidden bit in one display record ART-slot byte
+handler	0x5604	bin_handler_show_display_object	verified	bytecode	Opcode 0x86 clears the high hidden bit in one display record ART-slot byte
+handler	0x4696	bin_handler_normalize_map_cells	verified	bytecode	Opcode 0x87 directly calls the recovered full-grid normalizer
+handler	0x5861	bin_handler_clear_text_record_states	verified	bytecode	Opcode 0x88 clears persistent state byte four in all 66 text records
+handler	0x5883	bin_handler_mark_current_map_cell_explored	verified	bytecode	Opcode 0x89 sets the current X bit in the current exploration row
+handler	0x491c	bin_handler_and_variables	high	bytecode	Opcode 0x8f bitwise-ANDs a destination with another script variable
+handler	0x493b	bin_handler_and_variable	high	bytecode	Opcode 0x90 bitwise-ANDs a destination with an immediate word
 data	0xeba8	str_microsoft_runtime	verified	runtime	Runtime banner present at predicted QEMU address
 data	0xef64	str_vga_not_detected	high	hardware	Referenced by failed VGA startup branch
 data	0xef83	str_sound_configuration	verified	startup	SOUND.5 filename used by traced startup open
