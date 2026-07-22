@@ -24,9 +24,6 @@ dynamic checks.
 - The opcode-`0x02` 16-byte interactive/display records, the last two bytes of
   12-byte animation slots, and some animation mode transitions need finer
   field names.
-- The three bytes written by dialogue-presentation opcodes `0x5C` and `0x5D`
-  are assigned to their two channels, but their finer layout roles remain
-  deliberately unnamed.
 - Combat's `POWER` re-entry exists and is decoded, but its complete caller path
   has not been isolated. Randomized branches are not all labeled by rendered
   enemy phase.

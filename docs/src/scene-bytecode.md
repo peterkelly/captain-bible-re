@@ -166,8 +166,8 @@ control-flow behavior:
 | `0x3D` | `H` | `jump` | Replaces the cursor with an absolute file offset. |
 | `0x3E` | `BH` | `start_scene_thread_at` | Activates a BIN scheduler slot at an absolute target. |
 | `0x3F` | `B` | `wait_for_animation` | Continues for animation state 0, 5, or 6; otherwise suspends and retries the command. |
-| `0x41` | none | `enable_action_selection` | Enables screen-action input globally. |
-| `0x42` | none | `disable_action_selection` | Disables screen-action input globally. |
+| `0x41` | none | `enable_action_selection` | Enables screen-action input for the current scene. |
+| `0x42` | none | `disable_action_selection` | Disables screen-action input for the current scene. |
 | `0x44` | `Hp` | `add_dialogue_choice` | Appends an absolute target and far text pointer to the choice table. |
 | `0x45` | none | `clear_dialogue_choices` | Clears the choice count and dialogue state. |
 | `0x46` | none | `present_dialogue_choices` | Suspends the thread until the selected choice supplies a new BIN target. |
@@ -226,7 +226,7 @@ of 23 unused opcodes.
 | `0x0B` | `BB` | `add_navigation_edge` | Appends an undirected two-node edge used by the recursive route finder. |
 | `0x0C` | `BBp` | `add_scene_entry` | Associates an entry/segment string with the two initial navigation-node bytes used after `change_scene`. |
 | `0x0E`, `0x4A`, `0x4B`, `0x56` | none | `nop` | **Unused.** All four jump-table entries point at the interpreter's continue loop. |
-| `0x10` | `BHHp` | `configure_scene_thread_action` | Gives a scene thread selector X/Y coordinates and an action-label pointer. |
+| `0x10` | `BHHp` | `configure_scene_thread_action` | Gives a scene thread selector X/Y coordinates and an action-label pointer; newly created scene-thread selectors start enabled. |
 | `0x11` | `BHs` | `add_navigation_arrival_handler` | Maps a destination node to a BIN target and optional explicit thread slot. |
 | `0x12` | `BHs` | `add_navigation_departure_handler` | Maps a source node to a BIN target and optional explicit thread slot. |
 | `0x15` | `B` | `select_study_record` | Selects the text descriptor expanded by study placeholders and clears both success continuations. |
@@ -248,8 +248,8 @@ of 23 unused opcodes.
 | `0x54` | `B` | `move_scene_thread_to` | Requests movement to a navigation node, including path search and animation setup. |
 | `0x5A` | `H` | `jump_if_digital_audio_fallback` | Jumps when the digital-driver word is zero, effects are disabled, driver-state bit 0 is clear, or the fallback word is nonzero. Falls through only for a usable driver with a zero fallback word. |
 | `0x5B` | `B` | `set_scene_thread_direction` | Selects one of four movement orientations and its sprite/render offset. |
-| `0x5C` | `BBB` | `configure_captain_bible_dialogue` | Writes the three Captain Bible presentation fields. |
-| `0x5D` | `BBB` | `configure_character_dialogue` | Writes the three character presentation fields. |
+| `0x5C` | `BBB` | `configure_captain_bible_dialogue` | Writes Captain Bible text X, text Y, and wrap width. |
+| `0x5D` | `BBB` | `configure_character_dialogue` | Writes character text X, text Y, and wrap width. |
 | `0x5E` | `H` | `set_deferred_scene_thread_target` | **Unused.** Sets a target that the main loop later starts in scheduler slot 2. |
 | `0x62` | `H` | `store_mouse_x` | Stores the current mouse X coordinate in the selected script variable. |
 | `0x63` | `H` | `store_mouse_y` | Stores the current mouse Y coordinate in the selected script variable. |

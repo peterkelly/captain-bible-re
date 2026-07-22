@@ -80,6 +80,57 @@ those slots in increasing order. This lets the direct `LOGO.BIN` dome pieces
 at display indices 7 through 9 occlude the moving actor at index 4, producing
 the oval entry and exit mask without a dedicated ellipse-clipping routine.
 
+## `STUFF.ART`: font and interface labels
+
+The game does not obtain its dialogue font from the video BIOS. Startup calls
+the routine at `0xAE42`, which loads `STUFF.ART`, retains frame 0's pixel
+pointer and width, and constructs a 95-entry glyph-offset table at `DS:A1E8`.
+Frame 0 is a 257-by-14 atlas containing only source values 0, 1, and 2. The
+first seven rows hold bytes `21h` through `60h`; the offset resets to atlas row
+7 for byte `61h` (`a`) and continues through byte `7Fh`.
+
+The proportional widths live in the executable at `DS:3462`, indexed by
+character minus `21h`. Renderer `0xAF36` copies exactly seven scanlines and
+advances by the glyph width plus one. Space and control bytes advance three
+pixels without copying. The modal compositor later doubles each logical
+pixel in both axes, yielding seven-row glyphs at 640-by-400 output with a
+16-output-pixel line pitch. This explains why a fixed 5-by-7 host font drawn
+at one horizontal pixel per source column appeared narrow and tall.
+
+The text-object renderer at `0xBE7E` remaps the atlas values through a
+three-palette-index style. The eight recovered triplets are:
+
+```text
+1:  1,  7,  3    2:  1, 37,  4
+3: 16, 15, 17    4: 15, 84, 84
+5:  0, 64, 70    6:  0, 32, 37
+7: 15, 86, 90    8: 15, 74, 69
+```
+
+The live BOSS capture confirms style 2 for normal dialogue: its glyph pixels
+are framebuffer indexes 1, 37, and 4. State 1 uses style 1 for unselected
+choice rows and style 2 for the selected row. Character and Captain Bible
+messages enter state 2 and use style 2; adversary messages enter state 7 and
+use style 7.
+
+Several interface captions are complete indexed sprites in the same resource,
+including frame 16 `GET VERSE`, frame 28 `SELECT`, frame 29 `CONTINUE`, frame
+30 `UNLOAD`, and frame 31 `COMPUTER OFF`. Their descriptors include the signed
+origin used to overlap the associated panel or row. In particular, `SELECT`
+is `(-12,-3,24,7)` and `CONTINUE` is `(-17,-3,35,7)`. These sprites include
+their own letters and borders and are drawn with index zero transparent.
+Transparent-pixel matching against the preserved VGA dumps finds one unique
+placement for each: `CONTINUE` at logical top-left `(220,81)` with anchor
+`(237,84)`, and `SELECT` at `(154,69)` with anchor `(166,72)`.
+
+The top status row is another fixed subset of `STUFF.ART`. Frame 4 is the
+Computer Bible cross at descriptor origin `(4,1)`, frame 32 is the Map control
+at `(23,1)`, frames 22 through 26 are descending Faith-meter states at
+`(44,3)`, and frames 17 through 21 are Sword, Shield, No Trap, Candle, and
+Flight. Frame 11 is the disk indicator at `(297,1)`. The positive origins are
+already logical screen positions, so the UI draws these frames at anchor zero
+and uses their nontransparent bounds as pointer targets.
+
 ## QEMU framebuffer validation
 
 `INTRO.ART` consists of one descriptor `(0, 0, 320, 200, 12)`. Compared its
@@ -187,6 +238,9 @@ distinct pixel indices and acts as a base for later overlay frames.
 | `0xA0C9` | `blit_rect_to_vga` | Copies an opaque rectangle with a 320-byte destination stride. |
 | `0xA106` | `blit_rect_transparent_zero` | Copies rows while skipping pixel value 0. |
 | `0xA136` | `blit_rect_opaque` | Copies rows without a color key. |
+| `0xAE42` | Font initialization | Loads `STUFF.ART` frame 0 and builds the glyph-offset table. |
+| `0xAF36` | Proportional glyph renderer | Copies seven atlas rows using the executable width table. |
+| `0xBE7E` | Styled text-object renderer | Remaps atlas values 0, 1, and 2 through a palette-index triplet. |
 | `0xB620` | `update_palette_effect` | Applies bounded component offsets and submits changed palette ranges. |
 | `0xB99C` | `draw_art_frame_opaque` | Indexes a far ART pointer by `frame * 12` and uses width, height, and pixel offset. |
 

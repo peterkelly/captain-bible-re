@@ -23,11 +23,14 @@ cargo run --release -- --data ../CB --validate
 cargo run --release -- --data ../CB
 ```
 
-SDL3 is the default frontend. It accepts mouse clicks, Enter, Escape, letters for action
-shortcuts, arrow keys for navigation and modal selection, F9 for quick load,
-and F10 for quick save. It currently presents modal dialogue, choices, and the
-study list in the launching terminal while the original indexed graphics
-appear in the window.
+SDL3 is the default frontend. It draws modal dialogue, response choices, and
+the Computer Bible inside the game window. Enter or a primary click dismisses
+ordinary dialogue. Choice menus use Up and Down, pointer hover, Enter, and
+row-specific clicks. The study browser additionally accepts Page Up, Page
+Down, `A`, and Escape. Letters select exploration actions, arrow keys navigate,
+F1 through F8 activate the status-row controls, F9 quick-loads, and F10
+quick-saves when no modal interface is active. The status controls can also be
+clicked directly.
 
 Use the headless terminal frontend with:
 
@@ -76,10 +79,7 @@ against the captured DOS reference byte count and hash.
 ## Frontend scope
 
 The reusable engine core is the primary implementation. The included host
-frontends intentionally remain small: they emit music and decoded-effect
-events but do not synthesize XMIDI or submit PCM to an audio device, and the
-SDL adapter does not yet draw the game's text menus inside the window. Those
-host presentation limitations do not alter resource parsing, scene execution,
-save compatibility, or the logical timing used by scripts. Consequently, this
-release does not claim the specification's full player-facing UI/audio
-conformance profile yet.
+frontends emit music and decoded-effect events but do not yet synthesize XMIDI
+or submit PCM to an audio device. This remaining audio limitation does not
+alter resource parsing, scene execution, save compatibility, modal input, or
+the logical timing used by scripts.

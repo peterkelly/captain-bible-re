@@ -47,6 +47,29 @@ higher positive states select dialogue-box artwork and behavior. Function
 `show_dialogue_message` at `0x2933` renders the frame, wraps the far text, and
 runs the input loop while continuing to update scene animation.
 
+The three bytes written by opcodes `0x5C` and `0x5D` are logical text X, text
+Y, and wrap width. The `BOSS.BIN` values `[4, 30, 150]` and
+`[162, 89, 150]` align exactly with the upper-left and lower-right panels in
+the preserved capture. `FACE.BIN` supplies `[80, 12, 180]` and
+`[80, 170, 180]`, establishing that the tuple is general panel geometry rather
+than a small set of speaker identifiers.
+
+The visible type is not a BIOS font. Startup routine `0xAE42` loads frame 0 of
+`STUFF.ART`, a 257-by-14 atlas arranged as two seven-row glyph strips, and
+builds an offset table for bytes `21h` through `7Fh`. The executable's width
+table at `DS:3462` makes the font proportional; renderer `0xAF36` advances by
+width plus one, treats spaces as three pixels, and copies seven source rows.
+Each logical source pixel becomes a 2-by-2 block on the 640-by-400 presentation
+surface, with an eight-logical-pixel line pitch.
+
+The atlas has three source values which renderer `0xBE7E` maps through a text
+style. Character and Captain Bible messages use style 2 (`1,37,4`), while
+adversary messages use style 7 (`15,86,90`). The live BOSS framebuffer contains
+exactly indexes 1, 37, and 4 in the displayed line, independently confirming
+the normal-dialogue mapping. The `CONTINUE` caption is the complete sprite in
+`STUFF.ART` frame 29 rather than text rendered at runtime; its descriptor
+`(-17,-3,35,7)` centers and overlaps it above the panel.
+
 ## Choice table
 
 Opcode `0x45` clears the current choices and resets dialogue state. Each
@@ -78,6 +101,16 @@ The full command lifecycle is:
 5. `poll_input_event` writes that target to `DS:7CBA`. The resumed handler
    replaces the interpreter cursor with the target, so execution continues at
    the selected branch.
+
+The input loop clamps keyboard selection at row zero and count minus one.
+Mouse motion maps the pointer to the wrapped row records constructed by the
+menu, so a click returns the row under the pointer rather than an independently
+remembered default selection.
+
+Unselected choices use style 1 (`1,7,3`) and the selected choice uses style 2
+(`1,37,4`). The adjacent `SELECT` caption is `STUFF.ART` frame 28 with
+descriptor `(-12,-3,24,7)`, including its lettering and border. Thus neither
+choice label nor continuation label should be synthesized with a host font.
 
 The corpus contains 40 choice definitions in six resources, 11 clear
 commands in six resources, and 14 present commands in seven resources. Those
@@ -167,8 +200,7 @@ that branches can change the menu seen at runtime.
 
 ## Remaining boundaries
 
-- The exact formatting roles of every dialogue state and frame are not yet
-  named.
+- The exact artwork role of every positive dialogue state is not yet named.
 - Conversation choices and verse answers alter progression flags, but they do
   not expose a separate enemy-health, hit-test, or combat-entity structure.
 
@@ -190,6 +222,9 @@ that branches can change the menu seen at runtime.
 | `0x5357` | Suspend-scene-thread handler. |
 | `0x7BED` | `poll_input_event` |
 | `0x834E` | `handle_study_bible_request` |
+| `0xAE42` | Load the `STUFF.ART` font and build glyph offsets. |
+| `0xAF36` | Draw proportional seven-row glyphs. |
+| `0xBE7E` | Draw a text object with a three-index style mapping. |
 
 Offsets use the unpacked load-module convention documented elsewhere in this
 book.

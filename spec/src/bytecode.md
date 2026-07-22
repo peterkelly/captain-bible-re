@@ -67,7 +67,7 @@ full-interpreter compatibility profile.
 | `0D` | `zz` | `change_scene`: request the named scene and secondary entry/segment, ending current scene execution. |
 | `0E` | none | `nop`: continue. Unused. |
 | `0F` | `H` | `adjust_thread_delay`: subtract the word from the current scheduler thread's signed countdown; a resulting negative delay yields at the next command boundary until logical time makes it nonnegative. |
-| `10` | `BHHp` | `configure_scene_thread_action`: set thread selector, X, Y, and action label. |
+| `10` | `BHHp` | `configure_scene_thread_action`: set thread selector, X, Y, and action label; the selector starts enabled when its scene thread is created. |
 | `11` | `BHs` | `add_navigation_arrival_handler`: map destination node to target and optional explicit thread slot using the `BHs` rule. |
 | `12` | `BHs` | `add_navigation_departure_handler`: map source node to target and optional explicit thread slot using the `BHs` rule. |
 | `13` | `H` | `remove_dialogue_choice`: remove the first choice whose target matches. Unused. |
@@ -116,8 +116,8 @@ full-interpreter compatibility profile.
 | `3E` | `BH` | `start_scene_thread_at`: thread slot, target. |
 | `3F` | `B` | `wait_for_animation`: continue for state 0, 5, or 6; otherwise suspend and retry. |
 | `40` | `B` | `set_scene_thread_motion_state`: set current thread motion state; state 2 immediately performs a movement update. |
-| `41` | none | `enable_action_selection`: globally enable screen actions. |
-| `42` | none | `disable_action_selection`: globally disable screen actions. |
+| `41` | none | `enable_action_selection`: enable screen actions for the current scene. |
+| `42` | none | `disable_action_selection`: disable screen actions for the current scene. |
 | `43` | `BBHHHB` | `add_scaled_display_object`: same contract as `04`. |
 | `44` | `Hp` | `add_dialogue_choice`: append target and text to the current choice list. |
 | `45` | none | `clear_dialogue_choices`: clear all choices and dialogue state. |
@@ -143,8 +143,8 @@ full-interpreter compatibility profile.
 | `59` | none | `wait_for_sound_effect`: with a usable digital backend, yield and retry while playback remains active; without one, subtract 100 from the calling thread's delay and resume after this command. |
 | `5A` | `H` | `jump_if_digital_audio_fallback`: jump when the digital driver is absent, effects are disabled, backend state bit 0 is clear, or the fallback word is nonzero. Fall through only when the first three checks indicate usable playback and the fallback word is zero. |
 | `5B` | `B` | `set_scene_thread_direction`: select one of four orientations and its render offset. |
-| `5C` | `BBB` | `configure_captain_bible_dialogue`: set the three Captain Bible presentation bytes. |
-| `5D` | `BBB` | `configure_character_dialogue`: set the three character presentation bytes. |
+| `5C` | `BBB` | `configure_captain_bible_dialogue`: set Captain Bible text X, text Y, and wrap width. |
+| `5D` | `BBB` | `configure_character_dialogue`: set character text X, text Y, and wrap width. |
 | `5E` | `H` | `set_deferred_scene_thread_target`: schedule a target later started in thread slot 2. Unused. |
 | `5F` | `BBB` | `start_linked_animation`: animation, linked animation, mode. |
 | `60` | none | `nop`: continue. |

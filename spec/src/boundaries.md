@@ -28,7 +28,6 @@ name. Implementations MUST preserve and expose it to scene logic:
 - the separate 16×16 current-cell auxiliary table observed by opcodes `8E`
   and `91`;
 - the `ABT` auxiliary header word;
-- the three dialogue presentation bytes;
 - per-node Unibot transition values;
 - unrecognized companion `M` metadata strings; and
 - the two legacy pointer words in a loaded original save, which are ignored or
@@ -62,10 +61,12 @@ base shipped-game profile.
 
 Strings, CP437 decoding, text order, component selection, substitutions,
 70-column export wrapping, modal regions, and scene hit coordinates are
-normative. The exact bitmap glyph source is not exposed as an independent
-documented resource. A replacement font is allowed if the resulting line
-breaks and action regions remain compatible. Pixel-identical typography is
-therefore outside the base shipped-game profile.
+normative. The exact bitmap glyph source is `STUFF.ART` frame 0, with
+proportional widths stored by the executable and specified in
+[Graphics and palette rendering](graphics.md). The action captions are other
+frames of the same resource. Their pixels, palette remapping, proportional
+advances, wrapping, and 2-by-2 presentation are part of the base shipped-game
+profile. A BIOS or host replacement font does not conform to that profile.
 
 ## Content-defined behavior
 

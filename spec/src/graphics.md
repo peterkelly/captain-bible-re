@@ -10,6 +10,15 @@ hit targets always remain in logical pixels.
 The final image SHOULD be scaled without filtering. Aspect correction is a
 presentation option; it MUST NOT alter logical hit testing.
 
+The DOS presentation surface is 640 by 400: each indexed scene pixel occupies
+a 2-by-2 output block. Modal glyphs are seven logical pixels high, each source
+pixel is likewise expanded to a 2-by-2 output block, and successive text rows
+have an eight-logical-pixel (16-output-pixel) pitch. A host MAY produce the
+same relationship by composing at 640 by 400 or by another equivalent scaling
+pipeline. Pointer coordinates over the doubled scene MUST be converted back
+to the 320-by-200 scene coordinate system, while modal text-row hit testing
+uses the composed panel geometry.
+
 ## `PAL` resources
 
 A `PAL` member is exactly 768 bytes: 256 consecutive red, green, blue triplets.
@@ -135,7 +144,61 @@ boundaries to avoid partially updated presentation.
 
 Dialogue frames, action labels, maps, status icons, and most large UI elements
 are ordinary artwork or scene-driven compositions. Text strings are CP437.
-An implementation MAY substitute a metrically compatible bitmap-font renderer
-when the font resource path is not exposed, but it MUST preserve wrapping,
-selection regions, line order, and 320-by-200 layout closely enough that
-scene-defined coordinates remain usable.
+
+`STUFF.ART` frame 0 is the shipped proportional font atlas. It is 257 by 14
+pixels and contains two seven-row strips. It uses only source values 0, 1, and
+2; the text style maps those values to three current-palette indexes. Glyphs
+cover bytes `21h` through `7Fh`. Glyph `21h` starts at atlas offset zero. Each
+subsequent glyph begins after the preceding glyph's width plus one pixel. At
+glyph index `40h` (byte `61h`, lowercase `a`) the offset resets to the start
+of atlas row 7. Space and control bytes draw nothing and advance three logical
+pixels.
+
+The executable supplies these 95 glyph widths, in byte order `21h` through
+`7Fh`:
+
+```text
+1 3 5 5 5 1 1 2 2 5 3 2 3 1 3 4
+3 3 3 3 4 4 3 4 4 1 2 3 3 3 4 4
+4 4 4 4 3 3 4 4 3 4 4 3 5 4 4 4
+4 4 4 3 4 5 5 5 5 3 0 0 0 0 0 0
+4 4 4 4 4 4 4 4 1 4 4 1 5 4 4 4
+4 4 4 3 4 5 5 5 4 3 0 0 0 0 0
+```
+
+The destination advance for a printable glyph is its width plus one logical
+pixel. Wrapping MUST measure those proportional advances against the logical
+wrap-width byte, not count fixed character cells. All seven source rows and
+all three mapped source values are drawn; source value zero is a style color,
+not transparency.
+
+The recovered text-style triplets are:
+
+| Style | Source 0 | Source 1 | Source 2 |
+|---:|---:|---:|---:|
+| 1 | 1 | 7 | 3 |
+| 2 | 1 | 37 | 4 |
+| 3 | 16 | 15 | 17 |
+| 4 | 15 | 84 | 84 |
+| 5 | 0 | 64 | 70 |
+| 6 | 0 | 32 | 37 |
+| 7 | 15 | 86 | 90 |
+| 8 | 15 | 74 | 69 |
+
+Ordinary Captain Bible and character dialogue uses style 2, adversary
+dialogue uses style 7, unselected choice rows use style 1, and the selected
+choice uses style 2.
+
+Action captions are also shipped artwork. In `STUFF.ART`, frame 28 is
+`SELECT` and frame 29 is `CONTINUE`; their descriptors are respectively
+`(-12,-3,24,7)` and `(-17,-3,35,7)`. The frame origin is applied to the label
+anchor, source index zero is transparent, and every retained source pixel is
+expanded to the same 2-by-2 output block as other logical artwork. A
+shipped-game implementation MUST use this atlas, width table, style mapping,
+and label artwork rather than a host or BIOS font.
+
+The persistent status row is drawn from the same resource: Computer Bible is
+frame 4, Map is frame 32, the five Faith states are frames 22 through 26, the
+five acquired-power icons are frames 17 through 21, and the upper-right disk
+indicator is frame 11. Their positive descriptor origins are absolute logical
+screen placements when drawn with anchor `(0,0)`.

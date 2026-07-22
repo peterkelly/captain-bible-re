@@ -8,16 +8,32 @@ The game has three dialogue channels:
 - character dialogue (`48`), used for victims, bosses, and other characters;
 - Captain Bible dialogue (`4E`), also used for some narration or captions.
 
-Each displays translated CP437 text in a modal panel using its configured
-three-byte presentation tuple. The tuple affects visual presentation but its
-internal subdivision is not a cross-platform API. A compatible engine MUST
-keep the three channels visually distinguishable where the shipped resources
-configure them and MUST preserve their command timing.
+Each displays translated CP437 text in a modal panel using a three-byte
+presentation tuple containing logical text X, text Y, and wrap width. Opcode
+`5C` configures the Captain Bible channel. Opcode `5D` configures the character
+channel, which the adversary presentation also uses. The panel frame extends
+slightly beyond this text rectangle. A compatible engine MUST apply the tuple,
+wrap within its width, and preserve the channel's command timing.
+
+The `BOSS` introduction configures `[4, 30, 150]` for Captain Bible and
+`[162, 89, 150]` for the other character. These place the two speakers at the
+upper left and lower right respectively. `FACE` instead uses `[80, 12, 180]`
+for adversary messages and `[80, 170, 180]` for Captain Bible. These shipped
+values and the corresponding DOS captures establish all three byte roles.
+
+Dialogue text uses the proportional seven-row atlas in `STUFF.ART` frame 0.
+The renderer expands each logical atlas pixel to 2 by 2, advances by the
+executable's per-character width plus one, and wraps by measured logical
+width. Captain Bible and character messages use text style 2, whose atlas
+values `0,1,2` map to palette indexes `1,37,4`. Adversary messages use style 7,
+mapping them to `15,86,90`. The `CONTINUE` caption is not generated text: it
+is transparent-zero `STUFF.ART` frame 29, positioned by its signed origin over
+the horizontal center of the panel.
 
 If a dialogue command is reached while another modal message is active, it
 suspends before consuming its `p` operand. After the modal state clears, the
 same command is retried, consumes the text, and presents it. Confirmation by
-Enter or primary click dismisses ordinary dialogue.
+Enter, Escape, or a primary click dismisses ordinary dialogue.
 
 ## Choices
 
@@ -26,10 +42,16 @@ clears the list, `44` appends choices in display order, `13` can remove the
 first target match, and `46` presents the menu. Selecting a choice clears the
 modal state and resumes the suspended thread at that choice's target.
 
-Keyboard navigation MUST wrap or clamp consistently within the list, visually
-identify the current selection, and activate it with Enter. Mouse activation
-uses the visible choice rows. Empty choice lists MUST be treated as malformed
-content rather than leaving the player in an inescapable modal screen.
+Keyboard Up and Down clamp at the first and last rows, visually identify the
+current selection, and activate it with Enter. Pointer motion selects the
+visible row under the pointer; a primary click activates that row. A click
+outside the menu MUST NOT activate the previously selected row. Empty choice
+lists MUST be treated as malformed content rather than leaving the player in
+an inescapable modal screen.
+
+Unselected rows use text style 1 (`1,7,3`), while the selected row uses style
+2 (`1,37,4`). The `SELECT` caption is transparent-zero `STUFF.ART` frame 28,
+not a host-font label. Its signed origin positions it beside the selected row.
 
 ## Study browser
 

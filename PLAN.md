@@ -125,4 +125,5 @@ This plan is a living checklist. Findings and commands are recorded in
 - [x] Add terminal and required-build SDL3 reference frontends.
 - [x] Add corpus, rendering, save, world, VM, and QEMU-reference regressions.
 - [x] Feed implementation discoveries back into the clean-room specification.
-- [ ] Add native PCM/XMIDI playback and in-window modal text presentation.
+- [x] Add in-window dialogue, choice, and study text presentation.
+- [ ] Add native PCM and XMIDI playback.

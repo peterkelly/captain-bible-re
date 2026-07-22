@@ -3,11 +3,17 @@
 //! This module intentionally binds the small SDL surface it needs directly,
 //! keeping the engine core free of third-party Rust dependencies.
 
+mod ui;
+
 use crate::engine::{Engine, EngineEvent, InputEvent, ReferenceTimer};
 use crate::error::{EngineError, Result};
 use crate::graphics::{SCREEN_HEIGHT, SCREEN_WIDTH};
 use std::ffi::{CStr, c_char, c_int, c_void};
 use std::ptr;
+use ui::{
+    DISPLAY_HEIGHT, DISPLAY_SCALE, DISPLAY_WIDTH, StatusBarState, StatusControl, UiAssets, UiState,
+    draw_scene_overlays, status_control_at,
+};
 
 const SDL_INIT_VIDEO: u32 = 0x20;
 const SDL_WINDOW_RESIZABLE: u64 = 0x20;
@@ -132,8 +138,8 @@ impl Sdl {
                 renderer,
                 SDL_PIXELFORMAT_ARGB8888,
                 SDL_TEXTUREACCESS_STREAMING,
-                SCREEN_WIDTH as c_int,
-                SCREEN_HEIGHT as c_int,
+                DISPLAY_WIDTH as c_int,
+                DISPLAY_HEIGHT as c_int,
             );
             if texture.is_null() {
                 SDL_DestroyRenderer(renderer);
@@ -144,8 +150,8 @@ impl Sdl {
             if !SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST)
                 || !SDL_SetRenderLogicalPresentation(
                     renderer,
-                    SCREEN_WIDTH as c_int,
-                    SCREEN_HEIGHT as c_int,
+                    DISPLAY_WIDTH as c_int,
+                    DISPLAY_HEIGHT as c_int,
                     SDL_LOGICAL_PRESENTATION_LETTERBOX,
                 )
             {
@@ -163,20 +169,33 @@ impl Sdl {
         }
     }
 
-    fn present(&self, engine: &Engine) -> Result<()> {
+    fn present(&self, engine: &Engine, ui: &UiState, ui_assets: &UiAssets) -> Result<()> {
         let colors = engine.palette().rgba8888();
-        let pixels: Vec<u32> = engine
+        let mut pixels = vec![0; DISPLAY_WIDTH * DISPLAY_HEIGHT];
+        for (source_y, row) in engine
             .framebuffer()
             .pixels()
-            .iter()
-            .map(|&index| colors[index as usize])
-            .collect();
+            .chunks_exact(SCREEN_WIDTH)
+            .enumerate()
+        {
+            for (source_x, &index) in row.iter().enumerate() {
+                let color = colors[index as usize];
+                let destination_x = source_x * DISPLAY_SCALE;
+                let destination_y = source_y * DISPLAY_SCALE;
+                for y in 0..DISPLAY_SCALE {
+                    let offset = (destination_y + y) * DISPLAY_WIDTH + destination_x;
+                    pixels[offset..offset + DISPLAY_SCALE].fill(color);
+                }
+            }
+        }
+        draw_scene_overlays(&mut pixels, ui_assets, &colors, status_bar_state(engine));
+        ui.draw(&mut pixels, ui_assets, &colors);
         unsafe {
             if !SDL_UpdateTexture(
                 self.texture,
                 ptr::null(),
                 pixels.as_ptr().cast(),
-                (SCREEN_WIDTH * 4) as c_int,
+                (DISPLAY_WIDTH * 4) as c_int,
             ) || !SDL_RenderClear(self.renderer)
                 || !SDL_RenderTexture(self.renderer, self.texture, ptr::null(), ptr::null())
                 || !SDL_RenderPresent(self.renderer)
@@ -189,11 +208,12 @@ impl Sdl {
 }
 
 pub fn run_sdl(engine: &mut Engine) -> Result<()> {
+    let ui_assets = UiAssets::load(engine.archive())?;
     let sdl = Sdl::open()?;
+    let mut ui = UiState::default();
     let mut previous_keys = vec![false; 512];
     let mut previous_buttons = 0u32;
-    let mut selected_choice = 0usize;
-    let mut selected_study = 0usize;
+    let mut previous_pointer = None;
     let mut previous_tick = unsafe { SDL_GetTicks() };
     let mut reference_timer = ReferenceTimer::default();
     loop {
@@ -212,58 +232,77 @@ pub fn run_sdl(engine: &mut Engine) -> Result<()> {
         };
         let rising =
             |scan: usize| keys.get(scan) == Some(&true) && previous_keys.get(scan) != Some(&true);
-        let study_records = engine.available_study_records();
         if rising(40) {
-            if let Some(count) = engine.choice_count() {
-                inputs.push(InputEvent::Choose(
-                    selected_choice.min(count.saturating_sub(1)),
-                ));
-            } else if engine.study_active() {
-                if let Some(record) = study_records.get(selected_study) {
-                    inputs.push(InputEvent::ApplyStudy(record.selector));
-                }
+            if let Some(input) = ui.activate() {
+                inputs.push(input);
             } else {
                 inputs.push(InputEvent::Confirm);
             }
         }
         if rising(41) {
-            inputs.push(InputEvent::Cancel);
+            if let Some(input) = ui.cancel() {
+                inputs.push(input);
+            } else if !ui.choices_active() {
+                inputs.push(InputEvent::Cancel);
+            }
         }
-        if rising(66) {
+        if !ui.modal_active() && engine.status_controls_visible() {
+            for (scan, control) in [
+                (58, StatusControl::Bible),
+                (59, StatusControl::Map),
+                (60, StatusControl::Faith),
+                (61, StatusControl::Power(0)),
+                (62, StatusControl::Power(1)),
+                (63, StatusControl::Power(2)),
+                (64, StatusControl::Power(3)),
+                (65, StatusControl::Power(4)),
+            ] {
+                if rising(scan) {
+                    open_status_control(control, engine, &mut ui);
+                }
+            }
+        }
+        if rising(66) && !ui.modal_active() {
             inputs.push(InputEvent::QuickLoad);
         }
-        if rising(67) {
+        if rising(67) && !ui.modal_active() {
             inputs.push(InputEvent::QuickSave);
         }
         if rising(82) {
-            if engine.choice_count().is_some() {
-                selected_choice = selected_choice.saturating_sub(1);
-            } else if engine.study_active() {
-                selected_study = selected_study.saturating_sub(1);
+            if ui.choices_active() || ui.study_active() {
+                ui.move_selection(-1);
             } else {
                 inputs.push(InputEvent::Action(".u".into()));
             }
         }
         if rising(81) {
-            if engine.choice_count().is_some() {
-                selected_choice = selected_choice.saturating_add(1);
-            } else if engine.study_active() {
-                selected_study = selected_study
-                    .saturating_add(1)
-                    .min(study_records.len().saturating_sub(1));
+            if ui.choices_active() || ui.study_active() {
+                ui.move_selection(1);
             } else {
                 inputs.push(InputEvent::Action(".d".into()));
             }
         }
-        if rising(80) && engine.choice_count().is_none() && !engine.study_active() {
+        if rising(75) && ui.study_active() {
+            ui.move_selection(-18);
+        }
+        if rising(78) && ui.study_active() {
+            ui.move_selection(18);
+        }
+        if rising(80) && !ui.modal_active() {
             inputs.push(InputEvent::Action(".l".into()));
         }
-        if rising(79) && engine.choice_count().is_none() && !engine.study_active() {
+        if rising(79) && !ui.modal_active() {
             inputs.push(InputEvent::Action(".r".into()));
         }
         for scan in 4..=29 {
             if rising(scan) {
-                inputs.push(InputEvent::Key((b'a' + (scan - 4) as u8) as char));
+                if scan == 4 && ui.study_active() {
+                    if let Some(input) = ui.activate() {
+                        inputs.push(input);
+                    }
+                } else if !ui.modal_active() {
+                    inputs.push(InputEvent::Key((b'a' + (scan - 4) as u8) as char));
+                }
             }
         }
         previous_keys.clear();
@@ -281,20 +320,25 @@ pub fn run_sdl(engine: &mut Engine) -> Result<()> {
                 &mut logical_y,
             );
         }
-        let x = logical_x.round() as i16;
-        let y = logical_y.round() as i16;
+        let display_x = logical_x.round() as i32;
+        let display_y = logical_y.round() as i32;
+        if previous_pointer != Some((display_x, display_y)) {
+            ui.pointer_move(display_x, display_y);
+            previous_pointer = Some((display_x, display_y));
+        }
+        let x = (display_x / DISPLAY_SCALE as i32).clamp(0, (SCREEN_WIDTH - 1) as i32) as i16;
+        let y = (display_y / DISPLAY_SCALE as i32).clamp(0, (SCREEN_HEIGHT - 1) as i32) as i16;
         inputs.push(InputEvent::PointerMove { x, y });
         if buttons & 1 != 0 && previous_buttons & 1 == 0 {
-            if let Some(count) = engine.choice_count() {
-                inputs.push(InputEvent::Choose(
-                    selected_choice.min(count.saturating_sub(1)),
-                ));
-            } else if engine.study_active() {
-                if let Some(record) = study_records.get(selected_study) {
-                    inputs.push(InputEvent::ApplyStudy(record.selector));
+            if let Some(input) = ui.pointer_click(display_x, display_y) {
+                inputs.push(input);
+            } else if !ui.modal_active() {
+                let status = status_bar_state(engine);
+                if let Some(control) = status_control_at(display_x, display_y, &ui_assets, status) {
+                    open_status_control(control, engine, &mut ui);
+                } else {
+                    inputs.push(InputEvent::PointerClick { x, y });
                 }
-            } else {
-                inputs.push(InputEvent::PointerClick { x, y });
             }
         }
         previous_buttons = buttons;
@@ -306,25 +350,32 @@ pub fn run_sdl(engine: &mut Engine) -> Result<()> {
         engine.tick_elapsed(inputs, elapsed_units)?;
         for event in engine.take_events() {
             match event {
-                EngineEvent::SceneChanged { scene, .. } => eprintln!("scene: {scene}"),
-                EngineEvent::Dialogue { text, .. } => eprintln!("{text}"),
+                EngineEvent::SceneChanged { scene, .. } => {
+                    ui.clear();
+                    eprintln!("scene: {scene}");
+                }
+                EngineEvent::Dialogue { channel, text } => {
+                    ui.show_dialogue(channel, text.clone(), engine.dialogue_presentation(channel));
+                    eprintln!("{text}");
+                }
                 EngineEvent::Choices(choices) => {
-                    selected_choice = selected_choice.min(choices.len().saturating_sub(1));
+                    ui.show_choices(
+                        choices.clone(),
+                        engine.choice_presentation(),
+                        engine.menu_selection(),
+                    );
                     for (index, choice) in choices.iter().enumerate() {
-                        eprintln!(
-                            "{}{}",
-                            if index == selected_choice { "> " } else { "  " },
-                            choice
-                        );
+                        eprintln!("{}{choice}", if index == 0 { "> " } else { "  " });
                     }
                 }
                 EngineEvent::StudyRequested { .. } => {
-                    selected_study = selected_study.min(study_records.len().saturating_sub(1));
+                    let study_records = engine.available_study_records();
+                    ui.show_study(study_records.clone());
                     eprintln!("Computer Bible:");
                     for (index, record) in study_records.iter().enumerate() {
                         eprintln!(
                             "{}{} - {}",
-                            if index == selected_study { "> " } else { "  " },
+                            if index == 0 { "> " } else { "  " },
                             record.citation,
                             record.verse
                         );
@@ -333,10 +384,47 @@ pub fn run_sdl(engine: &mut Engine) -> Result<()> {
                 _ => {}
             }
         }
-        sdl.present(engine)?;
+        sdl.present(engine, &ui, &ui_assets)?;
         unsafe {
             SDL_Delay(16);
         }
+    }
+}
+
+fn status_bar_state(engine: &Engine) -> StatusBarState {
+    StatusBarState {
+        visible: engine.status_controls_visible(),
+        faith: engine.state.variables[21],
+        powers: std::array::from_fn(|index| engine.state.flag(0x30 + index as u8)),
+    }
+}
+
+fn open_status_control(control: StatusControl, engine: &Engine, ui: &mut UiState) {
+    match control {
+        StatusControl::Bible => ui.show_study_browser(engine.available_study_records()),
+        StatusControl::Map => {
+            let explored = std::array::from_fn(|index| engine.state.variables[37 + index] as u16);
+            ui.show_map(
+                engine.state.world.clone(),
+                explored,
+                usize::try_from(engine.state.variables[11]).unwrap_or(0),
+                usize::try_from(engine.state.variables[12]).unwrap_or(0),
+            );
+        }
+        StatusControl::Faith => {
+            let faith = engine.state.variables[21].clamp(0, 10_000);
+            let text = if faith == 10_000 {
+                "FAITH: 100%".to_owned()
+            } else {
+                format!("FAITH: {}.{:02}%", faith / 100, faith % 100)
+            };
+            ui.show_notice(text);
+        }
+        StatusControl::Power(index) if engine.state.flag(0x30 + index as u8) => {
+            let name = ["SWORD", "SHIELD", "NO TRAP", "CANDLE", "FLIGHT"][index];
+            ui.show_notice(format!("{name} POWER IS ACTIVE"));
+        }
+        StatusControl::Power(_) => {}
     }
 }
 

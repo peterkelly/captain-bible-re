@@ -200,6 +200,20 @@ Thread selectors use the same player-facing interaction model but are attached
 to a moving scene object. The engine MUST preserve list order for keyboard
 cycling and deterministic hit testing.
 
+A newly entered scene starts with global action selection enabled. A newly
+created scene-thread selector is also enabled, although it is not exposed
+until opcode `10` assigns a nonempty label and selector coordinates. Opcodes
+`1C` and `1D` then enable or disable that individual selector; opcodes `41`
+and `42` gate all selectors for the current scene. Empty selector strings MUST
+not become input targets.
+
+This initialization is observable in `FIRST.BIN`: it configures node 2 at
+`(282,124)` with selector `.r` but never executes `1C` or `41` on the initial
+path. After the entry animation completes, that target must therefore be
+available by pointer activation, the Right arrow, and the selector's keyboard
+key. Treating either initial enable state as false leaves the first explorable
+scene inescapable.
+
 ## Palette, audio, and modal waits
 
 Palette mapping and blackout effects are advanced as part of the scene update.

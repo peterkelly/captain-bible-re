@@ -60,6 +60,15 @@ These are context-sensitive controls. A scene may consume a function key as a
 normal continue action or suppress the status row. The engine MUST route input
 through the active UI state before applying global shortcuts.
 
+The ordinary status row uses transparent-zero frames from `STUFF.ART` at
+their descriptor origins. Frame 4 is Computer Bible at `(4,1)`, frame 32 is
+Map at `(23,1)`, and frames 22 through 26 are the five Faith-meter states at
+`(44,3)`. Acquired Sword, Shield, No Trap, Candle, and Flight powers display
+frames 17 through 21 respectively. Frame 11 is the upper-right disk indicator
+at `(297,1)`. These are logical 320-by-200 coordinates; the standard output
+expands them by 2 in both axes. Pointer activation uses the visible frame
+bounds and must invoke the same interface as F1 through F8.
+
 F2 is context-sensitive. Inside a building it shows explored and unexplored
 halls, room letters, stations, and verse references. Outside, it shows the
 city and colors a building gold after its victim has been rescued. One
@@ -69,9 +78,11 @@ heading.
 
 ## Dialogue and menus
 
-A modal message advances on Enter or an equivalent click. A choice menu uses
-Up and Down to move the highlighted row and Enter to select it. Pointer motion
-highlights the row under the cursor and a left click selects it.
+A modal message advances on Enter, Escape, or an equivalent click. A choice
+menu uses Up and Down to move the highlighted row, clamps at both ends, and
+uses Enter to select it. Pointer motion highlights the wrapped row under the
+cursor and a left click selects that row; clicking outside its panel does
+nothing.
 
 Escape cancels a study or returns from interfaces where an Off action is
 available. In the computer Bible, Page Up and Page Down change pages, arrow

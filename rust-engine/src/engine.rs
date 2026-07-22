@@ -122,7 +122,7 @@ impl Default for SceneActor {
             previous_node: 0,
             direction: 0,
             animation_phase: 0,
-            action_enabled: false,
+            action_enabled: true,
             selector: String::new(),
             selector_x: 0,
             selector_y: 0,
@@ -408,7 +408,7 @@ impl Scene {
             palette_adjustments: [0; 256],
             clear_color: 0,
             modal: None,
-            action_selection: false,
+            action_selection: true,
             selected_record: None,
             study_expected: None,
             study_component: 0,
@@ -486,6 +486,9 @@ impl Engine {
     pub fn scene_name(&self) -> &str {
         &self.scene.name
     }
+    pub fn status_controls_visible(&self) -> bool {
+        self.scene.action_selection && self.scene.modal.is_none() && self.state.variables[21] > 0
+    }
     pub fn actions(&self) -> impl Iterator<Item = (&str, i16, i16)> {
         let enabled = self.scene.action_selection;
         self.scene
@@ -497,12 +500,28 @@ impl Engine {
                 self.scene
                     .actors
                     .iter()
-                    .filter(move |actor| enabled && actor.action_enabled)
+                    .filter(move |actor| {
+                        enabled && actor.action_enabled && !actor.selector.is_empty()
+                    })
                     .map(|actor| (actor.selector.as_str(), actor.selector_x, actor.selector_y)),
             )
     }
     pub fn choice_count(&self) -> Option<usize> {
         matches!(self.scene.modal, Some(Modal::Choices { .. })).then_some(self.scene.choices.len())
+    }
+    pub fn dialogue_presentation(&self, channel: DialogueChannel) -> [u8; 3] {
+        match channel {
+            DialogueChannel::Adversary | DialogueChannel::Character => {
+                self.scene.character_presentation
+            }
+            DialogueChannel::CaptainBible => self.scene.captain_presentation,
+        }
+    }
+    pub fn choice_presentation(&self) -> [u8; 3] {
+        self.scene.captain_presentation
+    }
+    pub fn menu_selection(&self) -> usize {
+        usize::from(self.scene.menu_selection)
     }
     pub fn study_active(&self) -> bool {
         matches!(self.scene.modal, Some(Modal::Study { .. }))
@@ -735,7 +754,9 @@ impl Engine {
                 }
             }
             InputEvent::Cancel => {
-                if matches!(self.scene.modal, Some(Modal::Study { .. })) {
+                if matches!(self.scene.modal, Some(Modal::Dialogue { .. })) {
+                    self.resume_modal(None)?;
+                } else if matches!(self.scene.modal, Some(Modal::Study { .. })) {
                     self.state.set_flag(0x14, false);
                     self.state.set_flag(0x15, true);
                     self.resume_modal(None)?;
@@ -797,7 +818,7 @@ impl Engine {
                     .actors
                     .iter()
                     .enumerate()
-                    .filter(|(_, actor)| actor.action_enabled)
+                    .filter(|(_, actor)| actor.action_enabled && !actor.selector.is_empty())
                     .map(|(index, actor)| {
                         (Selection::Actor(index), actor.selector_x, actor.selector_y)
                     }),
@@ -827,7 +848,9 @@ impl Engine {
                     .actors
                     .iter()
                     .position(|actor| {
-                        actor.action_enabled && actor.selector.eq_ignore_ascii_case(label)
+                        actor.action_enabled
+                            && !actor.selector.is_empty()
+                            && actor.selector.eq_ignore_ascii_case(label)
                     })
                     .map(Selection::Actor)
             })
@@ -862,7 +885,7 @@ impl Engine {
                         .actors
                         .iter()
                         .enumerate()
-                        .filter(|(_, actor)| actor.action_enabled)
+                        .filter(|(_, actor)| actor.action_enabled && !actor.selector.is_empty())
                         .nth(combined_index - action_count)
                         .map(|(index, _)| Selection::Actor(index))
                 }
@@ -1415,6 +1438,13 @@ impl Engine {
                 self.scene.modal = None;
             }
             0x46 => {
+                if self.scene.choices.is_empty() {
+                    return Err(EngineError::vm(
+                        &self.scene.name,
+                        instruction.offset,
+                        "cannot present an empty dialogue-choice menu",
+                    ));
+                }
                 self.scene.modal = Some(Modal::Choices { owner: slot });
                 self.scene.threads[slot].suspended = true;
                 self.events.push_back(EngineEvent::Choices(
@@ -2509,6 +2539,87 @@ mod animation_tests {
         assert_eq!(engine.scene.threads[0].delay, -100);
         assert!(engine.scene.threads[0].active);
         assert!(!engine.scene.threads[1].active);
+    }
+
+    #[test]
+    fn empty_dialogue_choice_menu_is_rejected() {
+        let data_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../CB");
+        if !data_dir.join("DD1.DAT").is_file() {
+            return;
+        }
+
+        let config = LaunchConfig::parse(std::iter::empty::<&str>(), &data_dir).unwrap();
+        let mut engine = Engine::open(config).unwrap();
+        engine.scene = Scene::new("EMPTY-MENU".into(), vec![0x46]);
+        let error = engine.run_threads().unwrap_err();
+        assert!(error.to_string().contains("empty dialogue-choice menu"));
+    }
+
+    #[test]
+    fn dialogue_uses_configured_geometry_and_escape_dismisses_it() {
+        let data_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../CB");
+        if !data_dir.join("DD1.DAT").is_file() {
+            return;
+        }
+
+        let config = LaunchConfig::parse(std::iter::empty::<&str>(), &data_dir).unwrap();
+        let mut engine = Engine::open(config).unwrap();
+        engine.take_events();
+        engine.scene = Scene::new(
+            "DIALOGUE".into(),
+            vec![
+                0x5c, 4, 30, 150, 0x5d, 162, 89, 150, 0x48, b'H', b'e', b'l', b'l', b'o', 0,
+            ],
+        );
+        engine.run_threads().unwrap();
+
+        assert_eq!(
+            engine.dialogue_presentation(DialogueChannel::Character),
+            [162, 89, 150]
+        );
+        assert!(matches!(
+            engine.take_events().as_slice(),
+            [EngineEvent::Dialogue {
+                channel: DialogueChannel::Character,
+                text,
+            }] if text == "Hello"
+        ));
+        engine.handle_input(InputEvent::Cancel).unwrap();
+        assert!(!matches!(engine.scene.modal, Some(Modal::Dialogue { .. })));
+    }
+
+    #[test]
+    fn first_scene_exposes_and_accepts_the_right_opening_action() {
+        let data_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../CB");
+        if !data_dir.join("DD1.DAT").is_file() {
+            return;
+        }
+
+        let config = LaunchConfig::parse(std::iter::empty::<&str>(), &data_dir).unwrap();
+        let mut engine = Engine::open(config).unwrap();
+        engine.enter_scene("FIRST".into(), "beamer".into()).unwrap();
+        engine.tick_elapsed([], 4_000).unwrap();
+
+        assert!(engine.status_controls_visible());
+        assert_eq!(engine.actions().collect::<Vec<_>>(), vec![(".r", 282, 124)]);
+        assert_eq!(engine.selection_by_label(".r"), Some(Selection::Actor(2)));
+        assert_eq!(engine.nearest_action(282, 124), Some(Selection::Actor(2)));
+        engine
+            .handle_input(InputEvent::PointerClick { x: 282, y: 124 })
+            .unwrap();
+        assert!(engine.scene.movement.is_some());
+        assert_eq!(
+            engine
+                .scene
+                .movement
+                .as_ref()
+                .unwrap()
+                .route
+                .last()
+                .unwrap()
+                .to,
+            2
+        );
     }
 
     fn animation(mode: u8) -> Animation {

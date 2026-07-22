@@ -188,8 +188,8 @@ handler	0x5440	bin_handler_set_scene_thread_origin	verified	bytecode	Opcode 0x53
 handler	0x5468	bin_handler_move_scene_thread_to	verified	bytecode	Opcode 0x54 requests movement to a destination navigation node
 handler	0x514d	bin_handler_jump_if_digital_audio_fallback	high	bytecode	Opcode 0x5a branches only when all four digital effects guard values are nonzero
 handler	0x54dc	bin_handler_set_scene_thread_direction	verified	bytecode	Opcode 0x5b selects movement orientation and render offset
-handler	0x5504	bin_handler_configure_captain_bible_dialogue	high	bytecode	Opcode 0x5c writes the three Captain Bible presentation fields
-handler	0x551f	bin_handler_configure_character_dialogue	high	bytecode	Opcode 0x5d writes the three character presentation fields
+handler	0x5504	bin_handler_configure_captain_bible_dialogue	verified	bytecode	Opcode 0x5c writes Captain Bible text X, text Y, and wrap width
+handler	0x551f	bin_handler_configure_character_dialogue	verified	bytecode	Opcode 0x5d writes character text X, text Y, and wrap width
 handler	0x553a	bin_handler_set_deferred_scene_thread_target	high	bytecode	Unused opcode 0x5e sets the target later started in scheduler slot 2
 handler	0x556e	bin_handler_store_mouse_x	verified	bytecode	Opcode 0x62 stores the live mouse X coordinate in a script variable
 handler	0x5580	bin_handler_store_mouse_y	verified	bytecode	Opcode 0x63 stores the live mouse Y coordinate in a script variable
