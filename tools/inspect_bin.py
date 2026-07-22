@@ -158,7 +158,7 @@ OPCODE_NAMES = {
     0x13: "remove_dialogue_choice",
     0x14: "show_adversary_dialogue",
     0x15: "select_study_record",
-    0x16: "set_palette_mapping_range_from_variable",
+    0x16: "set_palette_adjustment_range_from_variable",
     0x17: "add_reverse_edge_departure_handler",
     0x18: "add_forward_edge_departure_handler",
     0x19: "add_forward_edge_arrival_handler",

@@ -312,7 +312,7 @@ fr case.0x4552.16 bin_handler_configure_scene_thread_action
 fr case.0x4552.17 bin_handler_add_navigation_arrival_handler
 fr case.0x4552.18 bin_handler_add_navigation_departure_handler
 fr case.0x4552.21 bin_handler_select_study_record
-fr case.0x4552.22 bin_handler_set_palette_mapping_range_from_variable
+fr case.0x4552.22 bin_handler_set_palette_adjustment_range_from_variable
 fr case.0x4552.23 bin_handler_add_edge_transition_handler
 fr case.0x4552.27 bin_handler_prime_primary_scene_thread_timer
 fr case.0x4552.28 bin_handler_enable_scene_thread_action

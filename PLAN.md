@@ -1,6 +1,6 @@
 # Captain Bible Reverse-Engineering Plan
 
-Last updated: 2026-07-19
+Last updated: 2026-07-22
 
 This plan is a living checklist. Findings and commands are recorded in
 `docs/src/progress-log.md`.
@@ -113,3 +113,16 @@ This plan is a living checklist. Findings and commands are recorded in
 - [x] Specify configuration, persistence, error behavior, and text export.
 - [x] Add conformance guidance and clearly bounded unspecified behavior.
 - [x] Validate links, chapter coverage, clean-room language, and both mdBook builds.
+
+## Phase 10: Clean-room Rust engine
+
+- [x] Create a standalone `rust-engine` crate with a dependency-free core.
+- [x] Implement and validate all shipped archive and resource codecs.
+- [x] Decode all 145 BIN opcodes and execute the cooperative scene scheduler.
+- [x] Implement indexed rendering, palettes, animation modes, and navigation.
+- [x] Implement dialogue, study records, map state, progression, and combat logic.
+- [x] Implement original-compatible checkpoints, saves, and command-line export.
+- [x] Add terminal and required-build SDL3 reference frontends.
+- [x] Add corpus, rendering, save, world, VM, and QEMU-reference regressions.
+- [x] Feed implementation discoveries back into the clean-room specification.
+- [ ] Add native PCM/XMIDI playback and in-window modal text presentation.

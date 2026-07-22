@@ -173,7 +173,7 @@ handler	0x4c61	bin_handler_configure_scene_thread_action	verified	bytecode	Opcod
 handler	0x4ee6	bin_handler_add_navigation_arrival_handler	verified	bytecode	Opcode 0x11 maps a destination node to a BIN thread target
 handler	0x4fb0	bin_handler_add_navigation_departure_handler	verified	bytecode	Opcode 0x12 maps a source node to a BIN thread target
 handler	0x5384	bin_handler_select_study_record	verified	bytecode	Opcode 0x15 selects the text record used by inline study substitutions
-handler	0x5543	bin_handler_set_palette_mapping_range_from_variable	verified	bytecode	Opcode 0x16 fills an inclusive palette map range from a script variable
+handler	0x5543	bin_handler_set_palette_adjustment_range_from_variable	verified	bytecode	Opcode 0x16 fills an inclusive signed palette-adjustment range from a script variable
 handler	0x4f44	bin_handler_add_edge_transition_handler	verified	bytecode	Opcodes 0x17 through 0x1a append directional departure and arrival callbacks
 handler	0x500e	bin_handler_prime_primary_scene_thread_timer	medium	bytecode	Unused opcode 0x1b negates its operand into the primary motion timer and sets a consumed motion-transition latch
 handler	0x4cf3	bin_handler_enable_scene_thread_action	verified	bytecode	Opcode 0x1c enables one scene-thread selector record

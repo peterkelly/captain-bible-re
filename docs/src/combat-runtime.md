@@ -134,13 +134,15 @@ used after an action target has supplied a branch destination. It is distinct
 from the separate 16-byte record family created by opcode `0x02`, whose type
 `0x02` entries also participate in the scene display/update list.
 
-Opcode `0x59` waits for a digital effect to finish. When the digital driver
-is unavailable, the same handler decrements a simulated 100-tick duration,
-preserving script timing. Opcode `0x82` computes a runtime pseudorandom value
-modulo its first operand and stores the remainder in the script variable
-selected by its second operand. Together with animation waits, these
-operations let the combat scripts sequence visual attacks, sounds, and
-randomized branches without embedding those policies in an enemy structure.
+Opcode `0x59` waits for a digital effect to finish. With usable playback it
+yields and retries while the driver reports an active effect. Without usable
+playback it subtracts 100 from the calling scheduler slot's delay, advances
+past the command, and lets the ordinary per-thread timer provide the pause.
+Opcode `0x82` computes a runtime pseudorandom value modulo its first operand
+and stores the remainder in the script variable selected by its second
+operand. Together with animation waits, these operations let the combat
+scripts sequence visual attacks, sounds, and randomized branches without
+embedding those policies in an enemy structure.
 
 ## Action and outcome control flow
 

@@ -93,6 +93,17 @@ bytes; restoring a checkpoint rebuilds its saved bank and reapplies the saved
 state bytes. Scene commands find a descriptor by selector, set or clear its
 state, branch on it, or copy a selected component into mutable scene memory.
 
+The mutable-memory copy command accepts more component selectors than the
+interactive prompt mapping. `V` copies `citation - verse`; a byte from 0
+through 9 copies that zero-based `W` occurrence; and ordinary tag bytes such
+as `C` or `E` copy the first matching component. These textual forms include a
+terminating NUL. Selector `X` instead writes a shuffled byte array containing
+`0..W-count-1` plus literal `C`, stores its length in variable 27, and does not
+append a NUL. The original performs 20 random swaps; the clean-room random
+algorithm may differ as allowed by the compatibility boundaries. Successful
+copying sets state flag `22`; a missing record or component clears it and
+leaves the destination bytes unchanged.
+
 ## Computer Bible
 
 The F1 interface displays descriptors whose state marks the verse as obtained.
@@ -103,6 +114,14 @@ Apply is available only when a scene has configured an expected selector and
 component. Applying the expected descriptor sets state flag `0x14`. Leaving
 without that match sets flag `0x15`. Both flags are cleared before each
 interactive study request.
+
+The expected record can also carry one success continuation. Opcode `4F`
+associates it with a navigation node, while opcode `51` associates it with a
+BIN target and scheduler thread. Applying the matching record starts that
+movement or command stream after the modal browser closes. Opcode `15`
+selects a record while clearing both continuations, and opcode `50` clears the
+active selection. A host must not merely set the result flag and discard these
+configured continuations.
 
 ## Prompt component selection
 

@@ -1,0 +1,20 @@
+[package]
+name = "captain-bible-engine"
+version = "0.1.0"
+edition = "2024"
+description = "Clean-room Rust engine for Captain Bible in the Dome of Darkness"
+license = "MIT"
+build = "build.rs"
+
+[lib]
+name = "captain_bible_engine"
+path = "src/lib.rs"
+
+[[bin]]
+name = "captain-bible"
+path = "src/main.rs"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

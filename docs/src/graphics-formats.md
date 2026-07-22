@@ -61,11 +61,24 @@ not directly on the screen. `LOGO.ART` demonstrates a multi-piece screen:
 | 4 | -3 | -3 | 7 | 9 | `0xC001` |
 | 5 | 22 | 138 | 275 | 30 | `0xC040` |
 
+The object renderer treats the 8.8 scale word as a divisor. It computes frame
+dimensions and origins as `value * 256 / scale`, so `0x0200` halves artwork.
+For a horizontal reflection it computes
+`anchor_x - scaled_origin_x - scaled_width`; it does not reuse the normal
+`anchor_x + scaled_origin_x` position. This is directly visible in
+`LOGO.BIN`, which reflects frame 3 at X=303 to form the left half of the dome.
+
 The descriptor itself does not specify transparency. The draw-call flags
 choose the copy operation. `blit_rect_transparent_zero` at `0xA106` tests each
 source byte and advances the destination without writing when the index is 0.
 `blit_rect_opaque` at `0xA136` copies every byte. The fast VGA copy at
 `0xA0C9` copies rows into segment `A000h` using a 320-byte screen stride.
+
+Layering uses the stable render slot allocated by the scene's mixed display
+list, rather than controller update order. The compositor at `0xC000` walks
+those slots in increasing order. This lets the direct `LOGO.BIN` dome pieces
+at display indices 7 through 9 occlude the moving actor at index 4, producing
+the oval entry and exit mask without a dedicated ellipse-clipping routine.
 
 ## QEMU framebuffer validation
 

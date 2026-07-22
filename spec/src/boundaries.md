@@ -40,18 +40,23 @@ resource reads even when no cross-scene semantic name is assigned.
 ## Underdetermined timing and animation details
 
 The resource-visible animation definition, its nine-byte steps, linking,
-start/stop operations, terminal states, display output, and wait predicates are
-normative. Two private runtime timing bytes and the exact internal transition
-table for animation modes 1 through 10 are not specified as a host data
-structure. A shipped-game implementation must nevertheless make the supplied
-sequences loop, link, stop, and reach their wait states with equivalent visible
-ordering. An implementation claiming cycle-exact animation compatibility must
-document its additional timing model separately.
+start/stop operations, mode transitions, terminal states, display output, and
+wait predicates are normative. The transition table for modes 1 through 10 is
+specified in [Scene runtime](scene-runtime.md). Two private runtime timing
+bytes are not specified as a host data structure. A shipped-game
+implementation must nevertheless make the supplied sequences loop, reverse,
+stop, and reach their wait states with equivalent visible ordering. An
+implementation claiming cycle-exact animation compatibility must document its
+additional wall-clock timing model separately.
 
-Likewise, the host duration of a “tick” is not fixed here. Scene delay values,
-the silent 100-tick effect wait, and the unused 3000-tick text timer are logical
-relative durations. They MUST remain ordered and playable; exact wall-clock
-matching is an optional higher-precision profile.
+Runtime controller values use 2,880 timer units per second. The reference
+normally receives those units in increments of 24 and caps one update's delta
+at 400. Scene delay values, the silent 100-unit effect wait, and the unused
+3000-unit text timer therefore correspond to approximately 35 ms and 1.04
+seconds. A host MAY batch several elapsed units into one presentation frame,
+but MUST advance timers at 2,880 units per second rather than by one unit per
+rendered frame. Exact interrupt phase and sub-frame jitter remain outside the
+base shipped-game profile.
 
 ## Font and text layout
 

@@ -66,14 +66,51 @@ Two drawing modes are required:
 - **transparent-zero:** skip writes for source index zero.
 
 Render-flag bits 0 and 1 flip the two image axes. Scaling uses `0x0100` as
-native size. A compatible renderer MUST apply frame origin, scene coordinate,
-scale, and flips consistently and clip output to the logical viewport.
+native size, but the stored word is an inverse 8.8 divisor rather than a
+magnification factor. For each axis the reference renderer computes:
+
+```text
+scaled_size   = trunc(source_size * 256 / scale)
+scaled_origin = trunc(signed_origin * 256 / scale)
+```
+
+Thus `0x0200` draws at half size and `0x0080` draws at double size. A zero
+scale, or a scale large enough to reduce either dimension to zero, suppresses
+the render slot. Division of a negative origin truncates toward zero.
+
+Without reflection, the destination origin is `anchor + scaled_origin`.
+Reflection also reflects the signed origin about the supplied anchor:
+
+```text
+normal_left    = anchor_x + scaled_origin_x
+reflected_left = anchor_x - scaled_origin_x - scaled_width
+normal_top     = anchor_y + scaled_origin_y
+reflected_top  = anchor_y - scaled_origin_y - scaled_height
+```
+
+The renderer then reverses the corresponding source axis and clips to the
+logical viewport. Applying the normal origin formula before merely reversing
+the pixels is incorrect. `LOGO.BIN` depends on this distinction: its left
+dome half is frame 4 reflected about X=303.
 
 ## Composition and display records
 
-Scene display entries are traversed in list order. Direct entries select an
-art slot with the low seven bits of their slot byte. Slot bit 7 hides the
-entry. An entry with a hidden slot or frame zero does not draw.
+Every display definition reserves a stable render slot in the mixed display
+list. Direct-object, animation, and scene-thread controllers update their own
+reserved slots even though their update routines run separately. Final scene
+composition paints the active slots in increasing display-list order; it MUST
+NOT regroup them by controller family. A later direct scenery record can
+therefore occlude an earlier animation or moving actor.
+
+`LOGO.BIN` relies on this rule for its oval aperture. Its moving `RUN.ART`
+actor uses an earlier display slot than three direct dome and bridge pieces.
+Those later pieces cover the actor while it enters from the left and exits to
+the right. This is ordinary display-list occlusion, not a geometric ellipse
+clip operation.
+
+Direct entries select an art slot with the low seven bits of their slot byte.
+Slot bit 7 hides the entry. An entry with a hidden slot or frame zero does not
+draw.
 
 Animation entries obtain the same frame, art, position, scale, and flip values
 from the current nine-byte animation step. UI overlays, text, and the pointer
@@ -84,7 +121,7 @@ are drawn by their active interface after scene composition.
 Scene programs can:
 
 - replace the complete palette;
-- fill an inclusive palette-mapping range from a script variable;
+- fill an inclusive signed palette-adjustment range from a script variable;
 - advance a signed phase and rotate an inclusive palette range;
 - schedule palette updates; and
 - start a blackout effect before a transition.

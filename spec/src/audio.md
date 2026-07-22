@@ -19,9 +19,18 @@ both zero request a stop rather than `D000.ABT`.
 
 Only one retained digital effect is required. Starting a replacement releases
 the preceding decoded buffer. The stop operation halts playback and releases
-that buffer. The wait operation yields until playback finishes; without a
-digital backend it uses a simulated 100-tick duration so script timing remains
-similar.
+that buffer. With usable digital playback, the wait operation yields and
+retries while playback remains active. Without usable playback, the wait
+operation subtracts 100 from the calling script thread's delay and advances
+past the command. The scheduler therefore resumes that thread after
+approximately 35 ms at 2,880 timer units per second. This delay begins at the
+wait command; it is not a global timer started by the play command.
+
+The digital-audio fallback branch jumps if the driver is absent, effects are
+disabled, driver-state bit 0 is clear, or the explicit fallback word is
+nonzero. It falls through only when a driver is present, effects are enabled,
+the state bit is set, and the fallback word is zero. An implementation without
+a digital playback backend MUST take the branch.
 
 ## `ABT` header
 

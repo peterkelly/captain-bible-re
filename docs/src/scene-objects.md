@@ -99,6 +99,22 @@ During scene updates, `0x3AFF` walks the current list:
 - types `0x03` and `0x43` pass the recovered ten-byte fields to `0xBCAC`;
 - other supported types are serviced by their dedicated animation paths.
 
+The main frame update calls those controller paths separately, but call order
+is not layer order. Each path writes into the render slot reserved by its
+mixed display-record index. Direct rendering passes `index + 1` at
+`0x3B72`--`0x3B76`; animation rendering passes its saved display index plus
+one at `0x3D64`--`0x3D6B`; scene-thread movement does the same at
+`0x763D`--`0x7642`. The dirty-region compositor at `0xC000` then advances
+through the 26-byte render slots in increasing order.
+
+This distinction supplies the opening oval mask. In `LOGO.BIN`, the moving
+`RUN.ART` controller is display record 4, while the direct dome and bridge
+pieces are records 7 through 9. The later scenery covers the character outside
+the oval as it enters and leaves. It is display-list occlusion rather than a
+separate geometric clipping primitive. Regrouping records as direct,
+animation, and movement passes incorrectly forces the character above the
+mask.
+
 The list is runtime scene state and is reconstructed from the BIN program. It
 is not serialized in the save file.
 
@@ -143,6 +159,17 @@ The summary includes source offset, type, and all definition fields known for
 that type. It follows linear file order; branches and calls can skip or repeat
 definitions at runtime, so indices outside a straight startup sequence are
 not guaranteed live indices.
+
+## Controller timer rate
+
+The hardware initialization at load offset `0x3600` installs the interrupt-8
+handler at `0xAAE4`. It programs PIT channel zero in mode 3 with divisor
+`0x26D7` (9,943), producing approximately 120 interrupts per second. Each
+interrupt increments the counter at `0x4B66`. The elapsed-delta helper at
+`0x00B6` multiplies that counter by 24 and caps the result at 400 before the
+frame controller at `0x7A8D` distributes it to animations, scene threads, and
+movement. The resulting controller rate is approximately 2,880 units per
+second, not one unit per millisecond.
 
 ## Remaining questions
 

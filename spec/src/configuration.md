@@ -10,9 +10,11 @@
 | 2 | `u8` | Mature-topic permission; only `DB` permits, any other value forces filtering. |
 | 3 | `u8` | Value ORed into no-combat mode. |
 
-A command-line translation selection is retained instead of being replaced by
-the installation translation. Restrictions combine monotonically: command
-line options can request filtering or no-combat, but cannot relax an
+An explicit `-bX` gameplay translation is retained instead of being replaced
+by the installation translation. With no `-bX`, the installation translation
+selects gameplay text. The `-sX` export selector is separate and is replaced
+by an installation translation lock. Restrictions combine monotonically:
+command-line options can request filtering or no-combat, but cannot relax an
 installation restriction.
 
 A portable engine MAY store equivalent policy in another configuration system
@@ -53,7 +55,53 @@ The export mask has these bits:
 `M` metadata is not printed. The text is CP437-compatible text, wrapped at 70
 columns, with the game study-file heading and section labels. Mature selectors
 `E0` and above are excluded when filtering is active. Installation translation
-locking applies to export as it does to gameplay.
+locking overrides the `-sX` export selector.
+
+The original-compatible export is a CP437 byte stream with DOS `CR LF` line
+endings. It begins with:
+
+```text
+CAPTAIN BIBLE IN DOME OF DARKNESS
+
+NUL
+
+```
+
+Here `NUL` is one literal zero byte on its own terminated line, not the three
+printed letters. Banks appear in `A B C D E F G R` order with these headings:
+
+```text
+BUILDING A - Round Tubes with Fireballs - Relative Moralist
+BUILDING B - Huge Dark Blue - Fearful
+BUILDING C - The First Building - Cultist
+BUILDING D - Purple Lights - Legalist
+BUILDING E - Wall with Platforms - Greedy
+BUILDING F - Green and Purple - Drug Abuser
+BUILDING G - Caves - New Ager
+BUILDING R - In the Unibot
+```
+
+A form-feed byte followed by two line endings separates successive banks.
+When mask bit 0 is set, `#NN` uses the one-based record ordinal within its
+bank, not the selector. Filtering a mature record leaves the later ordinals
+unchanged. Selected companion components retain their resource order and use
+the labels `CYBER LIE:`, `PARAPHRASE:`, `CONVERSATION WITH VICTIM:`, `WRONG
+GUESS:`, `CORRECT GUESS:`, and `EXPLANATION OF CORRECT GUESS:`. Verse output
+uses `VERSE:` followed by `citation - verse`.
+
+Wrapping is byte-oriented. While more than 70 bytes remain, search only the
+first 70 bytes for the last ASCII space, emit the bytes before it, and discard
+that separator plus every immediately following space. If there is no space,
+emit 70 bytes. The final 70 or fewer bytes form the last line. This strict
+first-70 search means a word that would end exactly in column 70 is moved to
+the next line when more text follows.
+
+After two blank lines, the export ends with these lines and a literal NUL byte:
+
+```text
+This study is copyrighted material as stated in the User Guide.
+Please respect the rights of the owners of the copyrights.
+```
 
 ## In-game settings
 

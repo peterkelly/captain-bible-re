@@ -16,11 +16,12 @@ The following indexes have cross-scene meanings:
 | 12 | Current map Y. |
 | 13 | Current connected kind or zero-mask room class. |
 | 14 | Room entrance code or contextual neighboring kind. |
+| 15 | Low kind of the cell two rows ahead during an upward hall view. |
 | 16 | Current map level letter as a character value. |
 | 17 | Current cell parameter A. |
 | 18 | Current cell parameter B. |
 | 21 | Faith, from 0 through 10000. |
-| 23–25 | Adjacent Trap parameter B at right, left, and above. |
+| 23–25 | Adjacent oriented-room parameter B at right, left, and above. |
 | 37–52 | Sixteen exploration bitmap rows, one word per map Y. |
 | 53 | Unibot turn/rotation value. |
 | 54 | Current Unibot node. |
@@ -46,7 +47,22 @@ mask = 1 << (n & 15)
 
 Flags `00` through `2F` include transient movement and action context and are
 rebuilt by current-cell processing. Higher flags carry durable abilities and
-progress. Important identifiers are:
+progress. The map-derived ranges are:
+
+| Flag range | Current-cell context |
+|---:|---|
+| `00`–`05` | Current down/right/left connections and immediate side rooms. |
+| `06`–`0A` | Connections and side rooms one row forward. |
+| `0B`–`0F` | Connections and side rooms two rows forward. |
+| `10`–`13` | Current cell is a room, or direct rooms one to three rows forward. |
+| `16`–`1E` | The corresponding adjacent/forward room has nonzero parameter B. |
+| `1F`–`21` | Immediate right, left, or upper room is Trap class. |
+
+The world-model chapter gives the exact individual mapping and scan gates.
+Flags `14`, `15`, and `22` through `2F` are cleared by this operation but not
+set from map geometry.
+
+Other important identifiers are:
 
 | Flag | Meaning |
 |---:|---|

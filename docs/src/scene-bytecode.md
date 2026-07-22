@@ -179,7 +179,7 @@ control-flow behavior:
 | `0x55` | none | `snapshot_state` | Copies the live state into a retained buffer. |
 | `0x57` | `BH` | `play_sound_effect` | Builds `D###.ABT`, decodes it, and starts playback at the supplied rate. |
 | `0x58` | none | `stop_sound_effect` | Stops active digital playback and releases its PCM buffer. |
-| `0x59` | none | `wait_for_sound_effect` | Suspends until digital playback or its simulated timer completes. |
+| `0x59` | none | `wait_for_sound_effect` | With usable digital playback, yields and retries while playback is active. Without it, subtracts 100 from the calling thread's delay and advances past the command. |
 | `0x60` | none | `nop` | Continues directly to the next command. |
 | `0x61` | `B` | `stop_scene_thread` | Clears one BIN scheduler slot's active byte. |
 | `0x65` | `BB` | `clear_display_object_frames` | **Unused.** Reads `first, count` and clears frame byte `+7` for records `[first, first + count)`. |
@@ -230,7 +230,7 @@ of 23 unused opcodes.
 | `0x11` | `BHs` | `add_navigation_arrival_handler` | Maps a destination node to a BIN target and optional explicit thread slot. |
 | `0x12` | `BHs` | `add_navigation_departure_handler` | Maps a source node to a BIN target and optional explicit thread slot. |
 | `0x15` | `B` | `select_study_record` | Selects the text descriptor expanded by study placeholders and clears both success continuations. |
-| `0x16` | `HHH` | `set_palette_mapping_range_from_variable` | Fills an inclusive palette-index mapping range with one script-variable value and schedules an update. |
+| `0x16` | `HHH` | `set_palette_adjustment_range_from_variable` | Fills an inclusive signed palette-brightness adjustment range with one script-variable value and schedules an update. |
 | `0x17` | `BHs` | `add_reverse_edge_departure_handler` | Adds a callback for starting traversal opposite an edge's stored order. |
 | `0x18` | `BHs` | `add_forward_edge_departure_handler` | **Unused.** Adds the corresponding forward-departure callback. |
 | `0x19` | `BHs` | `add_forward_edge_arrival_handler` | Adds a callback for completing traversal in stored edge order. |
@@ -244,9 +244,9 @@ of 23 unused opcodes.
 | `0x4F` | `BB` | `configure_study_navigation_success` | **Unused.** Selects a study record and the navigation node entered after success. |
 | `0x50` | none | `clear_study_record_selection` | **Unused.** Clears both active study-record selector words. |
 | `0x51` | `BHB` | `configure_study_thread_success` | Selects a study record plus the BIN target and thread slot started after success. |
-| `0x53` | `B` | `set_scene_thread_origin` | Initializes the primary navigation object's current and previous node. |
+| `0x53` | `B` | `set_scene_thread_origin` | Initializes the primary navigation object's nodes and its X/Y/scale from that node's opcode-`0x02` geometry. |
 | `0x54` | `B` | `move_scene_thread_to` | Requests movement to a navigation node, including path search and animation setup. |
-| `0x5A` | `H` | `jump_if_digital_audio_fallback` | Jumps only when the digital-driver word, effects-enabled word, driver-state bit 0, and fallback word are all nonzero; otherwise continues. |
+| `0x5A` | `H` | `jump_if_digital_audio_fallback` | Jumps when the digital-driver word is zero, effects are disabled, driver-state bit 0 is clear, or the fallback word is nonzero. Falls through only for a usable driver with a zero fallback word. |
 | `0x5B` | `B` | `set_scene_thread_direction` | Selects one of four movement orientations and its sprite/render offset. |
 | `0x5C` | `BBB` | `configure_captain_bible_dialogue` | Writes the three Captain Bible presentation fields. |
 | `0x5D` | `BBB` | `configure_character_dialogue` | Writes the three character presentation fields. |

@@ -4,3 +4,4 @@ __pycache__/
 *.py[cod]
 /docs/book
 /spec/book
+/rust-engine/target/

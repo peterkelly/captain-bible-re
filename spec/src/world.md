@@ -79,20 +79,62 @@ victim scenes are `JELO`, `FEAR`, `CULT`, `LAW`, `RICH`, `DENY`, and `NAGE`.
 
 Parameters are class-specific mutable state. Current-cell processing copies A
 and B into VM variables 17 and 18. In a Trap, A selects encounter study
-content. The parameter B of an adjacent Trap represents its locked-door
-prompt and is made available as variable 23 for right, 24 for left, or 25 for
-above; a correct answer clears that byte. Other classes MUST retain their
-parameters even when a new implementation does not attach a generic name to
-them.
+content. The parameter B of any correctly oriented adjacent room is copied to
+variable 23 for right, 24 for left, or 25 for above. Trap scripts use these
+values as locked-door prompts, and a correct answer clears that byte. Other
+classes MUST retain their parameters even when a new implementation does not
+attach a generic name to them.
 
 ## Current-cell derivation
 
-The current coordinates are variables 11 and 12. Processing a cell sets
-variable 13 to the hall kind or room class, variable 14 to the room entrance
-code or relevant neighboring kind, and variables 17, 18, 23, 24, and 25 as
-described above. It also rebuilds contextual movement/action flags. An engine
-MUST perform these derivations before dispatching the matching hall or room
-scene.
+The current coordinates are variables 11 and 12. Processing starts by copying
+the current A and B to variables 17 and 18, clearing variables 23 through 25,
+copying the current low kind to variable 13, and clearing flags `00` through
+`2F`.
+
+For a zero-connection cell, it sets flag `10`, subtracts one from variable
+13, and stores the signed quotient and remainder after division by three in
+variables 13 and 14. This is the room class and entrance derivation above.
+The all-zero cell consequently produces class `0` and entrance `-1`, matching
+the original signed division even though shipped scene flow does not use that
+value as a room.
+
+For a connected hall cell, the following flags describe the current cell and
+its immediately adjacent, correctly oriented rooms:
+
+| Flag | Meaning |
+|---:|---|
+| `00` | Current cell connects down. |
+| `01` | Current cell connects right. |
+| `02` | A west-entrance room is immediately right. |
+| `03` | Current cell connects left. |
+| `04` | An east-entrance room is immediately left. |
+| `05` | Current cell connects up. |
+| `11` | A south-entrance room is immediately above. |
+| `16`–`18` | Parameter B is nonzero for the rooms at right, left, and above. |
+| `1F`–`21` | The rooms at right, left, and above are Trap-class rooms. |
+
+The three adjacent rooms' B values, regardless of class, become variables 23,
+24, and 25. A room is recognized only when its complete packed byte is below
+`10`; connected cells with the same low kind are not rooms.
+
+When flag `05` is clear, processing stops after the immediate context. When it
+is set, the executable builds a forward perspective by scanning decreasing Y.
+The scan is clipped at the top map boundary:
+
+| Row relative to current | Direct cell | Right-side room | Left-side room |
+|---:|---|---|---|
+| `-1` | low kind to variable 14; connections right/left/up set `06`/`08`/`0A` | presence `07`, nonzero B `19` | presence `09`, nonzero B `1A` |
+| `-2` | low kind to variable 15; connections right/left/up set `0B`/`0D`/`0F`; south-entrance room presence `12`, nonzero B `1B` | presence `0C`, nonzero B `1C` | presence `0E`, nonzero B `1D` |
+| `-3` | south-entrance room presence `13`, nonzero B `1E` | not scanned | not scanned |
+
+Variables 14 and 15 retain their prior values if their respective forward
+rows are not scanned. The perspective flags do not require a continuous chain
+of up-connection bits beyond the current cell; the current up bit alone gates
+the complete bounded scan.
+
+An engine MUST perform these derivations before dispatching the matching hall
+or room scene.
 
 Map-cell kind mutation preserves the high connection nibble. Opcode `7B`
 technically ORs the complete low byte of its source variable without masking;
@@ -122,9 +164,17 @@ those two commands.
 
 ## Progression normalization
 
-After loading or restoring a map, the engine runs the scene-requested
-normalization command. It applies progression-dependent cell changes,
-including conversion of a resolved covered station from kind `6` to `A`
-with B moved to A, and conversion of resolved encounter kinds 1 through 9 to
-`B` where the corresponding progression state requires it. Scene programs
-remain authoritative about when normalization runs.
+When a scene invokes the normalization command, the engine scans the complete
+grid in column-major traversal order. Each cell is transformed independently:
+
+| Cell condition | Result |
+|---|---|
+| Connection nibble is zero | Clear parameter B; leave packed kind and A unchanged. |
+| Connected kind is `6` | Change kind to `A`, copy B to A, and clear B. |
+| Connected kind is `1` through `9` other than `6` | Change kind to `B`; retain A and B. |
+| Any other connected kind | Leave all three bytes unchanged. |
+
+Every kind replacement preserves the connection nibble. The operation does
+not consult a separate progression flag: scene programs remain authoritative
+about when it runs. Implementations MUST NOT narrow these transformations to
+only the current cell or to only a presumed encounter subtype.

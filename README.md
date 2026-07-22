@@ -30,6 +30,8 @@ complete activity log.
 - A POSIX shell
 - mdBook (for the research and specification books)
 - Rizin (for the supplied symbol script and further disassembly)
+- A current stable Rust toolchain, SDL3, and `pkg-config` (for the clean-room
+  engine)
 
 The setup is being developed and tested with QEMU 11.0.2 and mdBook 0.5.3 on
 macOS/Apple Silicon.
@@ -71,6 +73,24 @@ To recreate the play image from the current `CB/` directory:
 
 `--rebuild` replaces the persistent play image and therefore resets any saved
 games held only inside it.
+
+## Rust engine
+
+The clean-room native implementation lives in
+[`rust-engine`](rust-engine/README.md). It consumes the same original `CB/`
+data directory and includes a standard-library-only engine core plus terminal
+and SDL3 frontends. SDL3 and `pkg-config` are hard build requirements. Validate
+the complete shipped resource set and start the default SDL3 frontend with:
+
+```sh
+cd rust-engine
+cargo run --release -- --data ../CB --validate
+cargo run --release -- --data ../CB
+```
+
+Pass `--headless` for the terminal or deterministic tick frontend. See the
+engine README for SDL3 setup, controls, deterministic smoke runs, text export,
+tests, and current host-frontend limitations.
 
 ## Rebuilding FreeDOS
 

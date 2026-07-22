@@ -66,18 +66,18 @@ full-interpreter compatibility profile.
 | `0C` | `BBp` | `add_scene_entry`: associate an entry name with its two initial node bytes. |
 | `0D` | `zz` | `change_scene`: request the named scene and secondary entry/segment, ending current scene execution. |
 | `0E` | none | `nop`: continue. Unused. |
-| `0F` | `H` | `adjust_thread_delay`: subtract the word from the current scheduler thread's delay. |
+| `0F` | `H` | `adjust_thread_delay`: subtract the word from the current scheduler thread's signed countdown; a resulting negative delay yields at the next command boundary until logical time makes it nonnegative. |
 | `10` | `BHHp` | `configure_scene_thread_action`: set thread selector, X, Y, and action label. |
 | `11` | `BHs` | `add_navigation_arrival_handler`: map destination node to target and optional explicit thread slot using the `BHs` rule. |
 | `12` | `BHs` | `add_navigation_departure_handler`: map source node to target and optional explicit thread slot using the `BHs` rule. |
 | `13` | `H` | `remove_dialogue_choice`: remove the first choice whose target matches. Unused. |
 | `14` | `p` | `show_adversary_dialogue`: show text using adversary presentation and wait for dismissal. |
 | `15` | `B` | `select_study_record`: select a text descriptor and clear both study-result continuations. |
-| `16` | `HHH` | `set_palette_mapping_range_from_variable`: fill an inclusive index range with the value of a variable and schedule a palette update. |
-| `17` | `BHs` | `add_reverse_edge_departure_handler`: add a reverse-traversal departure callback. |
-| `18` | `BHs` | `add_forward_edge_departure_handler`: add a forward-traversal departure callback. Unused. |
-| `19` | `BHs` | `add_forward_edge_arrival_handler`: add a forward-traversal arrival callback. |
-| `1A` | `BHs` | `add_reverse_edge_arrival_handler`: add a reverse-traversal arrival callback. |
+| `16` | `HHH` | `set_palette_adjustment_range_from_variable`: fill an inclusive signed brightness-adjustment range with the value of a variable and refresh the palette. |
+| `17` | `BHs` | `add_reverse_edge_departure_handler`: add a reverse-traversal departure callback; `B` is the zero-based navigation-edge index. |
+| `18` | `BHs` | `add_forward_edge_departure_handler`: add a forward-traversal departure callback; `B` is the zero-based navigation-edge index. Unused. |
+| `19` | `BHs` | `add_forward_edge_arrival_handler`: add a forward-traversal arrival callback; `B` is the zero-based navigation-edge index. |
+| `1A` | `BHs` | `add_reverse_edge_arrival_handler`: add a reverse-traversal arrival callback; `B` is the zero-based navigation-edge index. |
 | `1B` | `H` | `prime_primary_scene_thread_timer`: store the negated value as the primary movement timer and set the transition latch. Unused. |
 | `1C` | `B` | `enable_scene_thread_action`: enable one scene thread as a selector. |
 | `1D` | `B` | `disable_scene_thread_action`: disable one scene thread as a selector. |
@@ -134,14 +134,14 @@ full-interpreter compatibility profile.
 | `50` | none | `clear_study_record_selection`: clear both active study selectors. Unused. |
 | `51` | `BHB` | `configure_study_thread_success`: set record selector, target, and thread slot started on success. |
 | `52` | `B` | `play_music`: load and start numbered music. |
-| `53` | `B` | `set_scene_thread_origin`: initialize the primary object's current and previous navigation node. |
+| `53` | `B` | `set_scene_thread_origin`: initialize the primary object's nodes and its X/Y/scale from the selected opcode-`02` geometry. |
 | `54` | `B` | `move_scene_thread_to`: route the primary object to a navigation node and start movement. |
 | `55` | none | `snapshot_state`: copy live state to the retained checkpoint state. |
 | `56` | none | `nop`: continue. Unused. |
 | `57` | `BH` | `play_sound_effect`: numbered effect and playback rate. |
 | `58` | none | `stop_sound_effect`: stop playback and release the decoded sample. |
-| `59` | none | `wait_for_sound_effect`: suspend until playback or its silent timer finishes. |
-| `5A` | `H` | `jump_if_digital_audio_fallback`: jump only when a digital backend is present, effects are enabled, backend state bit 0 is set, and the fallback flag is nonzero. |
+| `59` | none | `wait_for_sound_effect`: with a usable digital backend, yield and retry while playback remains active; without one, subtract 100 from the calling thread's delay and resume after this command. |
+| `5A` | `H` | `jump_if_digital_audio_fallback`: jump when the digital driver is absent, effects are disabled, backend state bit 0 is clear, or the fallback word is nonzero. Fall through only when the first three checks indicate usable playback and the fallback word is zero. |
 | `5B` | `B` | `set_scene_thread_direction`: select one of four orientations and its render offset. |
 | `5C` | `BBB` | `configure_captain_bible_dialogue`: set the three Captain Bible presentation bytes. |
 | `5D` | `BBB` | `configure_character_dialogue`: set the three character presentation bytes. |
@@ -182,7 +182,7 @@ full-interpreter compatibility profile.
 | `80` | `BH` | `jump_if_animation_active`: animation, target; jump when state is nonzero. |
 | `81` | `H` | `reduce_faith`: apply difficulty-scaled loss unless no-combat mode suppresses it. |
 | `82` | `HH` | `set_variable_random_modulo`: modulus, destination variable. |
-| `83` | `HBH` | `copy_text_record_component_to_bin`: record-selector variable, component, destination resource offset. |
+| `83` | `HBH` | `copy_text_record_component_to_bin`: record-selector variable, component, destination resource offset; set flag `22` on success and clear it when the component is absent. |
 | `84` | `HH` | `load_bin_byte`: immediate resource offset, destination variable; sign-extend the byte. |
 | `85` | `B` | `hide_display_object`: set the selected display object's hidden bit. |
 | `86` | `B` | `show_display_object`: clear the selected display object's hidden bit. |

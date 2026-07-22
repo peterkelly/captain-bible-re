@@ -20,7 +20,7 @@ opcode	handler	handler_symbol	confidence	schema	static_paths	name	variable_opera
 0x13	0x51ff	bin_handler_remove_dialogue_choice	high	H	H	remove_dialogue_choice	-	0	-	-
 0x14	0x52a3	bin_handler_show_dialogue	verified	p	-/p	show_adversary_dialogue	-	10	FACE.BIN	FACE.BIN@0x0827
 0x15	0x5384	bin_handler_select_study_record	verified	B	B	select_study_record	-	102	AHAL.BIN,BHAL.BIN,CHAL.BIN,CP2.BIN,CP3.BIN,CULT.BIN,DENY.BIN,DHAL.BIN,EHAL.BIN,FEAR.BIN,FHAL.BIN,GHAL.BIN,JELO.BIN,LAW.BIN,NAGE.BIN,POWER.BIN,RICH.BIN,ROOM1.BIN,ROOM3.BIN	CP3.BIN@0x08e6
-0x16	0x5543	bin_handler_set_palette_mapping_range_from_variable	verified	HHH	HHH	set_palette_mapping_range_from_variable	2	69	AHAL.BIN,BHAL.BIN,CHAL.BIN,CP2.BIN,CP3.BIN,DHAL.BIN,DOME.BIN,EHAL.BIN,FHAL.BIN,GHAL.BIN,GHALB.BIN,GHALS.BIN,INTRO.BIN,KABLAM.BIN,LOGO.BIN,NAGE.BIN,OUTE.BIN,TITLE.BIN,WIN.BIN	LOGO.BIN@0x0152
+0x16	0x5543	bin_handler_set_palette_adjustment_range_from_variable	verified	HHH	HHH	set_palette_adjustment_range_from_variable	2	69	AHAL.BIN,BHAL.BIN,CHAL.BIN,CP2.BIN,CP3.BIN,DHAL.BIN,DOME.BIN,EHAL.BIN,FHAL.BIN,GHAL.BIN,GHALB.BIN,GHALS.BIN,INTRO.BIN,KABLAM.BIN,LOGO.BIN,NAGE.BIN,OUTE.BIN,TITLE.BIN,WIN.BIN	LOGO.BIN@0x0152
 0x17	0x4f44	bin_handler_add_edge_transition_handler	verified	BHs	BH/BHH	add_reverse_edge_departure_handler	-	5	AHAL.BIN,FIRST.BIN	FIRST.BIN@0x019f
 0x18	0x4f44	bin_handler_add_edge_transition_handler	verified	BHs	BH/BHH	add_forward_edge_departure_handler	-	0	-	-
 0x19	0x4f44	bin_handler_add_edge_transition_handler	verified	BHs	BH/BHH	add_forward_edge_arrival_handler	-	6	GANTRY.BIN,OUTA.BIN,OUTB.BIN,OUTC.BIN,OUTD.BIN,OUTF.BIN	GANTRY.BIN@0x016a
