@@ -296,10 +296,10 @@ pub fn run_sdl(engine: &mut Engine) -> Result<()> {
             }
         }
         if rising(75) && ui.study_active() {
-            ui.move_selection(-18);
+            ui.move_selection(-14);
         }
         if rising(78) && ui.study_active() {
-            ui.move_selection(18);
+            ui.move_selection(14);
         }
         if rising(80) {
             if ui.map_active() {
@@ -321,7 +321,7 @@ pub fn run_sdl(engine: &mut Engine) -> Result<()> {
                     if let Some(input) = ui.activate() {
                         inputs.push(input);
                     }
-                } else if scan == 18 && ui.map_active() {
+                } else if scan == 18 && (ui.map_active() || ui.study_active()) {
                     if let Some(input) = ui.cancel() {
                         inputs.push(input);
                     }
@@ -419,9 +419,11 @@ pub fn run_sdl(engine: &mut Engine) -> Result<()> {
                         eprintln!("{}{choice}", if index == 0 { "> " } else { "  " });
                     }
                 }
-                EngineEvent::StudyRequested { .. } => {
+                EngineEvent::StudyRequested {
+                    expected_selector, ..
+                } => {
                     let study_records = engine.available_study_records();
-                    ui.show_study(study_records.clone());
+                    ui.show_study(study_records.clone(), expected_selector.is_some());
                     eprintln!("Computer Bible:");
                     for (index, record) in study_records.iter().enumerate() {
                         eprintln!(

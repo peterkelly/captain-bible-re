@@ -26,9 +26,11 @@ cargo run --release -- --data ../CB
 SDL3 is the default frontend. It draws modal dialogue, response choices, and
 the Computer Bible inside the game window. Enter or a primary click dismisses
 ordinary dialogue. Choice menus use Up and Down, pointer hover, Enter, and
-row-specific clicks. The study browser additionally accepts Page Up, Page
-Down, `A`, and Escape. Letters select exploration actions, arrow keys navigate,
-F1 through F8 activate the status-row controls, F9 quick-loads, and F10
+row-specific clicks. The Computer Bible uses Up and Down for individual
+records, Page Up and Page Down for 14-record pages, `A` or Enter for enabled
+Apply, and `O` or Escape for Off. Its authored rows and controls can also be
+clicked directly. Letters select exploration actions, arrow keys navigate, F1
+through F8 activate the status-row controls, F9 quick-loads, and F10
 quick-saves when no modal interface is active. The status controls can also be
 clicked directly.
 

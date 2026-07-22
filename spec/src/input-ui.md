@@ -144,8 +144,13 @@ cursor and a left click selects that row; clicking outside its panel does
 nothing.
 
 Escape cancels a study or returns from interfaces where an Off action is
-available. In the computer Bible, Page Up and Page Down change pages, arrow
-keys choose a verse, and Apply uses `A` or Enter when enabled.
+available. In the Computer Bible, Up and Down move one acquired verse, while
+Page Up, Page Down, and the artwork arrows move 14 acquired verses. Apply uses
+`A` or Enter only when encounter state enables it. Escape and `O` select Off.
+A pointer press on a reference row changes the selection without applying it;
+the authored Apply control requires a separate press. Disabled artwork also
+disables the corresponding pointer action. Exact artwork, coordinates, and
+text styles are specified in [Dialogue and Bible study](dialogue-study.md).
 
 ## Options menu
 

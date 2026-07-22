@@ -26,6 +26,8 @@ const FONT_WIDTHS: [u8; FONT_GLYPH_COUNT] = [
 const STYLE_CHOICE: [u8; 3] = [1, 7, 3];
 const STYLE_DIALOGUE: [u8; 3] = [1, 37, 4];
 const STYLE_ADVERSARY: [u8; 3] = [15, 86, 90];
+const STYLE_STUDY_SELECTED: [u8; 3] = [0, 64, 70];
+const STYLE_STUDY_UNSELECTED: [u8; 3] = [0, 32, 37];
 
 #[derive(Clone, Debug)]
 pub struct UiAssets {
@@ -39,6 +41,7 @@ pub struct UiAssets {
     powers: [ArtFrame; 5],
     save: ArtFrame,
     map_art: Art,
+    book_art: Art,
 }
 
 impl UiAssets {
@@ -104,6 +107,37 @@ impl UiAssets {
                 ));
             }
         }
+        let book_art = Art::parse(&archive.read("BOOK.ART")?)?;
+        let expected_book_frames = [
+            (28, 27, 266, 150),
+            (85, 162, 29, 12),
+            (36, 26, 26, 12),
+            (34, 85, 13, 14),
+            (34, 106, 13, 14),
+            (34, 85, 13, 14),
+            (34, 106, 13, 14),
+            (85, 162, 29, 12),
+        ];
+        if book_art.frames.len() != expected_book_frames.len() {
+            return Err(EngineError::format(
+                "BOOK.ART",
+                format!(
+                    "contains {} frames, expected {}",
+                    book_art.frames.len(),
+                    expected_book_frames.len()
+                ),
+            ));
+        }
+        for (index, expected) in expected_book_frames.into_iter().enumerate() {
+            let frame = &book_art.frames[index];
+            let actual = (frame.origin_x, frame.origin_y, frame.width, frame.height);
+            if actual != expected {
+                return Err(EngineError::format(
+                    "BOOK.ART",
+                    format!("frame {index} has descriptor {actual:?}, expected {expected:?}"),
+                ));
+            }
+        }
         let font_offsets = font_offsets(&font)?;
         Ok(Self {
             font,
@@ -116,6 +150,7 @@ impl UiAssets {
             powers,
             save,
             map_art,
+            book_art,
         })
     }
 }
@@ -208,6 +243,7 @@ struct ChoicesUi {
 struct StudyUi {
     records: Vec<StudyRecord>,
     selected: usize,
+    page_start: usize,
     apply_selection: bool,
 }
 
@@ -261,11 +297,12 @@ impl UiState {
         }));
     }
 
-    pub fn show_study(&mut self, records: Vec<StudyRecord>) {
+    pub fn show_study(&mut self, records: Vec<StudyRecord>, apply_selection: bool) {
         self.modal = Some(ModalUi::Study(StudyUi {
             records,
             selected: 0,
-            apply_selection: true,
+            page_start: 0,
+            apply_selection,
         }));
     }
 
@@ -273,6 +310,7 @@ impl UiState {
         self.modal = Some(ModalUi::Study(StudyUi {
             records,
             selected: 0,
+            page_start: 0,
             apply_selection: false,
         }));
     }
@@ -347,7 +385,7 @@ impl UiState {
                 menu.selected = offset_clamped(menu.selected, amount, menu.choices.len());
             }
             Some(ModalUi::Study(study)) => {
-                study.selected = offset_clamped(study.selected, amount, study.records.len());
+                move_study_selection(study, amount);
             }
             _ => {}
         }
@@ -398,13 +436,40 @@ impl UiState {
     }
 
     pub fn pointer_click(&mut self, x: i32, y: i32) -> Option<InputEvent> {
+        if let Some(ModalUi::Study(study)) = self.modal.as_mut() {
+            if STUDY_OFF_RECT.contains(x, y) {
+                self.clear();
+                return Some(InputEvent::Cancel);
+            }
+            if STUDY_UP_RECT.contains(x, y) {
+                if study.page_start != 0 {
+                    move_study_selection(study, -(STUDY_ROWS as isize));
+                }
+                return None;
+            }
+            if STUDY_DOWN_RECT.contains(x, y) {
+                if study.page_start + STUDY_ROWS < study.records.len() {
+                    move_study_selection(study, STUDY_ROWS as isize);
+                }
+                return None;
+            }
+            if STUDY_APPLY_RECT.contains(x, y) {
+                if study.apply_selection {
+                    let selector = study.records.get(study.selected)?.selector;
+                    self.clear();
+                    return Some(InputEvent::ApplyStudy(selector));
+                }
+                return None;
+            }
+            if let Some(index) = study_at(study, x, y) {
+                study.selected = index;
+            }
+            return None;
+        }
+
         let input = match self.modal.as_ref()? {
             ModalUi::Dialogue(_) => InputEvent::Confirm,
             ModalUi::Choices(menu) => InputEvent::Choose(choice_at(menu, x, y)?),
-            ModalUi::Study(study) if study.apply_selection => {
-                let index = study_at(study, x, y)?;
-                InputEvent::ApplyStudy(study.records.get(index)?.selector)
-            }
             ModalUi::Study(_) => return None,
             ModalUi::Map(_) if MAP_OFF_RECT.contains(x, y) => InputEvent::Cancel,
             ModalUi::Map(_) => return None,
@@ -434,6 +499,11 @@ fn offset_clamped(current: usize, amount: isize, count: usize) -> usize {
     current
         .saturating_add_signed(amount)
         .min(count.saturating_sub(1))
+}
+
+fn move_study_selection(study: &mut StudyUi, amount: isize) {
+    study.selected = offset_clamped(study.selected, amount, study.records.len());
+    study.page_start = study.selected / STUDY_ROWS * STUDY_ROWS;
 }
 
 fn default_presentation(channel: DialogueChannel) -> [u8; 3] {
@@ -656,29 +726,50 @@ fn art_rect(frame: &ArtFrame, anchor_x: i32, anchor_y: i32) -> Rect {
     }
 }
 
-const STUDY_PANEL: Rect = Rect {
-    x: 12,
-    y: 20,
-    width: 616,
-    height: 360,
+const STUDY_ANCHOR_Y: i32 = 24 * DISPLAY_SCALE as i32;
+const STUDY_LIST_X: i32 = 52 * DISPLAY_SCALE as i32;
+const STUDY_LIST_Y: i32 = 70 * DISPLAY_SCALE as i32;
+const STUDY_LIST_WIDTH: i32 = 128 * DISPLAY_SCALE as i32;
+const STUDY_ROWS: usize = 14;
+const STUDY_CITATION_X: i32 = 172 * DISPLAY_SCALE as i32;
+const STUDY_CITATION_Y: i32 = 61 * DISPLAY_SCALE as i32;
+const STUDY_VERSE_X: i32 = 168 * DISPLAY_SCALE as i32;
+const STUDY_VERSE_Y: i32 = 74 * DISPLAY_SCALE as i32;
+
+const STUDY_OFF_RECT: Rect = Rect {
+    x: 45 * DISPLAY_SCALE as i32,
+    y: 50 * DISPLAY_SCALE as i32,
+    width: 26 * DISPLAY_SCALE as i32,
+    height: 12 * DISPLAY_SCALE as i32,
 };
-const STUDY_LIST_X: i32 = 24;
-const STUDY_LIST_Y: i32 = 58;
-const STUDY_ROWS: usize = 18;
+const STUDY_UP_RECT: Rect = Rect {
+    x: 34 * DISPLAY_SCALE as i32,
+    y: 109 * DISPLAY_SCALE as i32,
+    width: 13 * DISPLAY_SCALE as i32,
+    height: 14 * DISPLAY_SCALE as i32,
+};
+const STUDY_DOWN_RECT: Rect = Rect {
+    x: 34 * DISPLAY_SCALE as i32,
+    y: 130 * DISPLAY_SCALE as i32,
+    width: 13 * DISPLAY_SCALE as i32,
+    height: 14 * DISPLAY_SCALE as i32,
+};
+const STUDY_APPLY_RECT: Rect = Rect {
+    x: 85 * DISPLAY_SCALE as i32,
+    y: 186 * DISPLAY_SCALE as i32,
+    width: 29 * DISPLAY_SCALE as i32,
+    height: 12 * DISPLAY_SCALE as i32,
+};
 
 fn visible_study_range(study: &StudyUi) -> std::ops::Range<usize> {
-    let first = study
-        .selected
-        .saturating_sub(STUDY_ROWS.saturating_sub(1))
-        .min(study.records.len().saturating_sub(STUDY_ROWS));
-    first..(first + STUDY_ROWS).min(study.records.len())
+    study.page_start..(study.page_start + STUDY_ROWS).min(study.records.len())
 }
 
 fn study_at(study: &StudyUi, x: i32, y: i32) -> Option<usize> {
     let list = Rect {
-        x: STUDY_LIST_X - 4,
+        x: STUDY_LIST_X,
         y: STUDY_LIST_Y,
-        width: 190,
+        width: STUDY_LIST_WIDTH,
         height: STUDY_ROWS as i32 * LINE_HEIGHT,
     };
     if !list.contains(x, y) {
@@ -691,35 +782,57 @@ fn study_at(study: &StudyUi, x: i32, y: i32) -> Option<usize> {
 }
 
 fn draw_study(pixels: &mut [u32], study: &StudyUi, assets: &UiAssets, colors: &[u32; 256]) {
-    draw_panel(pixels, STUDY_PANEL, colors);
-    draw_text(
+    pixels.fill(colors[0]);
+    draw_art_frame(
         pixels,
-        24,
-        30,
-        "COMPUTER BIBLE",
-        assets,
-        STYLE_DIALOGUE,
+        &assets.book_art.frames[0],
+        0,
+        STUDY_ANCHOR_Y,
         colors,
     );
-    draw_text(
+    draw_art_frame(
         pixels,
-        458,
-        354,
-        "ENTER: APPLY",
-        assets,
-        STYLE_DIALOGUE,
+        &assets.book_art.frames[2],
+        9 * DISPLAY_SCALE as i32,
+        STUDY_ANCHOR_Y,
         colors,
     );
-    draw_text(pixels, 24, 354, "ESC: OFF", assets, STYLE_DIALOGUE, colors);
+    if study.page_start == 0 {
+        draw_art_frame(
+            pixels,
+            &assets.book_art.frames[5],
+            0,
+            STUDY_ANCHOR_Y,
+            colors,
+        );
+    }
+    if study.page_start + STUDY_ROWS >= study.records.len() {
+        draw_art_frame(
+            pixels,
+            &assets.book_art.frames[6],
+            0,
+            STUDY_ANCHOR_Y,
+            colors,
+        );
+    }
+    if !study.apply_selection || study.records.is_empty() {
+        draw_art_frame(
+            pixels,
+            &assets.book_art.frames[7],
+            0,
+            STUDY_ANCHOR_Y,
+            colors,
+        );
+    }
 
     let range = visible_study_range(study);
     for (row, index) in range.clone().enumerate() {
         let style = if index == study.selected {
-            STYLE_DIALOGUE
+            STYLE_STUDY_SELECTED
         } else {
-            STYLE_CHOICE
+            STYLE_STUDY_UNSELECTED
         };
-        let citation = truncate_chars(&study.records[index].citation, 22);
+        let citation = truncate_to_width(&study.records[index].citation, 100);
         draw_text(
             pixels,
             STUDY_LIST_X,
@@ -732,34 +845,35 @@ fn draw_study(pixels: &mut [u32], study: &StudyUi, assets: &UiAssets, colors: &[
     }
 
     if let Some(record) = study.records.get(study.selected) {
+        let citation = truncate_to_width(&record.citation, 110);
         draw_text(
             pixels,
-            222,
-            58,
-            &record.citation,
+            STUDY_CITATION_X,
+            STUDY_CITATION_Y,
+            &citation,
             assets,
-            STYLE_DIALOGUE,
+            STYLE_STUDY_SELECTED,
             colors,
         );
-        for (line, value) in wrap_text(&record.verse, 192).iter().enumerate() {
+        for (line, value) in wrap_text(&record.verse, 114).iter().enumerate() {
             draw_text(
                 pixels,
-                222,
-                82 + line as i32 * LINE_HEIGHT,
+                STUDY_VERSE_X,
+                STUDY_VERSE_Y + line as i32 * LINE_HEIGHT,
                 value,
                 assets,
-                STYLE_CHOICE,
+                STYLE_STUDY_SELECTED,
                 colors,
             );
         }
     } else {
         draw_text(
             pixels,
-            24,
-            58,
-            "NO OBTAINED VERSES",
+            STUDY_VERSE_X,
+            STUDY_VERSE_Y,
+            "NO VERSES LOADED",
             assets,
-            STYLE_CHOICE,
+            STYLE_STUDY_SELECTED,
             colors,
         );
     }
@@ -933,8 +1047,19 @@ fn composite_map_symbol(destination: &mut ArtFrame, source: &ArtFrame, x: i32, y
     }
 }
 
-fn truncate_chars(value: &str, count: usize) -> String {
-    value.chars().take(count).collect()
+fn truncate_to_width(value: &str, logical_width: usize) -> String {
+    let mut width = 0;
+    value
+        .chars()
+        .take_while(|&character| {
+            let advance = character_advance(character);
+            if width + advance > logical_width {
+                return false;
+            }
+            width += advance;
+            true
+        })
+        .collect()
 }
 
 fn wrap_text(value: &str, logical_width: usize) -> Vec<String> {
@@ -1170,6 +1295,16 @@ mod tests {
         map_frames[1] = frame(64, 27, 15, 16, 2);
         map_frames[51] = frame(1, 4, 73, 37, 51);
         map_frames[62] = frame(65, 120, 69, 29, 62);
+        let book_frames = vec![
+            frame(28, 27, 266, 150, 40),
+            frame(85, 162, 29, 12, 41),
+            frame(36, 26, 26, 12, 42),
+            frame(34, 85, 13, 14, 43),
+            frame(34, 106, 13, 14, 44),
+            frame(34, 85, 13, 14, 45),
+            frame(34, 106, 13, 14, 46),
+            frame(85, 162, 29, 12, 47),
+        ];
         UiAssets {
             font_offsets: font_offsets(&font).unwrap(),
             font,
@@ -1187,6 +1322,9 @@ mod tests {
             ],
             save: frame(297, 1, 20, 17, 11),
             map_art: Art { frames: map_frames },
+            book_art: Art {
+                frames: book_frames,
+            },
         }
     }
 
@@ -1251,6 +1389,7 @@ mod tests {
             (23, 1, 16, 16)
         );
         assert_eq!(assets.map_art.frames.len(), 63);
+        assert_eq!(assets.book_art.frames.len(), 8);
         assert_eq!(
             (
                 assets.map_art.frames[0].origin_x,
@@ -1270,6 +1409,15 @@ mod tests {
                 (hash ^ u64::from(byte)).wrapping_mul(0x100_0000_01b3)
             });
         assert_eq!(checksum, 0x8cd8_aa81_baeb_7526);
+        assert_eq!(
+            (
+                assets.book_art.frames[0].origin_x,
+                assets.book_art.frames[0].origin_y,
+                assets.book_art.frames[0].width,
+                assets.book_art.frames[0].height,
+            ),
+            (28, 27, 266, 150)
+        );
     }
 
     #[test]
@@ -1483,6 +1631,104 @@ mod tests {
         assert_eq!(ui.activate(), None);
         assert_eq!(ui.cancel(), Some(InputEvent::Cancel));
         assert!(!ui.modal_active());
+    }
+
+    #[test]
+    fn bible_modal_replaces_the_scene_with_authored_dos_art() {
+        let mut ui = UiState::default();
+        ui.show_study_browser(Vec::new());
+        let assets = assets();
+        let colors = colors();
+        let mut pixels = vec![0xdead_beef; DISPLAY_WIDTH * DISPLAY_HEIGHT];
+        ui.draw(&mut pixels, &assets, &colors);
+
+        assert_eq!(pixels[0], colors[0]);
+        assert_eq!(pixels[102 * DISPLAY_WIDTH + 56], colors[40]);
+        assert_eq!(pixels[100 * DISPLAY_WIDTH + 90], colors[42]);
+        assert_eq!(pixels[218 * DISPLAY_WIDTH + 68], colors[45]);
+        assert_eq!(pixels[260 * DISPLAY_WIDTH + 68], colors[46]);
+        assert_eq!(pixels[372 * DISPLAY_WIDTH + 170], colors[47]);
+        assert_eq!(pixels[148 * DISPLAY_WIDTH + 336], colors[64]);
+    }
+
+    #[test]
+    fn bible_text_uses_the_dos_coordinates_and_styles() {
+        let mut ui = UiState::default();
+        ui.show_study_browser(vec![
+            StudyRecord {
+                selector: 1,
+                citation: "Test 1:1".into(),
+                verse: "First verse".into(),
+            },
+            StudyRecord {
+                selector: 2,
+                citation: "Test 1:2".into(),
+                verse: "Second verse".into(),
+            },
+        ]);
+        let assets = assets();
+        let colors = colors();
+        let mut pixels = vec![0; DISPLAY_WIDTH * DISPLAY_HEIGHT];
+        ui.draw(&mut pixels, &assets, &colors);
+
+        assert_eq!(pixels[140 * DISPLAY_WIDTH + 104], colors[64]);
+        assert_eq!(pixels[156 * DISPLAY_WIDTH + 104], colors[32]);
+        assert_eq!(pixels[122 * DISPLAY_WIDTH + 344], colors[64]);
+        assert_eq!(pixels[148 * DISPLAY_WIDTH + 336], colors[64]);
+    }
+
+    #[test]
+    fn bible_rows_select_separately_from_apply_and_off() {
+        let records = vec![
+            StudyRecord {
+                selector: 7,
+                citation: "Test 1:1".into(),
+                verse: "First verse".into(),
+            },
+            StudyRecord {
+                selector: 9,
+                citation: "Test 1:2".into(),
+                verse: "Second verse".into(),
+            },
+        ];
+        let mut ui = UiState::default();
+        ui.show_study(records.clone(), true);
+        assert_eq!(
+            ui.pointer_click(STUDY_LIST_X, STUDY_LIST_Y + LINE_HEIGHT),
+            None
+        );
+        assert!(ui.study_active());
+        assert_eq!(
+            ui.pointer_click(STUDY_APPLY_RECT.x, STUDY_APPLY_RECT.y),
+            Some(InputEvent::ApplyStudy(9))
+        );
+
+        ui.show_study(records, true);
+        assert_eq!(
+            ui.pointer_click(STUDY_OFF_RECT.x, STUDY_OFF_RECT.y),
+            Some(InputEvent::Cancel)
+        );
+        assert!(!ui.study_active());
+    }
+
+    #[test]
+    fn bible_page_controls_advance_fourteen_acquired_records() {
+        let records: Vec<_> = (0..16)
+            .map(|selector| StudyRecord {
+                selector,
+                citation: format!("Test {selector}"),
+                verse: "Verse".into(),
+            })
+            .collect();
+        let mut ui = UiState::default();
+        ui.show_study(records, true);
+        assert_eq!(ui.pointer_click(STUDY_DOWN_RECT.x, STUDY_DOWN_RECT.y), None);
+        let study = match ui.modal.as_ref().unwrap() {
+            ModalUi::Study(study) => study,
+            _ => unreachable!(),
+        };
+        assert_eq!((study.selected, study.page_start), (14, 14));
+        assert_eq!(ui.activate(), Some(InputEvent::ApplyStudy(14)));
     }
 
     #[test]

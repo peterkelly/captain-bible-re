@@ -79,6 +79,52 @@ The browser clears both result flags before accepting encounter input. It MUST
 compare stable record selectors, not translated display strings. This keeps
 gameplay identical in every supported translation.
 
+### DOS presentation
+
+The Computer Bible is a full-screen 320-by-200 indexed modal. Opening it
+clears the viewport to palette index zero and suppresses the scene and status
+row. It is not a generic white panel drawn over the current scene. The modal
+loads `BOOK.ART` (resource ID `0x239`) and draws its transparent-zero frames
+with the current scene palette.
+
+`BOOK.ART` contains the following zero-based frames:
+
+| Frame | Descriptor `(x, y, w, h)` | Purpose |
+|---:|---|---|
+| 0 | `(28, 27, 266, 150)` | Complete open-book chassis and enabled controls |
+| 1 | `(85, 162, 29, 12)` | Enabled Apply control |
+| 2 | `(36, 26, 26, 12)` | Off control |
+| 3 | `(34, 85, 13, 14)` | Enabled page-up control |
+| 4 | `(34, 106, 13, 14)` | Enabled page-down control |
+| 5 | `(34, 85, 13, 14)` | Disabled page-up control |
+| 6 | `(34, 106, 13, 14)` | Disabled page-down control |
+| 7 | `(85, 162, 29, 12)` | Disabled Apply control |
+
+Frame 0 and the page and Apply overlays use caller anchor `(0,24)`. Frame 2
+uses caller anchor `(9,24)`. The resulting logical bounds are `(28,51)` for
+the chassis, `(45,50)` for Off, `(34,109)` and `(34,130)` for the arrows, and
+`(85,186)` for Apply. The bottom of the chassis and controls is clipped by the
+200-line viewport exactly as in the DOS renderer.
+
+The acquired-reference list begins at `(52,70)`, contains 14 rows, and uses
+an eight-pixel line pitch. Each reference is clipped to 100 logical pixels.
+The selected row uses text style 5, whose font-atlas values `0,1,2` map to
+palette indexes `0,64,70`; unselected rows use style 6, mapping them to
+`0,32,37`. The selected citation is drawn at `(172,61)` with a 110-pixel
+limit. Its verse begins at `(168,74)`, wraps to 114 logical pixels, and uses
+style 5 with the same eight-pixel pitch. With no acquired records the right
+page displays the executable's exact message `NO VERSES LOADED`; both page
+arrows and Apply use their disabled artwork.
+
+Up and Down move one acquired record and clamp at the ends. Page Up, Page
+Down, and the two artwork arrows move by 14 acquired records. Enter or `A`
+activates Apply only while an encounter has enabled Bible application; the F1
+reference browser always displays disabled Apply artwork and cannot produce a
+study answer. Escape, `O`, or a primary press on Off closes the modal. A
+primary press on a reference row selects that row but does not apply it; a
+separate press on enabled Apply is required. Page and Apply controls ignore
+presses while disabled, and presses outside all authored bounds do nothing.
+
 ## Text expansion
 
 Before display, the engine resolves the selected record/component, expands
