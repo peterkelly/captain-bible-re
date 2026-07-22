@@ -76,6 +76,65 @@ building uses a special view of broken and closed platforms, rooms, and doors.
 During the Unibot sequence, a lower-right map shows the vehicle's node and
 heading.
 
+### F2 map modal
+
+The ordinary F2 map is a 320-by-200 indexed modal built from `MAP.ART`; it is
+not a host-drawn diagram or a panel layered over the current scene. Opening it
+replaces the complete viewport with palette index zero, temporarily suppresses
+the scene and status controls, and draws the composed map using the current
+scene palette. `MAP.ART` has no companion map palette.
+
+Frame numbers below are zero-based resource indexes. Frame 0 is the
+`189`-by-`167` blue enclosure at descriptor origin `(44,26)`, and frame 1 is
+the hinged `OFF` control at `(64,27)`. The engine MUST clone frame 0 for each
+opening. It then composites symbol frames into that clone with source color
+zero transparent. A symbol's destination is:
+
+```text
+destination_x = caller_x + symbol.origin_x
+destination_y = caller_y + symbol.origin_y
+```
+
+The mutated frame 0 and the unchanged frame 1 are then drawn at their own
+descriptor origins. Implementations MUST preserve indexed pixels through this
+composition; substituting generic lines, text, or geometric markers does not
+reproduce the resource artwork.
+
+When exterior-map flag `39` is set, the normal grid is skipped. Frame 51 is
+composited at caller offset `(66,31)`. For each set rescue flag `3A` through
+`40`, the corresponding frame 52 through 58 is composited at the same offset.
+This produces the seven-building city overview and turns rescued buildings
+gold using the authored overlays.
+
+When flag `39` is clear, the engine uses the packed world grid and exploration
+rows as described in the world chapter. Sixteen-column maps first composite
+frame 62 at `(0,0)` for the legend. Each cell uses caller position
+`(64 + 7*x, 34 + 5*y)`. Frames 3 through 18 are the 16 explored connection
+shapes, and frames 24 through 39 are the corresponding unexplored shapes.
+Frames 19 through 21 and 40 through 42 are the explored and unexplored room
+approaches. Explored rooms add their class letter from frames 46 through 50
+(`V`, `T`, `P`, `C`, or `J`). Frames 59 through 61 supply station and special
+level-E markers. The exact frame selection is specified with the packed-map
+model in the world chapter.
+
+Escape, `O`, `o`, or a primary-button press on frame 1 closes the modal. A
+press elsewhere does nothing. Enter does not close it. Arrow keys retain the
+DOS map behavior of snapping the pointer along its five-pixel vertical and
+seven-pixel horizontal grid:
+
+```text
+Up:    y = ((y - 57) / 5) * 5 + 52
+Down:  y = ((y - 57) / 5) * 5 + 62
+Left:  x = ((x - 104) / 7) * 7 + 97
+Right: x = ((x - 104) / 7) * 7 + 111
+```
+
+The divisions truncate toward zero, matching signed 16-bit DOS division.
+The mouse driver or host coordinate layer clamps the result to the logical
+viewport.
+When state flag `52` is set, the ordinary F2 map request is suppressed; the
+late-game vehicle map remains owned by its scene program.
+
 ## Dialogue and menus
 
 A modal message advances on Enter, Escape, or an equivalent click. A choice

@@ -75,8 +75,10 @@ Other important identifiers are:
 | `34` | Flight power. |
 | `37` | Automatic Combat enabled. |
 | `38` | Ordinary combat active; option is locked. |
+| `39` | Select the exterior seven-building overview in the F2 map. |
 | `3A`–`40` | Victims `JELO`, `FEAR`, `CULT`, `LAW`, `RICH`, `DENY`, `NAGE` rescued. |
 | `42`–`48` | Corresponding crew members aboard the Unibot. |
+| `52` | Suppress the ordinary F2 map during the Unibot sequence. |
 | `54` | One-time Annoy Cyber event completed. |
 
 The status bar exposes the five powers as F4 through F8 icons. They are

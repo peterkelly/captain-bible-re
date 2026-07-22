@@ -11,8 +11,8 @@ use crate::graphics::{SCREEN_HEIGHT, SCREEN_WIDTH};
 use std::ffi::{CStr, c_char, c_int, c_void};
 use std::ptr;
 use ui::{
-    DISPLAY_HEIGHT, DISPLAY_SCALE, DISPLAY_WIDTH, StatusBarState, StatusControl, UiAssets, UiState,
-    draw_scene_overlays, status_control_at,
+    DISPLAY_HEIGHT, DISPLAY_SCALE, DISPLAY_WIDTH, MapDirection, StatusBarState, StatusControl,
+    UiAssets, UiState, draw_scene_overlays, status_control_at,
 };
 
 const SDL_INIT_VIDEO: u32 = 0x20;
@@ -77,6 +77,14 @@ unsafe extern "C" {
         x: *mut f32,
         y: *mut f32,
     ) -> bool;
+    fn SDL_RenderCoordinatesToWindow(
+        renderer: *mut SdlRenderer,
+        x: f32,
+        y: f32,
+        window_x: *mut f32,
+        window_y: *mut f32,
+    ) -> bool;
+    fn SDL_WarpMouseInWindow(window: *mut SdlWindow, x: f32, y: f32);
     fn SDL_UpdateTexture(
         texture: *mut SdlTexture,
         rect: *const c_void,
@@ -226,6 +234,7 @@ pub fn run_sdl(engine: &mut Engine) -> Result<()> {
             }
         }
         let mut inputs = Vec::new();
+        let mut map_direction = None;
         let mut key_count = 0;
         let keys = unsafe {
             std::slice::from_raw_parts(SDL_GetKeyboardState(&mut key_count), key_count as usize)
@@ -235,7 +244,7 @@ pub fn run_sdl(engine: &mut Engine) -> Result<()> {
         if rising(40) {
             if let Some(input) = ui.activate() {
                 inputs.push(input);
-            } else {
+            } else if !ui.modal_active() {
                 inputs.push(InputEvent::Confirm);
             }
         }
@@ -269,14 +278,18 @@ pub fn run_sdl(engine: &mut Engine) -> Result<()> {
             inputs.push(InputEvent::QuickSave);
         }
         if rising(82) {
-            if ui.choices_active() || ui.study_active() {
+            if ui.map_active() {
+                map_direction = Some(MapDirection::Up);
+            } else if ui.choices_active() || ui.study_active() {
                 ui.move_selection(-1);
             } else {
                 inputs.push(InputEvent::Action(".u".into()));
             }
         }
         if rising(81) {
-            if ui.choices_active() || ui.study_active() {
+            if ui.map_active() {
+                map_direction = Some(MapDirection::Down);
+            } else if ui.choices_active() || ui.study_active() {
                 ui.move_selection(1);
             } else {
                 inputs.push(InputEvent::Action(".d".into()));
@@ -288,16 +301,28 @@ pub fn run_sdl(engine: &mut Engine) -> Result<()> {
         if rising(78) && ui.study_active() {
             ui.move_selection(18);
         }
-        if rising(80) && !ui.modal_active() {
-            inputs.push(InputEvent::Action(".l".into()));
+        if rising(80) {
+            if ui.map_active() {
+                map_direction = Some(MapDirection::Left);
+            } else if !ui.modal_active() {
+                inputs.push(InputEvent::Action(".l".into()));
+            }
         }
-        if rising(79) && !ui.modal_active() {
-            inputs.push(InputEvent::Action(".r".into()));
+        if rising(79) {
+            if ui.map_active() {
+                map_direction = Some(MapDirection::Right);
+            } else if !ui.modal_active() {
+                inputs.push(InputEvent::Action(".r".into()));
+            }
         }
         for scan in 4..=29 {
             if rising(scan) {
                 if scan == 4 && ui.study_active() {
                     if let Some(input) = ui.activate() {
+                        inputs.push(input);
+                    }
+                } else if scan == 18 && ui.map_active() {
+                    if let Some(input) = ui.cancel() {
                         inputs.push(input);
                     }
                 } else if !ui.modal_active() {
@@ -320,8 +345,32 @@ pub fn run_sdl(engine: &mut Engine) -> Result<()> {
                 &mut logical_y,
             );
         }
-        let display_x = logical_x.round() as i32;
-        let display_y = logical_y.round() as i32;
+        let mut display_x = logical_x.round() as i32;
+        let mut display_y = logical_y.round() as i32;
+        if let Some(direction) = map_direction {
+            let pointer_x =
+                (display_x / DISPLAY_SCALE as i32).clamp(0, (SCREEN_WIDTH - 1) as i32) as i16;
+            let pointer_y =
+                (display_y / DISPLAY_SCALE as i32).clamp(0, (SCREEN_HEIGHT - 1) as i32) as i16;
+            if let Some((target_x, target_y)) =
+                ui.map_pointer_target(direction, pointer_x, pointer_y)
+            {
+                display_x = i32::from(target_x) * DISPLAY_SCALE as i32;
+                display_y = i32::from(target_y) * DISPLAY_SCALE as i32;
+                let (mut window_x, mut window_y) = (0.0f32, 0.0f32);
+                unsafe {
+                    if SDL_RenderCoordinatesToWindow(
+                        sdl.renderer,
+                        display_x as f32,
+                        display_y as f32,
+                        &mut window_x,
+                        &mut window_y,
+                    ) {
+                        SDL_WarpMouseInWindow(sdl.window, window_x, window_y);
+                    }
+                }
+            }
+        }
         if previous_pointer != Some((display_x, display_y)) {
             ui.pointer_move(display_x, display_y);
             previous_pointer = Some((display_x, display_y));
@@ -347,7 +396,9 @@ pub fn run_sdl(engine: &mut Engine) -> Result<()> {
         let elapsed_ms = now.saturating_sub(previous_tick).max(1);
         previous_tick = now;
         let elapsed_units = reference_timer.advance_milliseconds(elapsed_ms);
-        engine.tick_elapsed(inputs, elapsed_units)?;
+        if !ui.map_active() {
+            engine.tick_elapsed(inputs, elapsed_units)?;
+        }
         for event in engine.take_events() {
             match event {
                 EngineEvent::SceneChanged { scene, .. } => {
@@ -403,12 +454,23 @@ fn open_status_control(control: StatusControl, engine: &Engine, ui: &mut UiState
     match control {
         StatusControl::Bible => ui.show_study_browser(engine.available_study_records()),
         StatusControl::Map => {
+            if engine.state.flag(0x52) {
+                return;
+            }
             let explored = std::array::from_fn(|index| engine.state.variables[37 + index] as u16);
+            let mut obtained_text = [false; 256];
+            if let Some(text) = &engine.state.text {
+                for descriptor in &text.descriptors {
+                    obtained_text[usize::from(descriptor.selector)] = descriptor.state != 0;
+                }
+            }
             ui.show_map(
                 engine.state.world.clone(),
                 explored,
-                usize::try_from(engine.state.variables[11]).unwrap_or(0),
-                usize::try_from(engine.state.variables[12]).unwrap_or(0),
+                engine.state.variables[16] as u8,
+                engine.state.flag(0x39),
+                std::array::from_fn(|index| engine.state.flag(0x3a + index as u8)),
+                obtained_text,
             );
         }
         StatusControl::Faith => {

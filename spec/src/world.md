@@ -154,6 +154,32 @@ The F2 map displays the 16×16 layout, connections, known room letters
 Explored areas are gold and unexplored areas gray. The view MUST not itself
 mark new cells explored.
 
+For map levels other than `E`, map rendering visits all rows and columns in
+row-major order. At `(x,y)`, the exploration bit chooses a one-based symbol
+base of 4 when set and 25 when clear. A connected cell composites one-based
+frame `base + (connections >> 4)`. A nonzero zero-mask room instead
+composites `base + 16 + ((kind - 1) % 3)` for its entrance and, when explored,
+one-based frame `47 + ((kind - 1) / 3)` for its class letter. These one-based
+numbers are the DOS drawing-call convention; subtract one to index
+`MAP.ART`.
+
+Connected kinds `6` and `A` add a Scripture-state marker. Kind `A` takes its
+text selector from parameter A; kind `6` takes it from parameter B. If the
+matching text descriptor has nonzero state, one-based frame 4 is composited;
+otherwise one-based frame 60 is used. A missing or zero selector counts as
+not obtained.
+
+Level `E` displays only source columns 8 through 15 at output columns 0
+through 7 and tests exploration bits 8 through 15. It omits the frame-62
+legend. Cells whose complete packed byte has remainder zero modulo three add
+one-based frame 61 when explored or 62 when unexplored. For cells with
+connection nibble `F`, kinds `D`, `F`, and all other kinds respectively use
+adjustments 20, 21, and 19 added to the explored/unexplored base. Kinds `6`
+and `A` then apply the same Scripture-state marker rule, except that their
+parameter B or A selector is read from the corresponding cell in source
+columns 0 through 7. This split-half lookup is intentional. The special
+branch MUST not be approximated by cropping the ordinary 16-column rendering.
+
 The runtime also has a separate opaque 16×16 byte table addressed as
 `16 * y + x`. Opcode `8E` copies bits 0 through 4 of the current entry to
 state flags `23` through `27`. Opcode `91` divides its zero-extended value by

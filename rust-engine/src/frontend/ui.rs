@@ -38,6 +38,7 @@ pub struct UiAssets {
     faith: [ArtFrame; 5],
     powers: [ArtFrame; 5],
     save: ArtFrame,
+    map_art: Art,
 }
 
 impl UiAssets {
@@ -81,6 +82,28 @@ impl UiAssets {
             required_frame(&art, 21, "Flight")?,
         ];
         let save = required_frame(&art, 11, "save")?;
+        let map_art = Art::parse(&archive.read("MAP.ART")?)?;
+        if map_art.frames.len() != 63 {
+            return Err(EngineError::format(
+                "MAP.ART",
+                format!("contains {} frames, expected 63", map_art.frames.len()),
+            ));
+        }
+        for (index, expected) in [
+            (0, (44, 26, 189, 167)),
+            (1, (64, 27, 15, 16)),
+            (51, (1, 4, 73, 37)),
+            (62, (65, 120, 69, 29)),
+        ] {
+            let frame = &map_art.frames[index];
+            let actual = (frame.origin_x, frame.origin_y, frame.width, frame.height);
+            if actual != expected {
+                return Err(EngineError::format(
+                    "MAP.ART",
+                    format!("frame {index} has descriptor {actual:?}, expected {expected:?}"),
+                ));
+            }
+        }
         let font_offsets = font_offsets(&font)?;
         Ok(Self {
             font,
@@ -92,6 +115,7 @@ impl UiAssets {
             faith,
             powers,
             save,
+            map_art,
         })
     }
 }
@@ -191,8 +215,18 @@ struct StudyUi {
 struct MapUi {
     world: WorldMap,
     explored: [u16; 16],
-    current_x: usize,
-    current_y: usize,
+    level: u8,
+    exterior: bool,
+    rescued: [bool; 7],
+    obtained_text: [bool; 256],
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MapDirection {
+    Up,
+    Down,
+    Left,
+    Right,
 }
 
 #[derive(Clone, Debug)]
@@ -247,14 +281,18 @@ impl UiState {
         &mut self,
         world: WorldMap,
         explored: [u16; 16],
-        current_x: usize,
-        current_y: usize,
+        level: u8,
+        exterior: bool,
+        rescued: [bool; 7],
+        obtained_text: [bool; 256],
     ) {
         self.modal = Some(ModalUi::Map(Box::new(MapUi {
             world,
             explored,
-            current_x: current_x.min(15),
-            current_y: current_y.min(15),
+            level,
+            exterior,
+            rescued,
+            obtained_text,
         })));
     }
 
@@ -280,6 +318,27 @@ impl UiState {
 
     pub fn study_active(&self) -> bool {
         matches!(self.modal, Some(ModalUi::Study(_)))
+    }
+
+    pub fn map_active(&self) -> bool {
+        matches!(self.modal, Some(ModalUi::Map(_)))
+    }
+
+    pub fn map_pointer_target(
+        &self,
+        direction: MapDirection,
+        x: i16,
+        y: i16,
+    ) -> Option<(i16, i16)> {
+        self.map_active().then(|| {
+            let (target_x, target_y) = match direction {
+                MapDirection::Up => (x, ((y - 57) / 5) * 5 + 52),
+                MapDirection::Down => (x, ((y - 57) / 5) * 5 + 62),
+                MapDirection::Left => (((x - 104) / 7) * 7 + 97, y),
+                MapDirection::Right => (((x - 104) / 7) * 7 + 111, y),
+            };
+            (target_x.clamp(0, 319), target_y.clamp(0, 199))
+        })
     }
 
     pub fn move_selection(&mut self, amount: isize) {
@@ -318,7 +377,8 @@ impl UiState {
                 InputEvent::ApplyStudy(study.records.get(study.selected)?.selector)
             }
             ModalUi::Study(_) => return None,
-            ModalUi::Map(_) | ModalUi::Notice(_) => InputEvent::Cancel,
+            ModalUi::Map(_) => return None,
+            ModalUi::Notice(_) => InputEvent::Cancel,
             ModalUi::Choices(_) => return None,
         };
         self.clear();
@@ -329,7 +389,8 @@ impl UiState {
         let input = match self.modal.as_ref()? {
             ModalUi::Dialogue(_) => InputEvent::Cancel,
             ModalUi::Study(_) => InputEvent::Cancel,
-            ModalUi::Map(_) | ModalUi::Notice(_) => InputEvent::Cancel,
+            ModalUi::Map(_) => InputEvent::Cancel,
+            ModalUi::Notice(_) => InputEvent::Cancel,
             ModalUi::Choices(_) => return None,
         };
         self.clear();
@@ -345,7 +406,9 @@ impl UiState {
                 InputEvent::ApplyStudy(study.records.get(index)?.selector)
             }
             ModalUi::Study(_) => return None,
-            ModalUi::Map(_) | ModalUi::Notice(_) => InputEvent::Cancel,
+            ModalUi::Map(_) if MAP_OFF_RECT.contains(x, y) => InputEvent::Cancel,
+            ModalUi::Map(_) => return None,
+            ModalUi::Notice(_) => InputEvent::Cancel,
         };
         self.clear();
         Some(input)
@@ -702,98 +765,172 @@ fn draw_study(pixels: &mut [u32], study: &StudyUi, assets: &UiAssets, colors: &[
     }
 }
 
-const MAP_PANEL: Rect = Rect {
-    x: 160,
-    y: 24,
-    width: 320,
-    height: 352,
+const MAP_OFF_RECT: Rect = Rect {
+    x: 64 * DISPLAY_SCALE as i32,
+    y: 27 * DISPLAY_SCALE as i32,
+    width: 15 * DISPLAY_SCALE as i32,
+    height: 16 * DISPLAY_SCALE as i32,
 };
-const MAP_LEFT: i32 = 208;
-const MAP_TOP: i32 = 70;
-const MAP_CELL: i32 = 14;
 
 fn draw_map(pixels: &mut [u32], map: &MapUi, assets: &UiAssets, colors: &[u32; 256]) {
-    draw_panel(pixels, MAP_PANEL, colors);
-    draw_text(pixels, 292, 38, "MAP", assets, STYLE_DIALOGUE, colors);
-    draw_text(pixels, 180, 350, "ESC: OFF", assets, STYLE_DIALOGUE, colors);
+    pixels.fill(colors[0]);
+    let composed = compose_map_frame(map, &assets.map_art);
+    draw_art_frame(pixels, &composed, 0, 0, colors);
+    draw_art_frame(pixels, &assets.map_art.frames[1], 0, 0, colors);
+}
 
-    for y in 0..16 {
-        for x in 0..16 {
-            let cell = map.world.cell(x, y).expect("fixed map coordinates");
-            if cell.packed == 0 {
-                continue;
+fn compose_map_frame(map: &MapUi, art: &Art) -> ArtFrame {
+    let mut destination = art.frames[0].clone();
+    if map.exterior {
+        composite_map_symbol(&mut destination, &art.frames[51], 66, 31);
+        for (index, &rescued) in map.rescued.iter().enumerate() {
+            if rescued {
+                composite_map_symbol(&mut destination, &art.frames[52 + index], 66, 31);
             }
-            let explored = map.explored[y] & (1u16 << x) != 0;
-            let color = if explored { colors[31] } else { colors[7] };
-            let left = MAP_LEFT + x as i32 * MAP_CELL;
-            let top = MAP_TOP + y as i32 * MAP_CELL;
-            let center_x = left + MAP_CELL / 2;
-            let center_y = top + MAP_CELL / 2;
-            fill_rect(
-                pixels,
-                Rect {
-                    x: center_x - 2,
-                    y: center_y - 2,
-                    width: 4,
-                    height: 4,
-                },
-                color,
-            );
-            for (mask, rect) in [
-                (
-                    0x10,
-                    Rect {
-                        x: center_x - 1,
-                        y: top,
-                        width: 2,
-                        height: MAP_CELL / 2,
-                    },
-                ),
-                (
-                    0x20,
-                    Rect {
-                        x: center_x - 1,
-                        y: center_y,
-                        width: 2,
-                        height: MAP_CELL / 2,
-                    },
-                ),
-                (
-                    0x40,
-                    Rect {
-                        x: left,
-                        y: center_y - 1,
-                        width: MAP_CELL / 2,
-                        height: 2,
-                    },
-                ),
-                (
-                    0x80,
-                    Rect {
-                        x: center_x,
-                        y: center_y - 1,
-                        width: MAP_CELL / 2,
-                        height: 2,
-                    },
-                ),
-            ] {
-                if cell.connections() & mask != 0 {
-                    fill_rect(pixels, rect, color);
-                }
+        }
+        return destination;
+    }
+
+    let level_e = map.level.eq_ignore_ascii_case(&b'E');
+    if !level_e {
+        composite_map_symbol(&mut destination, &art.frames[62], 0, 0);
+    }
+    let columns = if level_e { 8 } else { 16 };
+    for y in 0..16 {
+        for output_x in 0..columns {
+            let source_x = output_x + usize::from(level_e) * 8;
+            let cell = map.world.cell(source_x, y).expect("fixed map coordinates");
+            let explored = map.explored[y] & (1u16 << source_x) != 0;
+            let base = if explored { 4usize } else { 25usize };
+            let caller_x = 64 + 7 * output_x as i32;
+            let caller_y = 34 + 5 * y as i32;
+
+            if level_e {
+                let selector_cell = map.world.cell(output_x, y).expect("fixed map coordinates");
+                compose_level_e_cell(
+                    &mut destination,
+                    art,
+                    map,
+                    cell,
+                    selector_cell,
+                    base,
+                    (caller_x, caller_y),
+                );
+            } else {
+                compose_standard_map_cell(
+                    &mut destination,
+                    art,
+                    map,
+                    cell,
+                    base,
+                    caller_x,
+                    caller_y,
+                );
             }
         }
     }
+    destination
+}
 
-    fill_rect(
-        pixels,
-        Rect {
-            x: MAP_LEFT + map.current_x as i32 * MAP_CELL + 3,
-            y: MAP_TOP + map.current_y as i32 * MAP_CELL + 3,
-            width: 8,
-            height: 8,
-        },
-        colors[37],
-    );
+fn compose_standard_map_cell(
+    destination: &mut ArtFrame,
+    art: &Art,
+    map: &MapUi,
+    cell: crate::world::Cell,
+    base: usize,
+    x: i32,
+    y: i32,
+) {
+    if cell.connections() != 0 {
+        composite_one_based(
+            destination,
+            art,
+            base + usize::from(cell.connections() >> 4),
+            x,
+            y,
+        );
+        composite_station_marker(destination, art, map, cell.kind(), cell, x, y);
+        return;
+    }
+    if cell.packed == 0 {
+        return;
+    }
+
+    let adjusted = usize::from(cell.kind() - 1);
+    composite_one_based(destination, art, base + 16 + adjusted % 3, x, y);
+    if base == 4 {
+        composite_one_based(destination, art, 47 + adjusted / 3, x, y);
+    }
+}
+
+fn compose_level_e_cell(
+    destination: &mut ArtFrame,
+    art: &Art,
+    map: &MapUi,
+    cell: crate::world::Cell,
+    selector_cell: crate::world::Cell,
+    base: usize,
+    position: (i32, i32),
+) {
+    let (x, y) = position;
+    if cell.packed.is_multiple_of(3) {
+        composite_one_based(destination, art, if base == 4 { 61 } else { 62 }, x, y);
+    }
+    if cell.connections() != 0xf0 {
+        return;
+    }
+
+    let adjustment = match cell.kind() {
+        0x0d => 20,
+        0x0f => 21,
+        _ => 19,
+    };
+    composite_one_based(destination, art, base + adjustment, x, y);
+    composite_station_marker(destination, art, map, cell.kind(), selector_cell, x, y);
+}
+
+fn composite_station_marker(
+    destination: &mut ArtFrame,
+    art: &Art,
+    map: &MapUi,
+    kind: u8,
+    selector_cell: crate::world::Cell,
+    x: i32,
+    y: i32,
+) {
+    let selector = match kind {
+        0x0a => selector_cell.parameter_a,
+        0x06 => selector_cell.parameter_b,
+        _ => return,
+    };
+    let obtained = selector != 0 && map.obtained_text[usize::from(selector)];
+    composite_one_based(destination, art, if obtained { 4 } else { 60 }, x, y);
+}
+
+fn composite_one_based(destination: &mut ArtFrame, art: &Art, frame: usize, x: i32, y: i32) {
+    composite_map_symbol(destination, &art.frames[frame - 1], x, y);
+}
+
+fn composite_map_symbol(destination: &mut ArtFrame, source: &ArtFrame, x: i32, y: i32) {
+    let destination_width = i32::from(destination.width);
+    let destination_height = i32::from(destination.height);
+    let source_width = usize::from(source.width);
+    let left = x + i32::from(source.origin_x);
+    let top = y + i32::from(source.origin_y);
+    for source_y in 0..usize::from(source.height) {
+        let destination_y = top + source_y as i32;
+        if !(0..destination_height).contains(&destination_y) {
+            continue;
+        }
+        for source_x in 0..source_width {
+            let value = source.pixels[source_y * source_width + source_x];
+            let destination_x = left + source_x as i32;
+            if value != 0 && (0..destination_width).contains(&destination_x) {
+                destination.pixels[destination_y as usize * destination_width as usize
+                    + destination_x as usize] = value;
+            }
+        }
+    }
 }
 
 fn truncate_chars(value: &str, count: usize) -> String {
@@ -1028,6 +1165,11 @@ mod tests {
 
     fn assets() -> UiAssets {
         let font = frame(11, 7, 257, 14, 1);
+        let mut map_frames = vec![frame(0, 0, 1, 1, 0); 63];
+        map_frames[0] = frame(44, 26, 189, 167, 0);
+        map_frames[1] = frame(64, 27, 15, 16, 2);
+        map_frames[51] = frame(1, 4, 73, 37, 51);
+        map_frames[62] = frame(65, 120, 69, 29, 62);
         UiAssets {
             font_offsets: font_offsets(&font).unwrap(),
             font,
@@ -1044,11 +1186,23 @@ mod tests {
                 frame(167, 2, 27, 19, 21),
             ],
             save: frame(297, 1, 20, 17, 11),
+            map_art: Art { frames: map_frames },
         }
     }
 
     fn colors() -> [u32; 256] {
         std::array::from_fn(|index| 0xff00_0000 | index as u32)
+    }
+
+    fn map_ui() -> MapUi {
+        MapUi {
+            world: WorldMap::default(),
+            explored: [0; 16],
+            level: b'C',
+            exterior: false,
+            rescued: [false; 7],
+            obtained_text: [false; 256],
+        }
     }
 
     #[test]
@@ -1095,6 +1249,140 @@ mod tests {
                 assets.map.height,
             ),
             (23, 1, 16, 16)
+        );
+        assert_eq!(assets.map_art.frames.len(), 63);
+        assert_eq!(
+            (
+                assets.map_art.frames[0].origin_x,
+                assets.map_art.frames[0].origin_y,
+                assets.map_art.frames[0].width,
+                assets.map_art.frames[0].height,
+            ),
+            (44, 26, 189, 167)
+        );
+        let mut city = map_ui();
+        city.exterior = true;
+        let composed = compose_map_frame(&city, &assets.map_art);
+        let checksum = composed
+            .pixels
+            .iter()
+            .fold(0xcbf2_9ce4_8422_2325, |hash, &byte| {
+                (hash ^ u64::from(byte)).wrapping_mul(0x100_0000_01b3)
+            });
+        assert_eq!(checksum, 0x8cd8_aa81_baeb_7526);
+    }
+
+    #[test]
+    fn exterior_map_composites_city_and_rescue_frames_at_dos_offsets() {
+        let mut assets = assets();
+        assets.map_art.frames[52] = frame(3, 2, 2, 1, 99);
+        let mut map = map_ui();
+        map.exterior = true;
+        map.rescued[0] = true;
+
+        let composed = compose_map_frame(&map, &assets.map_art);
+        let stride = usize::from(composed.width);
+        assert_eq!(composed.pixels[35 * stride + 67], 51);
+        assert_eq!(composed.pixels[33 * stride + 69], 99);
+        assert_eq!(composed.pixels[33 * stride + 70], 99);
+    }
+
+    #[test]
+    fn ordinary_map_selects_authored_connection_and_room_frames() {
+        let mut assets = assets();
+        assets.map_art.frames[8] = frame(0, 0, 1, 1, 77);
+        assets.map_art.frames[20] = frame(0, 0, 1, 1, 78);
+        assets.map_art.frames[47] = frame(1, 0, 1, 1, 79);
+        let mut raw = [0; crate::world::MAP_SIZE];
+        raw[0] = 0x50;
+        raw[3] = 0x05;
+        let mut map = map_ui();
+        map.world = WorldMap::parse(&raw).unwrap();
+        map.explored[0] = 0b11;
+
+        let composed = compose_map_frame(&map, &assets.map_art);
+        let stride = usize::from(composed.width);
+        assert_eq!(composed.pixels[34 * stride + 64], 77);
+        assert_eq!(composed.pixels[34 * stride + 71], 78);
+        assert_eq!(composed.pixels[34 * stride + 72], 79);
+    }
+
+    #[test]
+    fn scripture_markers_follow_text_state_and_level_e_uses_right_half() {
+        let mut assets = assets();
+        assets.map_art.frames[3] = frame(0, 0, 1, 1, 81);
+        assets.map_art.frames[23] = frame(0, 0, 1, 1, 82);
+        assets.map_art.frames[59] = frame(0, 0, 1, 1, 83);
+        let mut raw = [0; crate::world::MAP_SIZE];
+        raw[0] = 0x1a;
+        raw[1] = 7;
+        raw[3 * 8] = 0xfa;
+        raw[3 * 9] = 0xfd;
+        let mut map = map_ui();
+        map.world = WorldMap::parse(&raw).unwrap();
+
+        let composed = compose_map_frame(&map, &assets.map_art);
+        let stride = usize::from(composed.width);
+        assert_eq!(composed.pixels[34 * stride + 64], 83);
+
+        map.obtained_text[7] = true;
+        let composed = compose_map_frame(&map, &assets.map_art);
+        assert_eq!(composed.pixels[34 * stride + 64], 81);
+
+        map.level = b'E';
+        map.explored[0] = (1 << 8) | (1 << 9);
+        let composed = compose_map_frame(&map, &assets.map_art);
+        assert_eq!(composed.pixels[34 * stride + 64], 81);
+        assert_eq!(composed.pixels[34 * stride + 71], 82);
+    }
+
+    #[test]
+    fn map_modal_only_closes_through_dos_off_actions() {
+        let mut ui = UiState::default();
+        ui.show_map(
+            WorldMap::default(),
+            [0; 16],
+            b'C',
+            true,
+            [false; 7],
+            [false; 256],
+        );
+        assert_eq!(ui.activate(), None);
+        assert_eq!(ui.pointer_click(639, 399), None);
+        assert!(ui.map_active());
+        assert_eq!(
+            ui.pointer_click(MAP_OFF_RECT.x, MAP_OFF_RECT.y),
+            Some(InputEvent::Cancel)
+        );
+        assert!(!ui.map_active());
+    }
+
+    #[test]
+    fn map_arrows_snap_pointer_on_the_dos_grid() {
+        let mut ui = UiState::default();
+        ui.show_map(
+            WorldMap::default(),
+            [0; 16],
+            b'C',
+            false,
+            [false; 7],
+            [false; 256],
+        );
+        assert_eq!(
+            ui.map_pointer_target(MapDirection::Up, 108, 59),
+            Some((108, 52))
+        );
+        assert_eq!(
+            ui.map_pointer_target(MapDirection::Down, 108, 59),
+            Some((108, 62))
+        );
+        assert_eq!(
+            ui.map_pointer_target(MapDirection::Left, 108, 59),
+            Some((97, 59))
+        );
+        assert_eq!(
+            ui.map_pointer_target(MapDirection::Right, 108, 59),
+            Some((111, 59))
         );
     }
 
